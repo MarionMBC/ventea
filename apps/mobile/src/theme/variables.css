@@ -1,0 +1,16 @@
+/*
+ * Tema base. Los colores de marca NO se hardcodean acá: el build por tenant
+ * sobrescribe estas variables desde TenantBranding (ver docs/white-label.md).
+ * Cambiar un valor de este archivo cambia TODAS las marcas.
+ */
+:root {
+  --ion-color-primary: #e23b2e;
+  --ion-color-primary-rgb: 226, 59, 46;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: #c73429;
+  --ion-color-primary-tint: #e54f43;
+
+  --ion-color-secondary: #1f1d1b;
+  --ion-color-secondary-rgb: 31, 29, 27;
+  --ion-color-secondary-contrast: #ffffff;
+}

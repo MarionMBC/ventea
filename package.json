@@ -1,0 +1,32 @@
+{
+  "name": "ventea",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma SaaS multi-tenant de pedidos para restaurantes. Primer tenant: Carolina Hot Chicken.",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml}\"",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run prisma:migrate -w @ventea/api",
+    "db:seed": "npm run prisma:seed -w @ventea/api"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.2",
+    "typescript": "^5.6.2"
+  }
+}

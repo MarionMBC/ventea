@@ -1,0 +1,46 @@
+# dependencias
+node_modules/
+.pnp/
+.pnp.js
+
+# builds
+dist/
+build/
+.output/
+*.tsbuildinfo
+
+# turbo
+.turbo/
+
+# entorno — NUNCA commitear secretos
+.env
+.env.*
+!.env.example
+
+# capacitor / nativo
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/dist/
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# tests / cobertura
+coverage/
+.nyc_output/
+
+# editores y SO
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+
+# grafo de conocimiento (regenerable)
+graphify-out/

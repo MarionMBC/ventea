@@ -1,0 +1,30 @@
+{
+  "name": "@ventea/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "echo \"(sin tests todavía)\" && exit 0"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@ventea/eslint-config": "*",
+    "@ventea/tsconfig": "*",
+    "eslint": "^9.11.0",
+    "typescript": "^5.6.2"
+  }
+}

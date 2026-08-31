@@ -1,0 +1,406 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Ventea — modelo de datos multi-tenant.
+//
+// REGLA INNEGOCIABLE: toda tabla de negocio lleva `tenantId` y todo índice único
+// de negocio lo incluye. Un unique sin tenantId (ej. email global) impediría que
+// dos marcas distintas tengan el mismo cliente, y filtrar por él expondría datos
+// entre tenants. Ver docs/multi-tenancy.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Plataforma (por encima de los tenants) ──────────────────────────────────
+
+/// Nosotros, los que operamos y vendemos el SaaS. Único actor que cruza tenants.
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  @@map("platform_admins")
+}
+
+/// Una marca cliente del SaaS. Carolina Hot Chicken es el tenant #1, no un caso especial.
+model Tenant {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  currency  String   @db.Char(3)
+  timezone  String   @default("America/Santiago")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branding        TenantBranding?
+  rewardProgram   RewardProgram?
+  locations       Location[]
+  categories      MenuCategory[]
+  menuItems       MenuItem[]
+  modifierGroups  ModifierGroup[]
+  modifierOptions ModifierOption[]
+  customers       Customer[]
+  staff           StaffMember[]
+  orders          Order[]
+  rewardEntries   RewardLedgerEntry[]
+  devices         Device[]
+
+  @@map("tenants")
+}
+
+/// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.
+model TenantBranding {
+  tenantId       String  @id
+  logoUrl        String?
+  primaryColor   String  @default("#E23B2E")
+  secondaryColor String  @default("#1F1D1B")
+  appDisplayName String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_branding")
+}
+
+// ─── Sucursales ──────────────────────────────────────────────────────────────
+
+model Location {
+  id        String  @id @default(uuid())
+  tenantId  String
+  name      String
+  address   String
+  latitude  Float
+  longitude Float
+  phone     String?
+  /// Horario semanal como JSON: [{ day: 0-6, opens: "11:00", closes: "23:00" }]
+  openingHours Json?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([tenantId, isActive])
+  @@map("locations")
+}
+
+// ─── Catálogo ────────────────────────────────────────────────────────────────
+
+model MenuCategory {
+  id        String  @id @default(uuid())
+  tenantId  String
+  name      String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  MenuItem[]
+
+  @@index([tenantId, sortOrder])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String  @id @default(uuid())
+  tenantId    String
+  categoryId  String
+  name        String
+  description String?
+  imageUrl    String?
+  /// Precio en la unidad mínima de la moneda (centavos). Nunca decimal flotante.
+  basePriceCents Int
+  isAvailable    Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category       MenuCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  modifierGroups MenuItemModifierGroup[]
+  orderLines     OrderLine[]
+
+  @@index([tenantId, categoryId])
+  @@index([tenantId, isAvailable])
+  @@map("menu_items")
+}
+
+model ModifierGroup {
+  id        String @id @default(uuid())
+  tenantId  String
+  name      String
+  minSelect Int    @default(0)
+  maxSelect Int    @default(1)
+
+  tenant  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  options ModifierOption[]
+  items   MenuItemModifierGroup[]
+
+  @@index([tenantId])
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id       String @id @default(uuid())
+  tenantId String
+  groupId  String
+  name     String
+  /// Puede ser negativo: quitar un ingrediente puede descontar.
+  priceDeltaCents Int     @default(0)
+  isAvailable     Boolean @default(true)
+  sortOrder       Int     @default(0)
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group            ModifierGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orderLineOptions OrderLineOption[]
+
+  @@index([tenantId, groupId])
+  @@map("modifier_options")
+}
+
+/// Tabla puente: un grupo de modificadores se reutiliza en varios productos.
+model MenuItemModifierGroup {
+  menuItemId String
+  groupId    String
+  sortOrder  Int    @default(0)
+
+  menuItem MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, groupId])
+  @@map("menu_item_modifier_groups")
+}
+
+// ─── Personas ────────────────────────────────────────────────────────────────
+
+/// Cliente final. El email es único POR TENANT: la misma persona puede tener
+/// cuenta en dos marcas distintas y son cuentas separadas.
+model Customer {
+  id           String  @id @default(uuid())
+  tenantId     String
+  email        String
+  phone        String?
+  passwordHash String?
+  firstName    String?
+  lastName     String?
+  /// Habilitó desbloqueo biométrico en algún dispositivo (el secreto vive en el device, no acá).
+  biometricEnabled Boolean   @default(false)
+  emailVerifiedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  rewardEntries RewardLedgerEntry[]
+  devices       Device[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("customers")
+}
+
+/// Empleado de la marca: usa el panel administrativo, no la app de cliente.
+model StaffMember {
+  id           String     @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String
+  role         TenantRole @default(staff)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@map("staff_members")
+}
+
+enum TenantRole {
+  owner
+  manager
+  staff
+}
+
+/// Dispositivo registrado: destino de push y ancla del login biométrico.
+model Device {
+  id         String         @id @default(uuid())
+  tenantId   String
+  customerId String
+  platform   DevicePlatform
+  pushToken  String?
+  /// Identificador de la credencial biométrica. El secreto nunca sale del dispositivo.
+  biometricKeyId String?
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerId])
+  @@map("devices")
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+// ─── Pedidos ─────────────────────────────────────────────────────────────────
+
+model Order {
+  id         String  @id @default(uuid())
+  tenantId   String
+  locationId String
+  customerId String?
+
+  /// Código corto que se canta en el mostrador. Único dentro del tenant.
+  code            String
+  status          OrderStatus     @default(draft)
+  paymentStatus   PaymentStatus   @default(pending)
+  fulfillmentType FulfillmentType
+
+  subtotalCents Int @default(0)
+  discountCents Int @default(0)
+  taxCents      Int @default(0)
+  totalCents    Int @default(0)
+
+  pointsEarned   Int @default(0)
+  pointsRedeemed Int @default(0)
+
+  customerNotes String?
+  scheduledFor  DateTime?
+  placedAt      DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location      Location            @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  customer      Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lines         OrderLine[]
+  rewardEntries RewardLedgerEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId, placedAt])
+  @@index([tenantId, locationId, placedAt])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  draft
+  pending_payment
+  confirmed
+  preparing
+  ready
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  paid
+  refunded
+  failed
+}
+
+enum FulfillmentType {
+  pickup
+  dine_in
+  delivery
+}
+
+/// Línea de pedido. Guarda SNAPSHOT de nombre y precio: si mañana sube el precio
+/// o se borra el producto, el pedido histórico y su boleta no pueden cambiar.
+model OrderLine {
+  id             String  @id @default(uuid())
+  tenantId       String
+  orderId        String
+  menuItemId     String?
+  nameSnapshot   String
+  quantity       Int
+  unitPriceCents Int
+  totalCents     Int
+  notes          String?
+
+  order    Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem?         @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  options  OrderLineOption[]
+
+  @@index([tenantId, orderId])
+  @@map("order_lines")
+}
+
+model OrderLineOption {
+  id              String  @id @default(uuid())
+  tenantId        String
+  orderLineId     String
+  optionId        String?
+  nameSnapshot    String
+  priceDeltaCents Int
+
+  orderLine OrderLine       @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+  option    ModifierOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, orderLineId])
+  @@map("order_line_options")
+}
+
+// ─── Puntos y recompensas ────────────────────────────────────────────────────
+
+/// Reglas del programa de puntos: cada marca configura el suyo.
+model RewardProgram {
+  tenantId  String  @id
+  isEnabled Boolean @default(false)
+  /// Puntos otorgados por unidad monetaria gastada (ej. 1.0 = 1 punto por peso).
+  pointsPerCurrencyUnit Float @default(1)
+  /// Valor en centavos de 1 punto al canjear.
+  redemptionValueCents Int      @default(1)
+  minPointsToRedeem    Int      @default(0)
+  signupBonusPoints    Int      @default(0)
+  updatedAt            DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("reward_programs")
+}
+
+/// Libro contable append-only de puntos. El saldo es SUM(points), nunca un
+/// contador mutable: así toda variación queda con causa y es auditable.
+model RewardLedgerEntry {
+  id         String  @id @default(uuid())
+  tenantId   String
+  customerId String
+  orderId    String?
+  /// Positivo acredita, negativo debita.
+  points    Int
+  reason    RewardLedgerReason
+  note      String?
+  createdAt DateTime           @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, customerId, createdAt])
+  @@map("reward_ledger_entries")
+}
+
+enum RewardLedgerReason {
+  order_earned
+  redemption
+  manual_adjustment
+  expiration
+  signup_bonus
+}

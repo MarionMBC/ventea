@@ -1,0 +1,77 @@
+# Ventea
+
+Plataforma SaaS multi-tenant de pedidos para restaurantes: menú público, carrito,
+checkout, cuenta de cliente, historial de pedidos, programa de puntos, sucursales
+y panel administrativo.
+
+**Primer cliente: Carolina Hot Chicken.** El producto no está construido *para*
+Carolina — Carolina es el tenant `carolina-hot-chicken`, el primero de muchos. Nada
+de lo que se escriba acá puede asumir una sola marca: ese es el activo que se revende.
+
+## Estructura
+
+```
+apps/
+  api/       NestJS + Prisma + PostgreSQL — API multi-tenant
+  mobile/    Ionic React + Capacitor — app de cliente (iOS, Android, web)
+  admin/     React + Vite — panel de gestión del tenant (desktop)
+packages/
+  shared/         contratos zod + vocabulario de dominio, compartidos por los tres
+  tsconfig/       configuraciones base de TypeScript
+  eslint-config/  reglas de lint compartidas
+docs/           arquitectura, multi-tenancy, decisiones (ADR)
+```
+
+## Arranque
+
+Requisitos: Node 22+, npm 10+, Docker.
+
+```bash
+cp .env.example .env          # completar JWT_SECRET
+npm install
+npm run db:up                 # PostgreSQL en Docker
+npm run db:migrate            # crea el esquema
+npm run db:seed               # 2 tenants de prueba (ver nota abajo)
+npm run dev                   # api :3000 · mobile :5173 · admin :5174
+```
+
+La semilla crea **dos** tenants a propósito: `carolina-hot-chicken` y `demo-burgers`.
+Con un solo tenant en la base, un bug de aislamiento es invisible.
+
+### App nativa
+
+```bash
+npm run build -w @ventea/mobile
+npx cap add android   # o ios — una sola vez
+npm run cap:sync -w @ventea/mobile
+npm run cap:android -w @ventea/mobile
+```
+
+Capacidades nativas en uso: biometría (desbloqueo de sesión), push, geolocalización
+puntual (ordenar sucursales por cercanía — **no** hay tracking continuo) y cámara.
+Todas pasan por la fachada `apps/mobile/src/lib/native/`; las features nunca importan
+`@capacitor/*` directo.
+
+## La regla que no se negocia
+
+Toda tabla de negocio lleva `tenantId`, y toda consulta filtra por él. No es estilo:
+un `where` sin `tenantId` muestra los pedidos de una marca a otra. `PrismaService`
+tiene un guard que revienta en desarrollo cuando falta.
+
+Detalle completo en [docs/multi-tenancy.md](docs/multi-tenancy.md).
+
+## Documentación
+
+| Documento | Qué responde |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | Cómo encajan las tres apps y por dónde va un request |
+| [docs/multi-tenancy.md](docs/multi-tenancy.md) | Aislamiento entre marcas, resolución de tenant, camino a RLS |
+| [docs/data-model.md](docs/data-model.md) | Entidades, por qué hay snapshots y por qué los puntos son un libro contable |
+| [docs/white-label.md](docs/white-label.md) | Cómo se produce una app con la marca de cada cliente |
+| [docs/adr/](docs/adr/) | Decisiones tomadas y qué se descartó |
+
+## Estado
+
+Esqueleto: estructura, configuración, modelo de datos, contratos compartidos y CI.
+Sin features implementadas todavía — los directorios `features/` y `modules/` están
+vacíos a propósito, con la nomenclatura ya fijada.
