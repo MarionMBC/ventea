@@ -1,0 +1,13 @@
+# Normalizar finales de línea: el repo guarda LF siempre.
+# Sin esto, en Windows cada archivo entra con CRLF y todo diff se ve como
+# "archivo completo modificado".
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.keystore binary
+*.jks binary
