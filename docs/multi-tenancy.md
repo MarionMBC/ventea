@@ -6,11 +6,11 @@ columna `tenantId`.
 
 ## Por qué `tenantId` y no una base por cliente
 
-| Estrategia | Aislamiento | Costo operativo | Elegida |
-|---|---|---|---|
-| `tenantId` por fila | Lógico, en la aplicación | Una DB, una migración | **Sí** |
-| Schema por tenant | Fuerte en Postgres | Migración por schema, N schemas | No |
-| DB por tenant | Total | Infra y costo por cliente | No |
+| Estrategia          | Aislamiento              | Costo operativo                 | Elegida |
+| ------------------- | ------------------------ | ------------------------------- | ------- |
+| `tenantId` por fila | Lógico, en la aplicación | Una DB, una migración           | **Sí**  |
+| Schema por tenant   | Fuerte en Postgres       | Migración por schema, N schemas | No      |
+| DB por tenant       | Total                    | Infra y costo por cliente       | No      |
 
 Con `tenantId`: una migración corre una vez para todos, el costo por cliente nuevo es
 cero, y agregar un tenant es un `INSERT`. El precio es que el aislamiento depende del
@@ -49,11 +49,16 @@ this.prisma.order.findMany({ where: { tenantId, status: 'confirmed' } });
 this.prisma.order.findMany({ where: { status: 'confirmed' } });
 ```
 
-### 3. Guard en Prisma — `apps/api/src/prisma/prisma.service.ts`
+### 3. Guard en Prisma — `apps/api/src/prisma/prisma.client.ts`
 
-Un middleware de Prisma inspecciona cada consulta de negocio y verifica que el `where`
-incluya `tenantId`. En desarrollo lanza una excepción; en producción registra el
-incidente sin tumbar el request.
+Una extensión de cliente (`$extends`) intercepta cada consulta de negocio y verifica que
+el `where` incluya `tenantId`. En desarrollo lanza una excepción; en producción registra
+el incidente sin tumbar el request.
+
+Es una extensión y no el viejo `$use`: Prisma 7 eliminó los middleware. Como `$extends`
+devuelve un objeto nuevo en vez de mutar el cliente, el cliente se provee por fábrica
+bajo el token `PRISMA` — una clase que heredara de `PrismaClient` no podría llevar la
+extensión consigo.
 
 Es una **red de seguridad, no el mecanismo**. Detecta el olvido, no lo corrige: no puede
 adivinar de qué tenant es una consulta que no lo dice.

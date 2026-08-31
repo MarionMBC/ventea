@@ -1,21 +1,21 @@
-import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
   app.use(helmet());
   app.setGlobalPrefix('api');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.enableShutdownHooks();
 
   // El subdominio identifica al tenant: sin trust proxy, detrás de un balanceador
-  // se lee el host interno y todos los requests caen en el mismo tenant.
+  // se lee el host interno y TODOS los requests caen en el mismo tenant.
   app.set('trust proxy', 1);
 
   app.enableCors({

@@ -29,4 +29,6 @@ de dependencias y cacheando lo que no cambió.
 
 - Un cambio de contrato rompe el typecheck de las tres apps en el mismo CI, antes del merge.
 - El CI instala todo el árbol aunque se toque una sola app.
+- La raíz declara `packageManager: npm@11.16.0`. Turborepo se niega a resolver el
+  workspace sin ese campo, y además fija la versión de npm para todos.
 - Migrar a pnpm más adelante: `pnpm import` y borrar `package-lock.json`.

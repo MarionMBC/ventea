@@ -8,7 +8,7 @@ const queryClient = new QueryClient();
  * así que el tenant sale del subdominio y NO hay selector de marca en la UI:
  * un usuario de staff pertenece a un solo tenant.
  */
-export function App(): JSX.Element {
+export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

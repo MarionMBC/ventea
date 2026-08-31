@@ -45,6 +45,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      # Los scripts de Prisma leen el .env de la raíz vía dotenv-cli, así que en CI
+      # hay que materializarlo: sin este archivo, `dotenv -e ../../.env` falla.
+      - name: Preparar .env
+        run: |
+          cat > .env <<EOF
+          NODE_ENV=test
+          DATABASE_URL=${DATABASE_URL}
+          JWT_SECRET=${JWT_SECRET}
+          DEFAULT_TENANT_SLUG=carolina-hot-chicken
+          EOF
+
       - name: Instalar dependencias
         run: npm ci
 

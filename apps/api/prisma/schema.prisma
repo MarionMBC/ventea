@@ -11,9 +11,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Prisma 7: la URL de conexion ya no vive en el schema. Migrate la lee de
+// prisma.config.ts y el cliente la recibe por adapter (ver src/prisma/prisma.service.ts).
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Plataforma (por encima de los tenants) ──────────────────────────────────

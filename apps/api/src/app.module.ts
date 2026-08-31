@@ -18,9 +18,6 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // Se aplica a TODO. Excluir una ruta acá es dejarla sin aislamiento de tenant:
     // solo van las rutas de plataforma, que por definición cruzan tenants.
-    consumer
-      .apply(TenantMiddleware)
-      .exclude('health', 'platform/(.*)')
-      .forRoutes('*');
+    consumer.apply(TenantMiddleware).exclude('health', 'platform/(.*)').forRoutes('*');
   }
 }

@@ -5,10 +5,16 @@
  * segundo tenant de prueba. Con un solo tenant en la base, un bug de aislamiento
  * es invisible — todo "funciona" porque no hay con qué mezclarse.
  */
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) throw new Error('Falta DATABASE_URL');
+
+// La semilla usa el cliente crudo, sin el guard de tenant: es el unico lugar
+// que legitimamente crea filas antes de que exista un tenant al cual filtrar.
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 async function seedTenant(input: {
   slug: string;

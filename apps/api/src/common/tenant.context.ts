@@ -20,9 +20,7 @@ export const CurrentTenant = createParamDecorator(
     if (!tenant) {
       // Programación defensiva: si esto salta, una ruta quedó fuera del middleware.
       // Preferimos romper antes que servir datos sin filtrar por tenant.
-      throw new Error(
-        'No hay tenant en el request. Toda ruta debe pasar por TenantMiddleware.',
-      );
+      throw new Error('No hay tenant en el request. Toda ruta debe pasar por TenantMiddleware.');
     }
 
     return tenant;

@@ -19,12 +19,12 @@
     "test": "echo \"(sin tests todavía)\" && exit 0"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@ventea/eslint-config": "*",
     "@ventea/tsconfig": "*",
-    "eslint": "^9.11.0",
-    "typescript": "^5.6.2"
+    "eslint": "^10.9.1",
+    "typescript": "^5.9.3"
   }
 }

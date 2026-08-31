@@ -1,26 +1,27 @@
-import { Injectable, NotFoundException, type NestMiddleware } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, type NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TENANT_HEADER } from '@ventea/shared';
 import type { NextFunction, Request, Response } from 'express';
 
 import { TENANT_REQUEST_KEY } from '@/common/tenant.context';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PRISMA } from '@/prisma/prisma.module';
+import type { PrismaClientExtended } from '@/prisma/prisma.client';
 
 /**
  * Resuelve el tenant de CADA request antes que cualquier controlador.
  *
  * Orden de resolución:
- *   1. Subdominio  — `carolina-hot-chicken.ventea.app` (web pública)
+ *   1. Subdominio  — `carolina-hot-chicken.ventea.app` (web pública, panel)
  *   2. Header      — `X-Tenant-Slug` (apps nativas: no tienen host propio)
- *   3. Fallback    — DEFAULT_TENANT_SLUG, SOLO en desarrollo
+ *   3. Fallback    — DEFAULT_TENANT_SLUG, SOLO fuera de producción
  *
  * El slug jamás se toma del body ni de un query param: son campos que el cliente
- * controla en cualquier request y permitirían saltar de tenant a voluntad.
+ * controla en cada request y permitirían saltar de tenant a voluntad.
  */
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly config: ConfigService,
   ) {}
 
@@ -37,7 +38,8 @@ export class TenantMiddleware implements NestMiddleware {
     });
 
     if (!tenant || !tenant.isActive) {
-      // Mismo error para "no existe" y "suspendido": no revelamos qué marcas existen.
+      // Mismo error para "no existe" y "suspendido": distinguirlos permitiría
+      // enumerar qué marcas usan la plataforma.
       throw new NotFoundException('Tenant no encontrado');
     }
 

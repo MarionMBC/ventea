@@ -20,13 +20,13 @@ Cliente nuevo = un `INSERT` y un registro DNS. Sin despliegue.
 Acá no hay atajo. Las tiendas exigen un bundle id propio, y el ícono y el nombre se
 compilan dentro del artefacto:
 
-| Qué | Fuente |
-|---|---|
-| `appId` (bundle id) | `VENTEA_APP_ID` — ej. `app.ventea.carolina` |
-| Nombre visible | `VENTEA_APP_NAME` |
-| Tenant fijo | `VITE_DEFAULT_TENANT_SLUG` (viaja en `X-Tenant-Slug`) |
-| Colores | `VITE_*` de branding, inyectados al build |
-| Ícono y splash | assets por marca, resueltos antes de `cap sync` |
+| Qué                 | Fuente                                                |
+| ------------------- | ----------------------------------------------------- |
+| `appId` (bundle id) | `VENTEA_APP_ID` — ej. `app.ventea.carolina`           |
+| Nombre visible      | `VENTEA_APP_NAME`                                     |
+| Tenant fijo         | `VITE_DEFAULT_TENANT_SLUG` (viaja en `X-Tenant-Slug`) |
+| Colores             | `VITE_*` de branding, inyectados al build             |
+| Ícono y splash      | assets por marca, resueltos antes de `cap sync`       |
 
 `capacitor.config.ts` ya lee esas variables. El pipeline por marca queda por armar:
 
