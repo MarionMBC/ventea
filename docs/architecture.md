@@ -1,5 +1,9 @@
 # Arquitectura
 
+> **Despliegue**: cada cliente corre esta pila completa en su propio VPS. Lo que sigue
+> describe una instancia; ver [deployment.md](deployment.md) para cómo se instala y se
+> actualiza.
+
 ## Piezas
 
 ```
@@ -9,8 +13,9 @@
 │  + Capacitor     │   │  (desktop)       │
 │  cliente final   │   │  staff del local │
 └────────┬─────────┘   └────────┬─────────┘
-         │  X-Tenant-Slug       │  subdominio
-         │  + Bearer JWT        │  + Bearer JWT
+         │  Bearer JWT          │  Bearer JWT
+         │  (+ X-Tenant-Slug    │  (+ subdominio en
+         │   en modo multi)     │   modo multi)
          └──────────┬───────────┘
                     ▼
          ┌──────────────────────┐
@@ -18,7 +23,7 @@
          │  TenantMiddleware    │  ← resuelve tenant ANTES de todo
          │  Guards de rol       │
          │  Servicios           │
-         │  PrismaService       │  ← guard de tenantId
+         │  cliente Prisma      │  ← guard de tenantId ($extends)
          └──────────┬───────────┘
                     ▼
             ┌───────────────┐
@@ -30,14 +35,15 @@
 
 ## Por dónde va un request
 
-1. **TenantMiddleware** resuelve el tenant (subdominio, header o fallback de desarrollo)
-   y lo deja en el request. Sin tenant, 404 — no llega a ningún controlador.
+1. **TenantMiddleware** resuelve el tenant y lo deja en el request. En producción
+   (`TENANT_MODE=single`) sale de la configuración de la instancia; en modo `multi`, del
+   subdominio o del header. Sin tenant, 404 — no llega a ningún controlador.
 2. **Guard de autenticación** valida el JWT. El token incluye el `tenantId`: si no
    coincide con el tenant resuelto, se rechaza. Un token robado de otra marca no sirve.
 3. **Guard de rol** para rutas de staff (`owner` / `manager` / `staff`).
 4. **Controlador** valida el body con el schema zod de `packages/shared`.
 5. **Servicio** consulta con `tenantId` explícito en el `where`.
-6. **PrismaService** verifica que ese filtro exista.
+6. La **extensión del cliente Prisma** verifica que ese filtro exista.
 
 ## Por qué tres apps y no una
 
@@ -80,6 +86,6 @@ plugins no existen.
   integración y el webhook de confirmación.
 - **Almacenamiento de imágenes**: el catálogo guarda `imageUrl`; falta decidir dónde
   viven los archivos.
-- **Facturación del SaaS**: cómo se le cobra a cada tenant. No hay modelo todavía.
+- **Facturación**: cómo se le cobra a cada cliente. No hay modelo todavía.
 - **Delivery**: el enum `fulfillmentType` lo contempla, pero no hay logística ni
   repartidores — quedó fuera del alcance acordado.

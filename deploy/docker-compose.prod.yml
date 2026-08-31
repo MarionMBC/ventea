@@ -1,0 +1,90 @@
+# Instancia completa de un cliente. Se copia este archivo y su .env al VPS.
+#
+# Todo lo que un cliente necesita corre acá: base de datos, API, front estático y
+# el proxy que termina TLS. Un cliente = un VPS = este compose.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d
+#
+# Postgres NO publica puerto al host: solo se llega por la red interna. Exponer
+# 5432 en un VPS es ofrecer la base al primer escaneo de internet.
+
+name: ventea
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Aplica las migraciones y termina. La API espera a que salga con código 0:
+  # arrancar la API contra un esquema viejo produce errores que parecen bugs.
+  migrate:
+    image: ${IMAGE_API}
+    restart: 'no'
+    working_dir: /app/apps/api
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: ${IMAGE_API}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      TENANT_MODE: ${TENANT_MODE:-single}
+      TENANT_SLUG: ${TENANT_SLUG}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: ${IMAGE_WEB}
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # Caddy obtiene y renueva el certificado TLS solo, contra Let's Encrypt.
+  # Requiere que el DNS del dominio ya apunte al VPS antes de levantarlo.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  pgdata:
+  caddy-data: # certificados TLS: perder este volumen fuerza a reemitirlos
+  caddy-config:

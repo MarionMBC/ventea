@@ -1,0 +1,51 @@
+# ─── Etapa de build ──────────────────────────────────────────────────────────
+FROM node:22-bookworm-slim AS build
+
+WORKDIR /repo
+
+# Se copian solo los manifiestos primero: mientras no cambien, Docker reutiliza
+# la capa de node_modules y el build no vuelve a bajar el arbol entero.
+COPY package.json package-lock.json turbo.json ./
+COPY packages/tsconfig/package.json      packages/tsconfig/
+COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/shared/package.json        packages/shared/
+COPY apps/api/package.json               apps/api/
+COPY apps/mobile/package.json            apps/mobile/
+COPY apps/admin/package.json             apps/admin/
+
+RUN npm ci
+
+COPY . .
+
+RUN npm run build -w @ventea/shared \
+ && npm run prisma:generate -w @ventea/api \
+ && npm run build -w @ventea/api
+
+# ─── Etapa de ejecucion ──────────────────────────────────────────────────────
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+
+# openssl lo necesitan los motores de Prisma; dumb-init hace de PID 1 para que
+# SIGTERM llegue a Node y el contenedor cierre limpio en vez de a los 10s.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl dumb-init \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=build /repo/node_modules              ./node_modules
+COPY --from=build /repo/packages/shared/dist      ./packages/shared/dist
+COPY --from=build /repo/packages/shared/package.json ./packages/shared/
+COPY --from=build /repo/apps/api/dist             ./apps/api/dist
+COPY --from=build /repo/apps/api/package.json     ./apps/api/
+COPY --from=build /repo/apps/api/prisma           ./apps/api/prisma
+COPY --from=build /repo/apps/api/prisma.config.ts ./apps/api/
+
+# No correr como root: si alguien escapa del proceso, no hereda la maquina.
+USER node
+
+EXPOSE 3000
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/api/dist/main.js"]

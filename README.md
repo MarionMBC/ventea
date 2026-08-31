@@ -8,9 +8,19 @@ y panel administrativo.
 Carolina — Carolina es el tenant `carolina-hot-chicken`, el primero de muchos. Nada
 de lo que se escriba acá puede asumir una sola marca: ese es el activo que se revende.
 
+## Modelo de despliegue
+
+**Cada cliente corre su propia instancia en su VPS u hosting**: base de datos, API y
+front completos, con su dominio y su certificado. No hay una nube central de Ventea.
+
+La API arranca en `TENANT_MODE=single` con el slug fijado por configuración; el modo
+`multi` (tenant por subdominio) queda para desarrollo y para alojar clientes chicos
+juntos si conviene. Ver [docs/deployment.md](docs/deployment.md).
+
 ## Estructura
 
 ```
+deploy/    Dockerfiles, compose de producción, Caddy y scripts de operación
 apps/
   api/       NestJS + Prisma + PostgreSQL — API multi-tenant
   mobile/    Ionic React + Capacitor — app de cliente (iOS, Android, web)
@@ -75,6 +85,7 @@ Detalle completo en [docs/multi-tenancy.md](docs/multi-tenancy.md).
 | [docs/multi-tenancy.md](docs/multi-tenancy.md) | Aislamiento entre marcas, resolución de tenant, camino a RLS                |
 | [docs/data-model.md](docs/data-model.md)       | Entidades, por qué hay snapshots y por qué los puntos son un libro contable |
 | [docs/white-label.md](docs/white-label.md)     | Cómo se produce una app con la marca de cada cliente                        |
+| [docs/deployment.md](docs/deployment.md)       | Cómo se instala y se actualiza la instancia de un cliente en su VPS         |
 | [docs/adr/](docs/adr/)                         | Decisiones tomadas y qué se descartó                                        |
 
 ## Estado
@@ -98,9 +109,14 @@ npm run db:seed
 Hasta que ese directorio tenga la migración, el paso `prisma migrate deploy` del CI
 corre en vacío y la base queda sin tablas.
 
+También falta el script de alta de tenant (`create-tenant`) y el workflow que publique
+las imágenes `ventea-api` y `ventea-web` en un registry.
+
 ### Decisiones abiertas
 
 - **Pagos**: proveedor sin elegir (el modelo ya tiene `paymentStatus`)
 - **Imágenes del catálogo**: dónde viven los archivos
-- **Facturación del SaaS**: cómo se le cobra a cada tenant
+- **Facturación**: cómo se le cobra a cada cliente (licencia, soporte, o ambos)
 - **Publicación en tiendas**: cuenta propia o del cliente (ver `docs/white-label.md`)
+- **Quién administra el VPS**: nosotros o el cliente. Define quién aplica los parches
+  del sistema operativo y quién responde cuando el servidor se cae.

@@ -1,0 +1,28 @@
+# Caddy resuelve TLS solo (Let's Encrypt). El DNS del dominio tiene que apuntar
+# al VPS ANTES de levantar el contenedor: si no, el desafio ACME falla y Caddy
+# reintenta con backoff, dejando el sitio sin certificado por varios minutos.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# La API va primero: una ruta mas especifica gana sobre el catch-all del front.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

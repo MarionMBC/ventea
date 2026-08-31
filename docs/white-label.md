@@ -2,18 +2,21 @@
 
 Cómo el mismo código llega a la tienda de aplicaciones con la cara de cada cliente.
 
-## Web: una sola instancia
+## Web: una instancia por cliente
 
-El menú público y el panel se sirven desde el mismo despliegue. El subdominio determina
-el tenant, y el branding (`TenantBranding`) llega en la respuesta de la API y se aplica
-como variables CSS en tiempo de ejecución:
+El menú público y el panel se sirven desde el VPS del propio cliente, bajo su dominio
+(ver [deployment.md](deployment.md)). El branding (`TenantBranding`) llega en la
+respuesta de la API y se aplica como variables CSS en tiempo de ejecución, así que la
+misma imagen de contenedor se ve distinta en cada instalación:
 
 ```
-carolina-hot-chicken.ventea.app  →  rojo, logo de Carolina
-demo-burgers.ventea.app          →  azul, logo de Demo
+pedidos.carolinahotchicken.cl  →  rojo, logo de Carolina
+pedidos.otramarca.cl           →  azul, logo de la otra marca
 ```
 
-Cliente nuevo = un `INSERT` y un registro DNS. Sin despliegue.
+Cliente nuevo = un despliegue en su VPS + el `INSERT` del tenant. Si en algún momento se
+alojan clientes chicos juntos en una instancia nuestra (`TENANT_MODE=multi`), ahí sí
+alcanza con el `INSERT` y un subdominio.
 
 ## Nativo: un binario por marca
 

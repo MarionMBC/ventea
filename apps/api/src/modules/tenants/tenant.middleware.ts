@@ -10,13 +10,20 @@ import type { PrismaClientExtended } from '@/prisma/prisma.client';
 /**
  * Resuelve el tenant de CADA request antes que cualquier controlador.
  *
- * Orden de resolución:
- *   1. Subdominio  — `carolina-hot-chicken.ventea.app` (web pública, panel)
- *   2. Header      — `X-Tenant-Slug` (apps nativas: no tienen host propio)
- *   3. Fallback    — DEFAULT_TENANT_SLUG, SOLO fuera de producción
+ * Hay dos modos de despliegue, y cambian de dónde sale el tenant:
  *
- * El slug jamás se toma del body ni de un query param: son campos que el cliente
- * controla en cada request y permitirían saltar de tenant a voluntad.
+ * `TENANT_MODE=single` — el caso normal. La instancia corre en el VPS de un
+ *   cliente y atiende UNA marca. El slug se fija en `TENANT_SLUG` y no se lee
+ *   de la petición: nada que mande el cliente puede cambiarlo.
+ *
+ * `TENANT_MODE=multi` — varias marcas en la misma instancia (hosting nuestro,
+ *   clientes chicos). El tenant sale, en este orden:
+ *     1. Subdominio  — `carolina-hot-chicken.ventea.app`
+ *     2. Header      — `X-Tenant-Slug` (apps nativas: no tienen host propio)
+ *     3. Fallback    — `DEFAULT_TENANT_SLUG`, SOLO fuera de producción
+ *
+ * En ningún modo el slug sale del body ni de un query param: son campos que el
+ * cliente controla en cada petición y permitirían saltar de tenant a voluntad.
  */
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
@@ -52,6 +59,16 @@ export class TenantMiddleware implements NestMiddleware {
   }
 
   private resolveSlug(req: Request): string | undefined {
+    if (this.config.get<string>('TENANT_MODE', 'single') === 'single') {
+      const slug = this.config.get<string>('TENANT_SLUG');
+      if (!slug) {
+        // Sin esto, una instancia mal configurada caería al modo multi y
+        // empezaría a resolver el tenant por subdominio sin que nadie lo note.
+        throw new Error('TENANT_MODE=single exige TENANT_SLUG');
+      }
+      return slug;
+    }
+
     const baseDomain = this.config.get<string>('TENANT_BASE_DOMAIN');
     const host = req.hostname;
 
