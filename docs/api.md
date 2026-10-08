@@ -49,6 +49,30 @@ No hay revocación del lado del servidor: cerrar sesión es descartar los tokens
   retirar. Pasa a `paid` al completarse.
 - **Solo `pickup` y `dine_in`:** `delivery` responde 400 porque no hay direcciones.
 
+### Reintentos seguros: `Idempotency-Key`
+
+`POST /api/orders` acepta el header opcional `Idempotency-Key`: de 8 a 128 caracteres
+`[A-Za-z0-9_-]` (un UUID sirve). La app genera una clave por intento de compra y la repite
+en cada reintento de ese mismo pedido. Así, si se pierde la respuesta, reintentar no crea un
+segundo pedido ni debita los puntos dos veces.
+
+| Caso                                   | Respuesta                                                 |
+| -------------------------------------- | --------------------------------------------------------- |
+| Clave nueva                            | `201` con el pedido creado                                |
+| Misma clave y mismo cuerpo (reintento) | `200` con el pedido original, en su estado actual         |
+| Misma clave y otro cuerpo              | `409 "Idempotency-Key reutilizada con otro pedido"`       |
+| Clave con formato inválido             | `400`                                                     |
+| Sin header                             | `201`: cada POST crea un pedido (comportamiento anterior) |
+
+- La clave es **por cliente**: la misma clave usada por otro cliente u otra marca no choca.
+- "Mismo cuerpo" se compara después de validar: un orden distinto de los campos o campos que
+  la API ignora no cuentan como cambio. Un cambio en las líneas, opciones, cantidades, sucursal,
+  canje o notas, sí.
+- Un reintento devuelve el pedido original aunque el menú haya cambiado desde entonces.
+- Requests concurrentes con la misma clave dejan un solo pedido: los demás reciben `200` con él.
+- CORS: la API refleja los headers pedidos en el preflight, así que `Idempotency-Key` está
+  permitido desde los orígenes habilitados.
+
 ## Puntos
 
 | Método | Ruta                   |                                      |
