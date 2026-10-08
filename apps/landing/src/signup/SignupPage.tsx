@@ -7,7 +7,7 @@ import { IntervalToggle } from '@/landing/IntervalToggle';
 import { ApiError, NETWORK_ERROR_MESSAGE, signup } from '@/lib/api';
 import { formatDate, formatUsd, MIN_PASSWORD_LENGTH, priceFor, slugify } from '@/lib/format';
 import { locationsLabel } from '@/lib/plans';
-import { track, trackOnce } from '@/lib/track';
+import { trackOnce } from '@/lib/track';
 import { FEATURED_PLAN, usePlans } from '@/lib/usePlans';
 
 import { PasswordField } from './PasswordField';
@@ -149,7 +149,6 @@ export function SignupPage({ search = window.location.search }: { search?: strin
         acceptedTermsVersion: TERMS_VERSION,
       });
       setDone(response);
-      track('signup_complete');
     } catch (error) {
       const status = error instanceof ApiError ? error.status : 0;
       if (status === 409 && unansweredSlug.current === slug) {

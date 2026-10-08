@@ -249,8 +249,10 @@ cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login
   `https://<slug>.<TENANT_BASE_DOMAIN>/api/health` con verificación TLS normal (timeout 3 s) y
   cachea la respuesta 10 s por slug. Solo slugs existentes y activos: no sirve para sondear hosts
   arbitrarios. La pantalla de éxito del registro la consulta cada 5 s.
-- **Embudo (`analytics`):** `event` ∈ `visit · cta_click · signup_start · signup_step_2 ·
-signup_step_3 · signup_complete`. Body estricto (un campo extra es `400`). Se guarda solo
+- **Embudo (`analytics`):** el endpoint público acepta `event` ∈ `visit · cta_click ·
+signup_start · signup_step_2 · signup_step_3` (lista blanca, body estricto: un campo extra o
+  `signup_complete` es `400`). `signup_complete` lo suma la API al crear una marca por el
+  registro (después del commit, sin bloquear el alta). Se guarda solo
   `funnel_daily_counts (day, event, count)`, con el día en `America/Tegucigalpa`; la IP solo la
   usa el rate limit en memoria. La landing lo manda con `navigator.sendBeacon`.
 - **Detalle de marca:** incluye `openAttempts` (`{orderId, kind, status, amountCents,

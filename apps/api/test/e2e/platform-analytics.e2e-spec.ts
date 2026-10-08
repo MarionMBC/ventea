@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import type { INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { FUNNEL_EVENT, funnelReportSchema, platformAuthResponseSchema } from '@ventea/shared';
+import {
+  FUNNEL_EVENT,
+  funnelReportSchema,
+  platformAuthResponseSchema,
+  PUBLIC_FUNNEL_EVENT,
+} from '@ventea/shared';
 import argon2 from 'argon2';
 import request from 'supertest';
 
@@ -59,8 +64,8 @@ describe('Embudo de registro: POST /api/platform/analytics/event (TASK-007 AC4)'
     expect(await countToday(prisma, 'cta_click')).toBeGreaterThanOrEqual(1);
   });
 
-  it('acepta los tipos del embudo; muchos eventos simultáneos no se pierden', async () => {
-    for (const event of FUNNEL_EVENT) {
+  it('acepta los tipos públicos del embudo; muchos eventos simultáneos no se pierden', async () => {
+    for (const event of PUBLIC_FUNNEL_EVENT) {
       await http().post('/api/platform/analytics/event').send({ event }).expect(204);
     }
     const before = await countToday(prisma, 'signup_step_2');
@@ -83,6 +88,13 @@ describe('Embudo de registro: POST /api/platform/analytics/event (TASK-007 AC4)'
       .send({ event: 'visit', email: 'ana@correo.com' })
       .expect(400);
     await http().post('/api/platform/analytics/event').send({ event: 'compra' }).expect(400);
+    // `signup_complete` lo cuenta la API al crear la marca: desde afuera no se puede inflar.
+    const before = await countToday(prisma, 'signup_complete');
+    await http()
+      .post('/api/platform/analytics/event')
+      .send({ event: 'signup_complete' })
+      .expect(400);
+    expect(await countToday(prisma, 'signup_complete')).toBe(before);
     await http().post('/api/platform/analytics/event').send({}).expect(400);
   });
 

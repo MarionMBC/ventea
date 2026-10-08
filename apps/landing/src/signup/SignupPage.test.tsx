@@ -153,13 +153,9 @@ describe('Registro (AC2)', () => {
       website: '',
       acceptedTermsVersion: TERMS_VERSION,
     });
-    // Embudo: un evento por paso y el registro completo; ningún dato del formulario.
-    expect(await beaconEvents()).toEqual([
-      'signup_start',
-      'signup_step_2',
-      'signup_step_3',
-      'signup_complete',
-    ]);
+    // Embudo: un evento por paso y ningún dato del formulario. El registro completo lo cuenta
+    // la API al crear la marca, no el navegador.
+    expect(await beaconEvents()).toEqual(['signup_start', 'signup_step_2', 'signup_step_3']);
   });
 
   it('valida los datos del dueño antes de enviar (contraseña de 10+)', async () => {

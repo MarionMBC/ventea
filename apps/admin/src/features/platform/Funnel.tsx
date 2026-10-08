@@ -117,8 +117,9 @@ export function Funnel() {
             </table>
           </div>
           <p className="pf-muted">
-            Contadores propios de la landing: sin cookies, sin IP ni datos personales. «Visitas»
-            cuenta una por pestaña; los pasos, una vez por pestaña.
+            Contadores propios de la landing: sin cookies, sin IP ni datos personales. «Visitas» y
+            los pasos cuentan una vez por pestaña; «Registros» los cuenta la API al crear cada
+            marca.
           </p>
         </>
       )}

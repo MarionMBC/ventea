@@ -112,8 +112,21 @@ export const FUNNEL_EVENT = [
   'signup_complete',
 ] as const;
 
+/**
+ * Eventos que puede mandar la landing (lista blanca del endpoint público). `signup_complete`
+ * NO está: lo cuenta la API al crear la marca (`createdVia: 'signup'`), así no se infla desde
+ * afuera y no depende de que el navegador alcance a mandarlo.
+ */
+export const PUBLIC_FUNNEL_EVENT = [
+  'visit',
+  'cta_click',
+  'signup_start',
+  'signup_step_2',
+  'signup_step_3',
+] as const satisfies readonly (typeof FUNNEL_EVENT)[number][];
+
 /** Body de `POST /api/platform/analytics/event`. Estricto: un campo extra es un 400. */
-export const funnelEventInputSchema = z.strictObject({ event: z.enum(FUNNEL_EVENT) });
+export const funnelEventInputSchema = z.strictObject({ event: z.enum(PUBLIC_FUNNEL_EVENT) });
 
 export const funnelReportQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).default(30),
@@ -229,6 +242,7 @@ export type SlugAvailability = z.infer<typeof slugAvailabilitySchema>;
 export type TermsVersion = (typeof TERMS_VERSIONS)[number];
 export type TenantReady = z.infer<typeof tenantReadySchema>;
 export type FunnelEvent = (typeof FUNNEL_EVENT)[number];
+export type PublicFunnelEvent = (typeof PUBLIC_FUNNEL_EVENT)[number];
 export type FunnelEventInput = z.infer<typeof funnelEventInputSchema>;
 export type FunnelReportQuery = z.infer<typeof funnelReportQuerySchema>;
 export type FunnelReport = z.infer<typeof funnelReportSchema>;

@@ -10,10 +10,22 @@ import {
 } from '@ventea/shared';
 import request from 'supertest';
 
+import { dayIn } from '@/modules/platform/funnel-report';
+
 import { createApp, createRawPrisma, seedTenant, type TestTenant } from './helpers';
 
 const OWNER_PASSWORD = 'dueno-password-123';
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** `signup_complete` de hoy en el embudo (lo suma la API al crear la marca). */
+async function signupsCountedToday(prisma: PrismaClient): Promise<number> {
+  const row = await prisma.funnelDailyCount.findUnique({
+    where: {
+      day_event: { day: new Date(`${dayIn(new Date())}T00:00:00Z`), event: 'signup_complete' },
+    },
+  });
+  return row?.count ?? 0;
+}
 
 function signupBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -101,6 +113,7 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
   it('el registro crea la marca completa en prueba de 14 días, sin header de tenant', async () => {
     const body = signupBody();
     const before = Date.now();
+    const completedBefore = await signupsCountedToday(prisma);
     const response = await http().post('/api/platform/signup').send(body).expect(201);
 
     const result = signupResponseSchema.parse(response.body);
@@ -148,6 +161,8 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
     });
     expect(tenant.subscription?.trialEndsAt?.getTime()).toBe(result.trialEndsAt.getTime());
     expect(tenant.billingEvents).toEqual([expect.objectContaining({ type: 'trial_started' })]);
+    // TASK-007: el embudo cuenta el registro completo desde la API.
+    expect(await signupsCountedToday(prisma)).toBe(completedBefore + 1);
     // TASK-007: queda registrada la versión de términos aceptada y cuándo.
     expect(tenant.termsVersion).toBe(TERMS_VERSION);
     expect(tenant.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
