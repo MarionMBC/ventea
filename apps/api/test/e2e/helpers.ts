@@ -56,6 +56,9 @@ export async function seedTenant(
 ): Promise<TestTenant> {
   const slug = `${base}-${randomUUID().slice(0, 8)}`;
   const staffEmail = `owner@${slug}.test`;
+  // Como la migración y create-tenant: toda marca nace con suscripción activa.
+  const chain = await prisma.plan.findUniqueOrThrow({ where: { code: 'chain' } });
+  const now = new Date();
 
   const tenant = await prisma.tenant.create({
     data: {
@@ -78,6 +81,15 @@ export async function seedTenant(
           passwordHash: await argon2.hash(STAFF_PASSWORD),
           name: 'Dueño',
           role: 'owner',
+        },
+      },
+      subscription: {
+        create: {
+          planId: chain.id,
+          interval: 'year',
+          status: 'active',
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
         },
       },
     },

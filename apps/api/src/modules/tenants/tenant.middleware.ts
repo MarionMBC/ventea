@@ -4,23 +4,28 @@ import { TENANT_HEADER } from '@ventea/shared';
 import type { NextFunction, Request, Response } from 'express';
 
 import { TENANT_REQUEST_KEY } from '@/common/tenant.context';
+import {
+  SUBSCRIPTION_REQUEST_KEY,
+  type SubscriptionContext,
+} from '@/modules/subscriptions/subscription.context';
 import { PRISMA } from '@/prisma/prisma.module';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 
 /**
- * Resuelve el tenant de CADA request antes que cualquier controlador.
+ * Resuelve el tenant de CADA request antes que cualquier controlador. En la misma
+ * consulta trae el estado de la suscripción, que mira después el SubscriptionMiddleware.
  *
  * Hay dos modos de despliegue, y cambian de dónde sale el tenant:
  *
- * `TENANT_MODE=single` — el caso normal. La instancia corre en el VPS de un
- *   cliente y atiende UNA marca. El slug se fija en `TENANT_SLUG` y no se lee
- *   de la petición: nada que mande el cliente puede cambiarlo.
- *
- * `TENANT_MODE=multi` — varias marcas en la misma instancia (hosting nuestro,
- *   clientes chicos). El tenant sale, en este orden:
+ * `TENANT_MODE=multi` — producción (SaaS, ADR 0007): todas las marcas en la misma
+ *   instancia. El tenant sale, en este orden:
  *     1. Subdominio  — `carolina-hot-chicken.ventea.tech`
  *     2. Header      — `X-Tenant-Slug` (apps nativas: no tienen host propio)
  *     3. Fallback    — `DEFAULT_TENANT_SLUG`, SOLO fuera de producción
+ *
+ * `TENANT_MODE=single` — instalación dedicada a UNA marca (excepcional). El slug se
+ *   fija en `TENANT_SLUG` y no se lee de la petición: nada que mande el cliente puede
+ *   cambiarlo.
  *
  * En ningún modo el slug sale del body ni de un query param: son campos que el
  * cliente controla en cada petición y permitirían saltar de tenant a voluntad.
@@ -41,7 +46,12 @@ export class TenantMiddleware implements NestMiddleware {
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },
-      select: { id: true, slug: true, isActive: true },
+      select: {
+        id: true,
+        slug: true,
+        isActive: true,
+        subscription: { select: { id: true, status: true, trialEndsAt: true } },
+      },
     });
 
     if (!tenant || !tenant.isActive) {
@@ -50,10 +60,10 @@ export class TenantMiddleware implements NestMiddleware {
       throw new NotFoundException('Tenant no encontrado');
     }
 
-    (req as unknown as Record<string, unknown>)[TENANT_REQUEST_KEY] = {
-      tenantId: tenant.id,
-      slug: tenant.slug,
-    };
+    const request = req as unknown as Record<string, unknown>;
+    request[TENANT_REQUEST_KEY] = { tenantId: tenant.id, slug: tenant.slug };
+    const subscription: SubscriptionContext | null = tenant.subscription;
+    request[SUBSCRIPTION_REQUEST_KEY] = subscription;
 
     next();
   }

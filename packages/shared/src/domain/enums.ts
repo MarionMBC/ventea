@@ -39,3 +39,34 @@ export const REWARD_LEDGER_REASON = [
   'signup_bonus',
 ] as const;
 export type RewardLedgerReason = (typeof REWARD_LEDGER_REASON)[number];
+
+/**
+ * Suscripción del SaaS (ADR 0007). `trialing` y `active` atienden; el resto deja la API
+ * pública de la marca en 402 (el staff sigue entrando al panel para pagar).
+ */
+export const SUBSCRIPTION_STATUS = [
+  'trialing',
+  'active',
+  'past_due', // prueba vencida o cobro fallido: falta pagar
+  'suspended', // suspendida a mano o por falta de pago
+  'canceled',
+] as const;
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUS)[number];
+
+export const BILLING_INTERVAL = ['month', 'year'] as const;
+export type BillingInterval = (typeof BILLING_INTERVAL)[number];
+
+/** Planes del SaaS. Precios y límites viven en la tabla `plans`, no acá. */
+export const PLAN_CODE = ['basic', 'pro', 'chain'] as const;
+export type PlanCode = (typeof PLAN_CODE)[number];
+
+export const BILLING_EVENT_TYPE = [
+  'trial_started',
+  'trial_extended',
+  'trial_expired',
+  'plan_changed',
+  'suspended',
+  'reactivated',
+  'canceled',
+] as const;
+export type BillingEventType = (typeof BILLING_EVENT_TYPE)[number];
