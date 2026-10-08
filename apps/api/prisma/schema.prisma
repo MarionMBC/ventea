@@ -283,6 +283,10 @@ model Order {
   pointsRedeemed Int @default(0)
 
   customerNotes String?
+  /// Header Idempotency-Key del POST que creó el pedido (único por cliente).
+  idempotencyKey         String?
+  /// sha256 del cuerpo validado: misma clave con otro cuerpo es un error del cliente.
+  idempotencyRequestHash String?
   scheduledFor  DateTime?
   placedAt      DateTime?
   completedAt   DateTime?
@@ -296,6 +300,7 @@ model Order {
   rewardEntries RewardLedgerEntry[]
 
   @@unique([tenantId, code])
+  @@unique([tenantId, customerId, idempotencyKey])
   @@index([tenantId, status])
   @@index([tenantId, customerId, placedAt])
   @@index([tenantId, locationId, placedAt])

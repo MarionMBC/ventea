@@ -25,6 +25,17 @@ export const createOrderSchema = z.object({
   customerNotes: z.string().max(500).optional(),
 });
 
+/**
+ * Header opcional de `POST /api/orders`. Un reintento con la misma clave (del mismo
+ * cliente) devuelve el pedido ya creado en vez de crear otro: una respuesta perdida
+ * no duplica pedido ni canje de puntos. La app genera una clave por intento de compra.
+ */
+export const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
+
+export const idempotencyKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{8,128}$/, 'Idempotency-Key: 8 a 128 caracteres [A-Za-z0-9_-]');
+
 export const orderLineSchema = z.object({
   id: z.string().uuid(),
   // null si el producto se borró del menú después del pedido (la FK queda en SetNull)
