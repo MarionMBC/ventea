@@ -2,6 +2,9 @@ import { authTokensSchema, TENANT_HEADER } from '@ventea/shared';
 
 import type { SessionStore } from './session';
 
+/** Tiempo máximo de una request antes de tratarla como error de red. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /**
  * Error de la API con el status HTTP. `status = 0` es un error de red (sin respuesta).
  * `message` es el de la API (`{statusCode, message, error}`), listo para mostrar.
@@ -97,12 +100,22 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (token) headers.Authorization = `Bearer ${token}`;
     if (tenantSlug) headers[TENANT_HEADER] = tenantSlug;
 
+    // Tope de 15 s por request: un PATCH colgado pausa el polling del tablero (no se
+    // recarga mientras hay un cambio en vuelo), así que sin tope un pedido nuevo
+    // podría no aparecer hasta que el navegador corte la conexión.
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    // `AbortSignal.any` falta en navegadores viejos (Safari < 17.4): ahí manda la señal
+    // de quien llama, que react-query cancela al desmontar.
+    const combined =
+      signal && typeof AbortSignal.any === 'function'
+        ? AbortSignal.any([signal, timeout])
+        : (signal ?? timeout);
     try {
       return await doFetch(`${baseUrl}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal,
+        signal: combined,
       });
     } catch (error) {
       if (signal?.aborted) throw error;

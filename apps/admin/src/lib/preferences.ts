@@ -58,16 +58,18 @@ export function getSoundStatus(): SoundStatus {
  * Para `useSyncExternalStore`: crea el AudioContext (solo mientras el sonido está
  * activado) y escucha el primer toque para reanudarlo.
  */
+const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown'] as const;
+
 export function subscribeSound(listener: () => void): () => void {
   ensureContext();
   listeners.add(listener);
-  document.addEventListener('pointerdown', unlockOnGesture);
-  document.addEventListener('keydown', unlockOnGesture);
+  // `pointerdown` no cuenta como gesto de activación de audio en pantallas táctiles:
+  // hacen falta `click`/`touchend` para que tocar cualquier botón de la tablet sirva.
+  for (const event of UNLOCK_EVENTS) document.addEventListener(event, unlockOnGesture);
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
-      document.removeEventListener('pointerdown', unlockOnGesture);
-      document.removeEventListener('keydown', unlockOnGesture);
+      for (const event of UNLOCK_EVENTS) document.removeEventListener(event, unlockOnGesture);
     }
   };
 }
