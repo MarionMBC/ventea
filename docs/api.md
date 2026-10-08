@@ -138,6 +138,12 @@ city?, line1?, state?, zip?, phone?, email?}}`. Tokeniza y cobra el próximo per
   (`BILLING_RATE_LIMIT_PER_HOUR`), más de 10 por IP y día entre todas las marcas
   (`BILLING_IP_RATE_LIMIT_PER_DAY`), o 3 tarjetas rechazadas seguidas (bloqueo de 24 h con
   alerta `billing_alert`).
+- **Eventos que ve el dueño:** solo los tipos de la lista blanca `OWNER_BILLING_EVENT_TYPE`
+  (`packages/shared/src/domain/enums.ts`), con `{type, description, amountCents, status,
+createdAt}`. `description` la genera la API desde el tipo («Pago registrado», «Cobro
+  rechazado por el banco»…); el `message` interno (email del admin, referencia, notas,
+  orderId) nunca sale. `billing_alert`, `payment_unknown` y cualquier tipo nuevo quedan solo
+  para la plataforma.
 - **El número y el CVV nunca se guardan, ni se loguean, ni vuelven en una respuesta.** Se
   guarda el token de la pasarela, el `networkTransactionId` del primer cobro, marca, últimos 4
   y vencimiento. El logger de la API tacha PAN y CVV como red de seguridad.
@@ -230,6 +236,11 @@ cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login
   mismo origen (Traefik manda `ventea.tech/api/*` a la API). En producción el CORS acepta
   además el apex `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio
   (`src/cors-origins.ts`), por si la landing se sirve aparte y llama a `api.ventea.tech`.
+- **Detalle de marca:** incluye `openAttempts` (`{orderId, kind, status, amountCents,
+createdAt}` de los cobros `pending`/`unknown`/`needs_review`): son los que se cierran con
+  `resolve-payment`.
+- **record-payment idempotente:** la misma `reference` (sin espacios extremos ni mayúsculas)
+  en la misma marca → `409 "Ese pago ya fue registrado"`. En otra marca es otro pago.
 - **Token de plataforma:** lleva `ver` (`PlatformAdmin.tokenVersion`); resetear la clave lo sube
   y todos los tokens vivos dejan de valer.
 - **Región:** la asigna `REGIONS` por país: el del body, si no `CF-IPCountry` / `X-Country`.
