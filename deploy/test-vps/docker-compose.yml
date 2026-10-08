@@ -37,6 +37,9 @@ services:
       TENANT_SLUG: ${TENANT_SLUG}
       TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN}
       PUBLIC_ORIGIN: https://${HOST}
+      # SaaS (TASK-004). Opcionales: vacías = default (región hn-1, 5 registros/hora por IP).
+      REGIONS: ${REGIONS:-}
+      SIGNUP_RATE_LIMIT_PER_HOUR: ${SIGNUP_RATE_LIMIT_PER_HOUR:-}
     networks: [internal, dokploy-network]
     depends_on:
       postgres: { condition: service_healthy }
