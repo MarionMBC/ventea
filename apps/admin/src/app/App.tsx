@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 const queryClient = new QueryClient();
 
 /**
- * Panel de gestión del tenant. El staff entra en `<slug>.ventea.app/admin`,
+ * Panel de gestión del tenant. El staff entra en `<slug>.ventea.tech/admin`,
  * así que el tenant sale del subdominio y NO hay selector de marca en la UI:
  * un usuario de staff pertenece a un solo tenant.
  */

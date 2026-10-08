@@ -77,7 +77,8 @@ openssl rand -base64 48   # JWT_SECRET
 docker compose -f docker-compose.prod.yml --env-file .env up -d
 
 # 5 · Crear el tenant y su usuario dueño
-docker compose exec api node apps/api/dist/scripts/create-tenant.js   # pendiente
+docker compose exec api node apps/api/dist/scripts/create-tenant.js \
+  --slug carolina-hot-chicken --name "Carolina Hot Chicken" --owner-email dueno@ejemplo.com
 
 # 6 · Verificar contra el sitio publicado, no contra la salida del comando
 curl https://<dominio>/api/health
@@ -163,8 +164,6 @@ Lo que cuesta, y hay que tenerlo previsto antes del tercer cliente:
 
 ## Qué falta
 
-- **Script de alta de tenant** (`create-tenant`): hoy solo existe la semilla de
-  desarrollo, que crea dos tenants de prueba.
 - **Publicación de imágenes**: falta el workflow que construya y publique
   `ventea-api` y `ventea-web` etiquetadas por versión en un registry.
 - **Endpoint de versión en el front**: el `/api/health` ya devuelve la de la API; falta

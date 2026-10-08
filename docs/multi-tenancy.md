@@ -25,7 +25,7 @@ tenant genera volumen que degrada a los demás.
 
 Corre antes que cualquier controlador y resuelve el tenant en este orden:
 
-1. **Subdominio** — `carolina-hot-chicken.ventea.app` (web pública, panel admin)
+1. **Subdominio** — `carolina-hot-chicken.ventea.tech` (web pública, panel admin)
 2. **Header `X-Tenant-Slug`** — apps nativas, que no tienen host propio
 3. **`DEFAULT_TENANT_SLUG`** — **solo** fuera de producción
 

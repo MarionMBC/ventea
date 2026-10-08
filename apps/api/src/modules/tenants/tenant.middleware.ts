@@ -18,7 +18,7 @@ import type { PrismaClientExtended } from '@/prisma/prisma.client';
  *
  * `TENANT_MODE=multi` — varias marcas en la misma instancia (hosting nuestro,
  *   clientes chicos). El tenant sale, en este orden:
- *     1. Subdominio  — `carolina-hot-chicken.ventea.app`
+ *     1. Subdominio  — `carolina-hot-chicken.ventea.tech`
  *     2. Header      — `X-Tenant-Slug` (apps nativas: no tienen host propio)
  *     3. Fallback    — `DEFAULT_TENANT_SLUG`, SOLO fuera de producción
  *
