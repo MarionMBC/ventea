@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   DEFAULT_REWARD_PROGRAM,
@@ -12,7 +19,7 @@ import {
 import argon2 from 'argon2';
 
 import { addDays, TRIAL_DAYS } from '@/modules/subscriptions/subscription-state';
-import type { PrismaClientExtended } from '@/prisma/prisma.client';
+import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
@@ -20,6 +27,18 @@ import { toPlan } from './platform.mapper';
 import { RegionService } from './region.service';
 
 const SLUG_TAKEN = 'Ese subdominio ya está en uso';
+export const SIGNUP_CLOSED = 'Registro temporalmente cerrado, escríbenos';
+
+/**
+ * Cupo GLOBAL de altas self-service (TASK-004 review). Cada alta es un certificado
+ * Let's Encrypt HTTP-01 y Let's Encrypt da 50 por dominio y semana: sin tope, un abuso
+ * desde muchas IPs (el rate limit es por IP) dejaría sin certificado a marcas reales.
+ * Se cuenta en la base (no en memoria): vale entre reinicios y entre réplicas.
+ */
+const DEFAULT_SIGNUP_WEEKLY_LIMIT = 25;
+const DEFAULT_SIGNUP_DAILY_LIMIT = 10;
+/** Clave del advisory lock que serializa las altas para que el cupo no se pase por carrera. */
+const SIGNUP_LOCK_KEY = 'ventea:signup-quota';
 
 /**
  * Registro self-service de una marca (ADR 0007): la deja completa y en prueba de
@@ -32,7 +51,7 @@ export class SignupService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly regions: RegionService,
-    config: ConfigService,
+    private readonly config: ConfigService,
   ) {
     this.baseDomain = config.get<string>('TENANT_BASE_DOMAIN') || 'ventea.tech';
   }
@@ -93,6 +112,7 @@ export class SignupService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await this.assertSignupQuota(tx, now);
         const tenant = await tx.tenant.create({
           data: {
             slug: input.slug,
@@ -153,5 +173,29 @@ export class SignupService {
       tenant: { slug: input.slug, url, adminUrl: `${url}/admin`, region: region.code },
       trialEndsAt,
     };
+  }
+
+  /**
+   * 429 si ya se alcanzó el cupo de altas self-service de las últimas 24 h o 7 días.
+   * Dentro de la transacción del alta y tras un advisory lock: dos registros simultáneos
+   * no pueden contar ambos "queda uno".
+   */
+  private async assertSignupQuota(tx: PrismaDb, now: Date): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SIGNUP_LOCK_KEY}))`;
+    const [weekly, daily] = await Promise.all([
+      tx.tenant.count({ where: { createdVia: 'signup', createdAt: { gte: addDays(now, -7) } } }),
+      tx.tenant.count({ where: { createdVia: 'signup', createdAt: { gte: addDays(now, -1) } } }),
+    ]);
+    const weeklyLimit = this.limit('SIGNUP_WEEKLY_LIMIT', DEFAULT_SIGNUP_WEEKLY_LIMIT);
+    const dailyLimit = this.limit('SIGNUP_DAILY_LIMIT', DEFAULT_SIGNUP_DAILY_LIMIT);
+    if (weekly >= weeklyLimit || daily >= dailyLimit) {
+      throw new HttpException(SIGNUP_CLOSED, HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
+  private limit(key: string, fallback: number): number {
+    const raw = this.config.get<string>(key);
+    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
   }
 }

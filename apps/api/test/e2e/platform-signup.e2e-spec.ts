@@ -33,6 +33,8 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
   beforeAll(async () => {
     // Cupo amplio: este bloque prueba el registro, no el rate limit (va abajo, con el de verdad).
     process.env.SIGNUP_RATE_LIMIT_PER_HOUR = '100';
+    process.env.SIGNUP_DAILY_LIMIT = '1000';
+    process.env.SIGNUP_WEEKLY_LIMIT = '1000';
     process.env.REGIONS = JSON.stringify([
       { code: 'hn-1', countries: ['*'], currency: 'HNL', timezone: 'America/Tegucigalpa' },
       { code: 'cl-1', countries: ['CL'], currency: 'CLP', timezone: 'America/Santiago' },
@@ -44,6 +46,8 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
 
   afterAll(async () => {
     delete process.env.SIGNUP_RATE_LIMIT_PER_HOUR;
+    delete process.env.SIGNUP_DAILY_LIMIT;
+    delete process.env.SIGNUP_WEEKLY_LIMIT;
     delete process.env.REGIONS;
     await app.close();
     await prisma.$disconnect();
@@ -179,6 +183,10 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
       .send(signupBody({ slug: 'admin' }))
       .expect(400);
     expect(reserved.body.message).toContain('reservado');
+    // Suplantación: login/pagos y cualquier slug con "ventea" o que empiece con "admin".
+    for (const slug of ['login', 'pagos', 'secure', 'soporte-ventea', 'administracion']) {
+      await http().post('/api/platform/signup').send(signupBody({ slug })).expect(400);
+    }
 
     await http()
       .post('/api/platform/signup')
@@ -245,5 +253,55 @@ describe('Plataforma: rate limit del registro (AC3)', () => {
       .post('/api/platform/auth/login')
       .send({ email: 'nadie@ventea.tech', password: 'x' })
       .expect(401);
+  });
+});
+
+describe('Plataforma: cupo global de altas self-service (review TASK-004)', () => {
+  let app: INestApplication;
+  let prisma: PrismaClient;
+
+  const http = () => request(app.getHttpServer());
+  const recentSignups = (days: number) =>
+    prisma.tenant.count({
+      where: { createdVia: 'signup', createdAt: { gte: new Date(Date.now() - days * DAY_MS) } },
+    });
+
+  beforeAll(async () => {
+    process.env.SIGNUP_RATE_LIMIT_PER_HOUR = '100'; // el tope por IP no es lo que se prueba
+    prisma = createRawPrisma();
+    app = await createApp();
+  });
+
+  afterAll(async () => {
+    delete process.env.SIGNUP_RATE_LIMIT_PER_HOUR;
+    delete process.env.SIGNUP_DAILY_LIMIT;
+    delete process.env.SIGNUP_WEEKLY_LIMIT;
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  it('cupo diario: contado en la base, al llenarse da 429 y no crea nada', async () => {
+    // El cupo cuenta TODAS las altas por registro de la base (también las de otros tests).
+    process.env.SIGNUP_DAILY_LIMIT = String((await recentSignups(1)) + 1);
+    process.env.SIGNUP_WEEKLY_LIMIT = '1000';
+
+    await http().post('/api/platform/signup').send(signupBody()).expect(201);
+    const body = signupBody();
+    const closed = await http().post('/api/platform/signup').send(body).expect(429);
+    expect(closed.body).toMatchObject({
+      statusCode: 429,
+      message: 'Registro temporalmente cerrado, escríbenos',
+    });
+    expect(await prisma.tenant.findUnique({ where: { slug: body.slug } })).toBeNull();
+  });
+
+  it('cupo semanal: también cierra el registro', async () => {
+    process.env.SIGNUP_DAILY_LIMIT = '1000';
+    process.env.SIGNUP_WEEKLY_LIMIT = String(await recentSignups(7));
+    await http().post('/api/platform/signup').send(signupBody()).expect(429);
+
+    // Abrir el cupo reabre el registro.
+    process.env.SIGNUP_WEEKLY_LIMIT = String((await recentSignups(7)) + 1);
+    await http().post('/api/platform/signup').send(signupBody()).expect(201);
   });
 });

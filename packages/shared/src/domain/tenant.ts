@@ -13,30 +13,56 @@ export const tenantSlugSchema = z
 export type TenantSlug = z.infer<typeof tenantSlugSchema>;
 
 /**
- * Subdominios que el proxy o la plataforma usan para otra cosa: ninguna marca puede
- * llamarse así. Los usan el registro self-service y el script `create-tenant`.
+ * Subdominios que ninguna marca puede tomar: los que el proxy o la plataforma usan para
+ * otra cosa, y los que servirían para suplantar (phishing con TLS válido bajo
+ * `*.ventea.tech`). Los usan el registro self-service y el script `create-tenant`.
  */
 export const RESERVED_TENANT_SLUGS: readonly string[] = [
+  // infraestructura y plataforma
   'www',
   'api',
-  'admin',
   'app',
   'mail',
   'status',
   'docs',
   'platform',
-  'ventea',
   'billing',
   'help',
   'support',
+  'soporte',
   'blog',
   'static',
   'cdn',
   'traefik',
+  // suplantación obvia
+  'login',
+  'signin',
+  'secure',
+  'seguridad',
+  'pay',
+  'pagos',
+  'pago',
+  'banco',
+  'bank',
+  'account',
+  'cuenta',
+  'verify',
+  'verificar',
+  'password',
 ];
 
+/** Prefijos reservados: `admin`, `admin-panel`, `administracion`… */
+const RESERVED_SLUG_PREFIXES: readonly string[] = ['admin'];
+
+/** Fragmentos prohibidos en cualquier posición: la marca de la plataforma. */
+const RESERVED_SLUG_FRAGMENTS: readonly string[] = ['ventea'];
+
 export function isReservedTenantSlug(slug: string): boolean {
-  return RESERVED_TENANT_SLUGS.includes(slug);
+  return (
+    RESERVED_TENANT_SLUGS.includes(slug) ||
+    RESERVED_SLUG_PREFIXES.some((prefix) => slug.startsWith(prefix)) ||
+    RESERVED_SLUG_FRAGMENTS.some((fragment) => slug.includes(fragment))
+  );
 }
 
 /**

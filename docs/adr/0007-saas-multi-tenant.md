@@ -68,10 +68,21 @@ probado en la VPS de prueba con cuatro marcas.
 - Un solo despliegue actualiza a todos: se acaban las versiones divergentes del 0006, pero
   una migración mala afecta a todos. Las migraciones siguen siendo aditivas y con
   respaldo previo.
-- **Un certificado por marca tiene techo**: Let's Encrypt emite 50 certificados por dominio
-  registrado y semana. El registro público lleva rate limit por IP (5 por hora) y honeypot,
-  pero un abuso distribuido podría gastar el cupo y dejar sin certificado a marcas reales.
-  Si el volumen de altas se acerca a ese número, pasar al comodín por DNS-01.
+- **Un certificado por marca tiene techo, y un subdominio con TLS válido sirve para
+  suplantar.** Let's Encrypt emite 50 certificados por dominio registrado y semana, y el
+  registro es público y sin verificar el email. Mitigación de esta fase:
+  - cupo **global** de altas self-service contado en la base (`SIGNUP_WEEKLY_LIMIT`, 25 por
+    semana; `SIGNUP_DAILY_LIMIT`, 10 por día): al llenarse, `429 "Registro temporalmente
+cerrado, escríbenos"`. Vale entre reinicios y réplicas, a diferencia del rate limit por IP;
+  - rate limit por IP (5 por hora) y honeypot;
+  - slugs reservados contra suplantación (`login`, `secure`, `pay`, `pagos`, `banco`,
+    `account`, `verify`, `soporte`…, todo lo que empiece con `admin` y todo lo que contenga
+    `ventea`).
+
+  **Antes de cualquier marketing masivo son requisito**: verificación del email del dueño
+  antes de publicar la ruta, y el certificado comodín `*.ventea.tech` por DNS-01 (saca las
+  altas del cupo de Let's Encrypt).
+
 - Un tenant con volumen desproporcionado afecta a los demás. La salida prevista es moverlo
   a otra región o a una base propia; `region` ya está en el modelo.
 - Los tenants existentes (`carolina-hot-chicken`, `demo-burgers`, `pollos-prueba`,
