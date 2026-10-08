@@ -19,11 +19,11 @@ import { PrismaModule } from './prisma/prisma.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // Se aplica a TODO. Excluir una ruta acá es dejarla sin aislamiento de tenant.
-    // Las exclusiones llevan el prefijo global `api` porque se comparan contra la
-    // ruta completa, no contra la del controlador.
+    // Las exclusiones van SIN el prefijo global `api`: Nest ya lo antepone (con él
+    // quedaban como `/api/api/health` y no excluían nada).
     //
-    //   api/health     — tiene que responder aunque la config de tenant esté rota
-    //   api/platform/* — administración de la plataforma: cruza tenants por definición
-    consumer.apply(TenantMiddleware).exclude('api/health', 'api/platform/(.*)').forRoutes('*');
+    //   health      — tiene que responder aunque la config de tenant esté rota
+    //   platform/*  — administración de la plataforma: cruza tenants por definición
+    consumer.apply(TenantMiddleware).exclude('health', 'platform/{*path}').forRoutes('*');
   }
 }
