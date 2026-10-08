@@ -12,7 +12,20 @@ import type { CreateOrderInput } from '@ventea/shared';
  * campos que la API ignora (p. ej. precios que mande el cliente).
  */
 export function hashOrderRequest(input: CreateOrderInput): string {
-  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  // El orden de las opciones elegidas no cambia el pedido: se ordenan para que
+  // [A,B] y [B,A] no den un 409 falso. El orden de las líneas sí se respeta.
+  const normalized = {
+    ...input,
+    lines: input.lines.map((line) => ({
+      ...line,
+      selectedOptionIds: [...line.selectedOptionIds].sort(),
+    })),
+  };
+  // Prefijo de versión: si cambia la forma del cuerpo (un campo nuevo con
+  // default), se sube a v2 y los hashes viejos dejan de compararse por accidente.
+  return createHash('sha256')
+    .update('v1:' + JSON.stringify(normalized))
+    .digest('hex');
 }
 
 /** Misma clave con otro cuerpo: el cliente reutilizó una clave para otro pedido. */
