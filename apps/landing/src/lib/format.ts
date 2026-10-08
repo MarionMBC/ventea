@@ -33,7 +33,7 @@ export function yearlySavingsCents(plan: {
 export function slugify(name: string): string {
   return name
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/&/g, ' y ')
     .replace(/[^a-z0-9]+/g, '-')
