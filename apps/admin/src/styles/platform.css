@@ -383,3 +383,10 @@
 .billing__note a {
   font-weight: 700;
 }
+
+/* Facturación del dueño: dentro del shell de staff, que no da márgenes propios. */
+.billing {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem var(--gutter) 3rem;
+}
