@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
+import { RedactingLogger } from './common/logging/redacting-logger';
 
 /**
  * Orígenes que pueden llamar a la API en producción.
@@ -31,7 +32,10 @@ function productionOrigins(config: ConfigService): (string | RegExp)[] {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Logger con redacción de PAN/CVV (TASK-005): red de seguridad para cualquier log.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new RedactingLogger(),
+  });
   const config = app.get(ConfigService);
 
   app.use(helmet());
