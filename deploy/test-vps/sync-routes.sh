@@ -8,8 +8,9 @@
 # propio certificado y dar de alta una no reemite los de las demás.
 #
 # Cada subdominio de marca lleva DOS routers (TASK-003):
-#   - `Host(x) && PathPrefix(/api)` → API (priority alta: gana siempre en /api);
+#   - `Host(x) && (PathPrefix(/api/) || Path(/api))` → API (priority alta);
 #   - `Host(x)`                     → web (nginx: panel en /admin y menú en /).
+# `/api/` con barra: `/apiary` o `/api-x` son del web, no de la API.
 # Así el panel llama a /api del mismo origen, sin CORS. `api.` y el host sslip
 # siguen yendo enteros a la API.
 set -euo pipefail
@@ -51,7 +52,7 @@ router() {
   done
   for h in $tenant_hosts; do
     name="ventea-test-$(echo "$h" | tr '.' '-')"
-    router "$name-api" "Host(\`$h\`) && PathPrefix(\`/api\`)" ventea-test 100
+    router "$name-api" "Host(\`$h\`) && (PathPrefix(\`/api/\`) || Path(\`/api\`))" ventea-test 100
     router "$name-web" "Host(\`$h\`)" ventea-test-web 10
   done
   echo "  services:"

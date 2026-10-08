@@ -14,11 +14,11 @@ corriendo junto a otros servicios en la VPS de VIAJU. No usa el Caddy de
 
 `sync-routes.sh` genera `/etc/traefik/dynamic/ventea-test.yml` desde los tenants activos:
 
-| Host                          | Ruta     | Servicio                                    |
-| ----------------------------- | -------- | ------------------------------------------- |
-| `api.ventea.tech`, host sslip | todo     | `api` (`ventea-test-api-1:3000`)            |
-| `<slug>.ventea.tech`          | `/api/*` | `api` (priority 100)                        |
-| `<slug>.ventea.tech`          | el resto | `web` (`ventea-test-web-1:80`, priority 10) |
+| Host                          | Ruta             | Servicio                                    |
+| ----------------------------- | ---------------- | ------------------------------------------- |
+| `api.ventea.tech`, host sslip | todo             | `api` (`ventea-test-api-1:3000`)            |
+| `<slug>.ventea.tech`          | `/api`, `/api/*` | `api` (priority 100)                        |
+| `<slug>.ventea.tech`          | el resto         | `web` (`ventea-test-web-1:80`, priority 10) |
 
 En `web` (nginx, `deploy/Dockerfile.web`) el panel de staff vive en `/admin` y llama a `/api`
 del mismo origen, así que no hay CORS de por medio. En `/` queda el build web de `apps/mobile`.
@@ -39,8 +39,11 @@ Si una marca se desactiva o se borra a mano, correr `./sync-routes.sh` para quit
 
 ## Desplegar otra versión
 
-La primera vez que se agrega `web`, sumar `IMAGE_WEB=` al `.env` y correr `./sync-routes.sh`
-(las rutas viejas mandaban todo el subdominio a la API).
+Orden obligatorio: **build de la imagen web → `IMAGE_WEB=<tag>` en `.env` → `docker compose up -d`
+→ `./sync-routes.sh`**. El compose exige `IMAGE_WEB` (`${IMAGE_WEB:?…}`): sin ella o vacía,
+TODO comando `docker compose` falla, incluidos los `compose exec` de `sync-routes.sh` y
+`new-tenant.sh`. Nunca dejar `IMAGE_WEB=` vacío. La primera vez que se agrega `web`, la
+variable no existe en el `.env` de la VPS: agregarla (línea nueva) antes de copiar el compose.
 
 ```bash
 # local
@@ -50,8 +53,10 @@ cd ~/ventea-test && rm -rf src && mkdir src && tar xzf ventea.tgz -C src
 docker build -f src/deploy/Dockerfile.api -t ventea-api:0.1.0-<commit> src
 docker build -f src/deploy/Dockerfile.web -t ventea-web:0.1.0-<commit> src
 sed -i 's/^IMAGE_API=.*/IMAGE_API=ventea-api:0.1.0-<commit>/' .env
-sed -i 's/^IMAGE_WEB=.*/IMAGE_WEB=ventea-web:0.1.0-<commit>/' .env
+grep -q '^IMAGE_WEB=' .env   && sed -i 's/^IMAGE_WEB=.*/IMAGE_WEB=ventea-web:0.1.0-<commit>/' .env   || echo 'IMAGE_WEB=ventea-web:0.1.0-<commit>' >> .env
+cp src/deploy/test-vps/docker-compose.yml src/deploy/test-vps/*.sh .   # si cambiaron
 docker compose up -d
+./sync-routes.sh
 curl https://api.ventea.tech/api/health
 curl -I https://carolina-hot-chicken.ventea.tech/admin/   # 200, el panel
 ```

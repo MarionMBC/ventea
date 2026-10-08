@@ -45,8 +45,10 @@ services:
   # Traefik le manda todo `<slug>.ventea.tech` salvo /api (ver sync-routes.sh), así que
   # el panel llama a la API en su mismo origen. El nombre del contenedor
   # (ventea-test-web-1) es el upstream de la ruta.
+  # Sin IMAGE_WEB todo el proyecto compose es inválido (también los `compose exec` de
+  # sync-routes.sh y new-tenant.sh): mejor fallar con un mensaje claro.
   web:
-    image: ${IMAGE_WEB}
+    image: ${IMAGE_WEB:?falta IMAGE_WEB en .env}
     restart: unless-stopped
     networks: [dokploy-network]
 networks:
