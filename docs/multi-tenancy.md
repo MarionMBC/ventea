@@ -1,8 +1,9 @@
 # Multi-tenancy
 
-Un tenant es una marca que compró el SaaS. Carolina Hot Chicken es `carolina-hot-chicken`,
-el tenant #1. La plataforma corre **una sola base de datos** y separa los datos por la
-columna `tenantId`.
+Un tenant es una marca que contrató el SaaS. Carolina Hot Chicken es `carolina-hot-chicken`,
+el tenant #1. La plataforma corre **una sola base de datos por región** y separa los datos
+por la columna `tenantId`. Desde el [ADR 0007](adr/0007-saas-multi-tenant.md), el modo
+`multi` es el de producción: todas las marcas comparten instancia y base.
 
 ## Por qué `tenantId` y no una base por cliente
 
@@ -33,8 +34,13 @@ El slug **nunca** sale del body ni de un query param. Son campos que el cliente 
 en cada request: aceptarlos ahí es dejar que cualquiera pida los datos de otra marca
 cambiando un parámetro.
 
-Un tenant inexistente y uno suspendido devuelven el mismo 404. Distinguirlos permitiría
-enumerar qué marcas usan la plataforma.
+Un tenant inexistente y uno desactivado (`isActive=false`) devuelven el mismo 404.
+Distinguirlos permitiría enumerar qué marcas usan la plataforma.
+
+**Desactivado no es suspendido.** La suspensión por falta de pago es un estado de la
+suscripción, no del tenant: la marca sigue existiendo, su API pública responde `402` y su
+staff puede entrar al panel para pagar (ver `SubscriptionMiddleware` en
+[architecture.md](architecture.md)).
 
 ### 2. Filtro explícito en cada servicio
 
@@ -66,7 +72,15 @@ adivinar de qué tenant es una consulta que no lo dice.
 Modelos exentos, y por qué:
 
 - `PlatformAdmin`, `Tenant` — viven por encima de los tenants
+- `Plan` — catálogo global de planes del SaaS: es el mismo para todas las marcas y no
+  tiene `tenantId`
 - `MenuItemModifierGroup` — tabla puente pura; ambos extremos ya están acotados
+
+`Subscription` y `BillingEvent` **no** están exentos: llevan `tenantId` y toda consulta
+directa los filtra por él. El panel de plataforma, que sí cruza marcas, los lee a través de
+`Tenant` (exento) con `include`, o con `tenantId: { in: [...] }` para los conteos. Así no
+hace falta un cliente Prisma sin guard dentro de la API: el único cliente crudo sigue
+siendo el de los scripts de operación y la semilla.
 
 ## Índices únicos
 

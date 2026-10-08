@@ -27,6 +27,11 @@ async function seedTenant(input: {
   latitude: number;
   longitude: number;
 }): Promise<void> {
+  // Suscripción activa: sin ella el tenant funciona igual (el middleware falla abierto),
+  // pero el panel de plataforma lo mostraría sin plan.
+  const chain = await prisma.plan.findUniqueOrThrow({ where: { code: 'chain' } });
+  const now = new Date();
+
   const tenant = await prisma.tenant.upsert({
     where: { slug: input.slug },
     update: {},
@@ -37,6 +42,15 @@ async function seedTenant(input: {
       branding: { create: { primaryColor: input.primaryColor, appDisplayName: input.name } },
       rewardProgram: {
         create: { ...DEFAULT_REWARD_PROGRAM },
+      },
+      subscription: {
+        create: {
+          planId: chain.id,
+          interval: 'year',
+          status: 'active',
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+        },
       },
     },
   });

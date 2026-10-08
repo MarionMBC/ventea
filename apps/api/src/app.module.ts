@@ -9,7 +9,14 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { HealthModule } from './modules/health/health.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
+import {
+  SUBSCRIPTION_OPEN_ROUTES,
+  SubscriptionMiddleware,
+  SubscriptionStateMiddleware,
+} from './modules/subscriptions/subscription.middleware';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { TenantMiddleware } from './modules/tenants/tenant.middleware';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -26,6 +33,8 @@ import { PrismaModule } from './prisma/prisma.module';
     CatalogModule,
     OrdersModule,
     RewardsModule,
+    SubscriptionsModule,
+    PlatformModule,
   ],
   // Formato de error uniforme `{statusCode, message, error}` en toda la API.
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
@@ -37,7 +46,17 @@ export class AppModule implements NestModule {
     // quedaban como `/api/api/health` y no excluían nada).
     //
     //   health      — tiene que responder aunque la config de tenant esté rota
-    //   platform/*  — administración de la plataforma: cruza tenants por definición
+    //   platform/*  — registro y administración de la plataforma: cruzan tenants por definición
     consumer.apply(TenantMiddleware).exclude('health', 'platform/{*path}').forRoutes('*');
+
+    // 402 a la API de una marca suspendida (ADR 0007). Corren después del de tenant (orden
+    // de registro). Las rutas abiertas (panel del dueño para pagar, pedidos en curso del
+    // cliente: SUBSCRIPTION_OPEN_ROUTES) no cortan, pero igual marcan la prueba vencida.
+    // Misma regla de Nest 12: sin prefijo `api`.
+    consumer
+      .apply(SubscriptionMiddleware)
+      .exclude('health', 'platform/{*path}', ...SUBSCRIPTION_OPEN_ROUTES)
+      .forRoutes('*');
+    consumer.apply(SubscriptionStateMiddleware).forRoutes(...SUBSCRIPTION_OPEN_ROUTES);
   }
 }

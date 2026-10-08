@@ -8,8 +8,17 @@ const logger = new Logger('PrismaTenantGuard');
  * Modelos que NO llevan tenantId porque viven por encima de los tenants
  * o son puramente relacionales. Cualquier otro modelo consultado sin filtro
  * de tenant es un bug de aislamiento.
+ *
+ * - `Plan`: catálogo global de planes del SaaS, igual para todas las marcas (TASK-004).
+ *   `Subscription` y `BillingEvent` NO están exentos: llevan tenantId y se filtran por él;
+ *   el panel de plataforma los lee vía `Tenant` (include) o con `tenantId: { in }`.
  */
-const TENANT_EXEMPT_MODELS = new Set<string>(['PlatformAdmin', 'Tenant', 'MenuItemModifierGroup']);
+const TENANT_EXEMPT_MODELS = new Set<string>([
+  'PlatformAdmin',
+  'Tenant',
+  'Plan',
+  'MenuItemModifierGroup',
+]);
 
 /** Operaciones que leen o afectan múltiples filas y por lo tanto exigen el filtro. */
 const GUARDED_OPERATIONS = new Set<string>([

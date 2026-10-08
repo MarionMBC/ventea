@@ -7,8 +7,11 @@ Este documento explica **por qué** el esquema es así, no repite los campos.
 
 ```
 PlatformAdmin                        (fuera de todo tenant — nosotros)
+Plan                                 (catálogo global: basic, pro, chain)
 
-Tenant ──┬── TenantBranding          1:1  colores, logo, nombre visible
+Tenant ──┬── Subscription ── Plan    1:1  plan, intervalo, estado, período, prueba
+         ├── BillingEvent[]               auditoría append-only de la suscripción
+         ├── TenantBranding          1:1  colores, logo, nombre visible
          ├── RewardProgram           1:1  reglas de puntos de la marca
          ├── Location[]                   sucursales
          ├── MenuCategory[] ── MenuItem[] ── MenuItemModifierGroup ── ModifierGroup ── ModifierOption[]
@@ -21,6 +24,21 @@ Tenant ──┬── TenantBranding          1:1  colores, logo, nombre visibl
 Todo lo que cuelga de `Tenant` lleva `tenantId`. Ver [multi-tenancy.md](multi-tenancy.md).
 
 ## Decisiones que no se leen del esquema
+
+### La suscripción es del tenant, la suspensión no toca `Tenant.isActive`
+
+`Subscription` (1:1 con `Tenant`) guarda plan, intervalo (`month` | `year`), estado
+(`trialing` | `active` | `past_due` | `suspended` | `canceled`), fin de la prueba y período.
+Una marca `suspended`, `canceled`, `past_due` o con la prueba vencida responde `402` en su
+API pública, pero existe: su staff entra al panel. `Tenant.isActive=false` sigue siendo
+"no existe" (404). Los campos de pago (`paymentToken`, `networkTransactionId`…) son para el
+cobro recurrente de TASK-005 y hoy quedan en null.
+
+`BillingEvent` es append-only como el libro de puntos: cada cambio de estado o de plan deja
+un asiento. Su `orderId` es único y será la clave idempotente hacia `ms-payments`.
+
+Los planes viven en la tabla `plans` y los siembra una migración SQL idempotente; cambiar un
+precio es otra migración, así queda en el historial del repo.
 
 ### El dinero es `Int` en centavos
 

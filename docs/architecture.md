@@ -1,8 +1,8 @@
 # Arquitectura
 
-> **Despliegue**: cada cliente corre esta pila completa en su propio VPS. Lo que sigue
-> describe una instancia; ver [deployment.md](deployment.md) para cómo se instala y se
-> actualiza.
+> **Despliegue**: SaaS alojado por nosotros ([ADR 0007](adr/0007-saas-multi-tenant.md)).
+> Una instancia en modo `multi` atiende a todas las marcas, cada una en
+> `<slug>.ventea.tech`; ver [deployment.md](deployment.md).
 
 ## Piezas
 
@@ -36,14 +36,23 @@
 ## Por dónde va un request
 
 1. **TenantMiddleware** resuelve el tenant y lo deja en el request. En producción
-   (`TENANT_MODE=single`) sale de la configuración de la instancia; en modo `multi`, del
-   subdominio o del header. Sin tenant, 404 — no llega a ningún controlador.
-2. **Guard de autenticación** valida el JWT. El token incluye el `tenantId`: si no
+   (`TENANT_MODE=multi`) sale del subdominio o del header; en una instalación dedicada
+   (`single`), de la configuración. Sin tenant, 404 — no llega a ningún controlador.
+   En la misma consulta trae el estado de la suscripción.
+2. **SubscriptionMiddleware** corta con `402 Servicio suspendido` las rutas públicas de
+   una marca suspendida, cancelada o con la prueba vencida. Siguen abiertas las rutas de
+   staff (`/api/staff/*`), `/api/tenant` y `/api/auth/refresh` (el dueño entra a pagar), y
+   `GET /api/orders[/:id]` y `GET /api/me` (el cliente ve sus pedidos en curso).
+3. **Guard de autenticación** valida el JWT. El token incluye el `tenantId`: si no
    coincide con el tenant resuelto, se rechaza. Un token robado de otra marca no sirve.
-3. **Guard de rol** para rutas de staff (`owner` / `manager` / `staff`).
-4. **Controlador** valida el body con el schema zod de `packages/shared`.
-5. **Servicio** consulta con `tenantId` explícito en el `where`.
-6. La **extensión del cliente Prisma** verifica que ese filtro exista.
+4. **Guard de rol** para rutas de staff (`owner` / `manager` / `staff`).
+5. **Controlador** valida el body con el schema zod de `packages/shared`.
+6. **Servicio** consulta con `tenantId` explícito en el `where`.
+7. La **extensión del cliente Prisma** verifica que ese filtro exista.
+
+Las rutas `/api/platform/*` (registro, planes y administración de la plataforma) no pasan
+por los middlewares de tenant: cruzan marcas por definición. Las de administración exigen
+un JWT `kind: "platform"` (`PlatformAdmin`), que no sirve en rutas de marca ni al revés.
 
 ## Por qué tres apps y no una
 
@@ -86,6 +95,7 @@ plugins no existen.
   integración y el webhook de confirmación.
 - **Almacenamiento de imágenes**: el catálogo guarda `imageUrl`; falta decidir dónde
   viven los archivos.
-- **Facturación**: cómo se le cobra a cada cliente. No hay modelo todavía.
+- **Cobro de la suscripción**: planes, suscripciones y `BillingEvent` ya existen; el
+  cobro recurrente vía `ms-payments` (CyberSource para cobros sin CVV) es TASK-005.
 - **Delivery**: el enum `fulfillmentType` lo contempla, pero no hay logística ni
   repartidores — quedó fuera del alcance acordado.

@@ -2,21 +2,21 @@
 
 Cómo el mismo código llega a la tienda de aplicaciones con la cara de cada cliente.
 
-## Web: una instancia por cliente
+## Web: una instancia, un subdominio por marca
 
-El menú público y el panel se sirven desde el VPS del propio cliente, bajo su dominio
-(ver [deployment.md](deployment.md)). El branding (`TenantBranding`) llega en la
-respuesta de la API y se aplica como variables CSS en tiempo de ejecución, así que la
-misma imagen de contenedor se ve distinta en cada instalación:
+El menú público y el panel se sirven desde nuestra plataforma, en `<slug>.ventea.tech`
+(ver [ADR 0007](adr/0007-saas-multi-tenant.md) y [deployment.md](deployment.md)). El
+branding (`TenantBranding`) llega en la respuesta de la API y se aplica como variables CSS
+en tiempo de ejecución, así que la misma imagen de contenedor se ve distinta por marca:
 
 ```
-pedidos.carolinahotchicken.cl  →  rojo, logo de Carolina
-pedidos.otramarca.cl           →  azul, logo de la otra marca
+carolina-hot-chicken.ventea.tech  →  rojo, logo de Carolina
+otra-marca.ventea.tech            →  azul, logo de la otra marca
 ```
 
-Cliente nuevo = un despliegue en su VPS + el `INSERT` del tenant. Si en algún momento se
-alojan clientes chicos juntos en una instancia nuestra (`TENANT_MODE=multi`), ahí sí
-alcanza con el `INSERT` y un subdominio.
+Cliente nuevo = registro self-service (`POST /api/platform/signup`) o `create-tenant`: un
+`INSERT` del tenant y el subdominio queda publicado por el cron de rutas. El dominio propio
+(`pedidos.carolinahotchicken.cl`) es una feature del plan Pro, todavía sin implementar.
 
 ## Nativo: un binario por marca
 

@@ -8,14 +8,15 @@ y panel administrativo.
 Carolina — Carolina es el tenant `carolina-hot-chicken`, el primero de muchos. Nada
 de lo que se escriba acá puede asumir una sola marca: ese es el activo que se revende.
 
-## Modelo de despliegue
+## Modelo de negocio y despliegue
 
-**Cada cliente corre su propia instancia en su VPS u hosting**: base de datos, API y
-front completos, con su dominio y su certificado. No hay una nube central de Ventea.
+**SaaS por suscripción, alojado por nosotros** ([ADR 0007](docs/adr/0007-saas-multi-tenant.md)):
+cada marca paga un plan (Básico $25, Pro $59, Cadena $129 al mes, en USD) y vive en
+`<slug>.ventea.tech`. Una instancia atiende a todas las marcas en `TENANT_MODE=multi`; la
+región se asigna sola según el país del registro (hoy una sola, `hn-1`).
 
-La API arranca en `TENANT_MODE=single` con el slug fijado por configuración; el modo
-`multi` (tenant por subdominio) queda para desarrollo y para alojar clientes chicos
-juntos si conviene. Ver [docs/deployment.md](docs/deployment.md).
+`TENANT_MODE=single` queda para instalaciones dedicadas excepcionales. Ver
+[docs/deployment.md](docs/deployment.md).
 
 ## Estructura
 
@@ -86,7 +87,7 @@ Detalle completo en [docs/multi-tenancy.md](docs/multi-tenancy.md).
 | [docs/api.md](docs/api.md)                     | Endpoints, autenticación, reglas de pedidos y puntos, scripts de operación  |
 | [docs/data-model.md](docs/data-model.md)       | Entidades, por qué hay snapshots y por qué los puntos son un libro contable |
 | [docs/white-label.md](docs/white-label.md)     | Cómo se produce una app con la marca de cada cliente                        |
-| [docs/deployment.md](docs/deployment.md)       | Cómo se instala y se actualiza la instancia de un cliente en su VPS         |
+| [docs/deployment.md](docs/deployment.md)       | Cómo se despliega y actualiza la plataforma (y una instalación dedicada)    |
 | [docs/adr/](docs/adr/)                         | Decisiones tomadas y qué se descartó                                        |
 
 ## Estado
@@ -117,7 +118,7 @@ las imágenes `ventea-api` y `ventea-web` en un registry.
 
 - **Pagos**: proveedor sin elegir (el modelo ya tiene `paymentStatus`)
 - **Imágenes del catálogo**: dónde viven los archivos
-- **Facturación**: cómo se le cobra a cada cliente (licencia, soporte, o ambos)
+- **Cobro de la suscripción**: el modelo de planes y suscripciones ya existe; el cobro
+  recurrente con `ms-payments` es TASK-005
 - **Publicación en tiendas**: cuenta propia o del cliente (ver `docs/white-label.md`)
-- **Quién administra el VPS**: nosotros o el cliente. Define quién aplica los parches
-  del sistema operativo y quién responde cuando el servidor se cae.
+- **Dominio propio y app con marca (plan Pro)**: hoy solo son `features` del plan
