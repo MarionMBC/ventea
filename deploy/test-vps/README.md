@@ -41,11 +41,12 @@ primer deploy: `grep -rn "ventea.tech" /etc/traefik/dynamic` (solo debe aparecer
 `<slug>.ventea.tech/admin/plataforma` nginx responde `301` al apex (y la app no monta su login
 fuera del apex).
 
-nginx agrega en todas las respuestas (`deploy/nginx-security-headers.conf`) HSTS (1 año,
-`includeSubDomains`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+nginx agrega en todas las respuestas (`deploy/nginx-security-headers.conf`) HSTS (30 días,
+`includeSubDomains`; subir a 1 año —`max-age=31536000`— cuando se haya verificado que todo
+`*.ventea.tech` responde por HTTPS), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: strict-origin-when-cross-origin` y una CSP del mismo origen
-(`frame-ancestors 'none'`; `style-src 'unsafe-inline'` por Ionic; `img-src https:` por los
-logos de cada marca). Verificar después del deploy:
+(`frame-ancestors 'none'`; `connect-src 'self'`; `style-src 'unsafe-inline'` por Ionic;
+`img-src https:` por los logos de cada marca). Verificar después del deploy:
 `curl -sI https://ventea.tech/ | grep -iE "strict-transport|content-security|x-frame"`.
 
 ### Rutas automáticas (cron)
