@@ -7,6 +7,7 @@
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { DEFAULT_REWARD_PROGRAM } from '@ventea/shared';
 import argon2 from 'argon2';
 
 const connectionString = process.env.DATABASE_URL;
@@ -35,13 +36,7 @@ async function seedTenant(input: {
       currency: input.currency,
       branding: { create: { primaryColor: input.primaryColor, appDisplayName: input.name } },
       rewardProgram: {
-        create: {
-          isEnabled: true,
-          pointsPerCurrencyUnit: 0.01, // 1 punto por cada 100 unidades de moneda gastadas
-          redemptionValueCents: 100,
-          minPointsToRedeem: 10,
-          signupBonusPoints: 20,
-        },
+        create: { ...DEFAULT_REWARD_PROGRAM },
       },
     },
   });

@@ -74,3 +74,12 @@ export function createPrismaClient(connectionString: string) {
 
 /** Tipo del cliente extendido. Es lo que se inyecta en los servicios. */
 export type PrismaClientExtended = ReturnType<typeof createPrismaClient>;
+
+/**
+ * Lo que reciben los servicios que pueden correr dentro o fuera de una transacción
+ * interactiva: el cliente extendido o el `tx` de `$transaction(async (tx) => …)`.
+ */
+export type PrismaDb = Omit<
+  PrismaClientExtended,
+  '$transaction' | '$connect' | '$disconnect' | '$on' | '$extends'
+>;

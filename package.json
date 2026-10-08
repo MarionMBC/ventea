@@ -29,5 +29,8 @@
     "prettier": "^3.9.6",
     "turbo": "^2.10.12",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "proxy-addr": "^2.0.8"
   }
 }

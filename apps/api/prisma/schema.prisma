@@ -118,6 +118,10 @@ model MenuItem {
   imageUrl    String?
   /// Precio en la unidad mínima de la moneda (centavos). Nunca decimal flotante.
   basePriceCents Int
+  /// Precio anterior (tachado en la app). Null si no hay rebaja.
+  compareAtPriceCents Int?
+  /// Badges de la app: popular, new, hot, combo…
+  tags           String[] @default([])
   isAvailable    Boolean  @default(true)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
