@@ -1,0 +1,254 @@
+{
+  "currency": "USD",
+  "modifierGroups": [
+    {
+      "key": "heat-mild",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "heat-medium",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "heat-hot",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "heat-reaper",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "extras",
+      "name": "Extras",
+      "minSelect": 0,
+      "maxSelect": 4,
+      "options": [
+        {
+          "name": "Extra pickles",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Pimento cheese",
+          "priceDeltaCents": 150,
+          "isAvailable": true
+        },
+        {
+          "name": "Extra comeback sauce",
+          "priceDeltaCents": 75,
+          "isAvailable": true
+        },
+        {
+          "name": "Coleslaw",
+          "priceDeltaCents": 120,
+          "isAvailable": false
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "name": "Sandwiches",
+      "items": [
+        {
+          "name": "Reaper Tender Sandwich",
+          "description": "Two hand-breaded tenders fried in cayenne oil on a toasted brioche bun with fresh slaw, pickles and house comeback sauce.",
+          "basePriceCents": 1290,
+          "compareAtPriceCents": 1650,
+          "tags": ["popular", "hot"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-hot", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Tenders",
+      "items": [
+        {
+          "name": "Nashville Tenders · 3 pzas",
+          "description": "Three breast tenders brined 24 h in buttermilk, double dredged and bathed in Nashville cayenne oil.",
+          "basePriceCents": 1140,
+          "compareAtPriceCents": null,
+          "tags": ["popular"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-medium", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Wings",
+      "items": [
+        {
+          "name": "Half Dozen Wings",
+          "description": "Six wings fried to order, tossed in the sauce you pick and served with buttermilk ranch.",
+          "basePriceCents": 1050,
+          "compareAtPriceCents": null,
+          "tags": ["new"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-medium", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Combos",
+      "items": [
+        {
+          "name": "Reaper Box",
+          "description": "The house box: three tenders at the heat level you pick, fries, slaw and a 16 oz drink.",
+          "basePriceCents": 1840,
+          "compareAtPriceCents": 2300,
+          "tags": ["combo", "hot"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-reaper", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Sides",
+      "items": [
+        {
+          "name": "Loaded Reaper Fries",
+          "description": "Fries with pimento cheese, tender bites and a drizzle of comeback sauce.",
+          "basePriceCents": 940,
+          "compareAtPriceCents": null,
+          "tags": [],
+          "isAvailable": false,
+          "modifierGroups": ["heat-hot", "extras"]
+        },
+        {
+          "name": "Carolina Slaw",
+          "description": "Sharp, crunchy slaw — the mandatory counterweight to hot chicken.",
+          "basePriceCents": 390,
+          "compareAtPriceCents": null,
+          "tags": [],
+          "isAvailable": true,
+          "modifierGroups": ["heat-mild", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Drinks",
+      "items": [
+        {
+          "name": "Sweet Tea 20 oz",
+          "description": "Freshly brewed black tea, sweetened hot and served over plenty of ice.",
+          "basePriceCents": 320,
+          "compareAtPriceCents": null,
+          "tags": [],
+          "isAvailable": true,
+          "modifierGroups": ["heat-mild", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Sauces",
+      "items": [
+        {
+          "name": "Comeback Sauce",
+          "description": "The house sauce: mayo, chilli, garlic and a touch of smoke.",
+          "basePriceCents": 75,
+          "compareAtPriceCents": null,
+          "tags": ["popular"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-mild", "extras"]
+        }
+      ]
+    }
+  ]
+}
