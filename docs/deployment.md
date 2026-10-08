@@ -49,7 +49,8 @@ en la primera renovación.
 ### Modo manual (hoy, en la VPS)
 
 El ciclo no cobra: pasa a `past_due` las pruebas y los períodos vencidos, y a `suspended` tras 7
-días de gracia. Cuando el cliente paga (transferencia), el admin de plataforma lo registra:
+días de gracia. Durante la gracia de un período pagado la marca sigue atendiendo y el panel
+avisa con la fecha de fin (TASK-007); una prueba vencida sin pago queda en 402 de inmediato. Cuando el cliente paga (transferencia), el admin de plataforma lo registra:
 
 ```bash
 curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \

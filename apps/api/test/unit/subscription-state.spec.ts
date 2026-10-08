@@ -2,33 +2,88 @@ import {
   accessDecision,
   addDays,
   extendedTrialEnd,
+  GRACE_DAYS,
+  graceEndsAt,
   nextStatus,
   periodEnd,
 } from '@/modules/subscriptions/subscription-state';
 
 const NOW = new Date('2026-10-08T12:00:00.000Z');
 
+/** En prueba el período termina con la prueba (alta y extend-trial los mueven juntos). */
+const trial = (end: Date) => ({
+  status: 'trialing' as const,
+  trialEndsAt: end,
+  currentPeriodEnd: end,
+});
+
 describe('accessDecision', () => {
   it('active atiende aunque el período haya vencido (sin cobro automático todavía)', () => {
-    expect(accessDecision({ status: 'active', trialEndsAt: null }, NOW)).toBe('allow');
-    expect(accessDecision({ status: 'active', trialEndsAt: addDays(NOW, -100) }, NOW)).toBe(
-      'allow',
-    );
+    expect(
+      accessDecision({ status: 'active', trialEndsAt: null, currentPeriodEnd: NOW }, NOW),
+    ).toBe('allow');
+    expect(
+      accessDecision(
+        { status: 'active', trialEndsAt: addDays(NOW, -100), currentPeriodEnd: NOW },
+        NOW,
+      ),
+    ).toBe('allow');
   });
 
   it('trialing atiende hasta el fin de la prueba', () => {
-    expect(accessDecision({ status: 'trialing', trialEndsAt: addDays(NOW, 1) }, NOW)).toBe('allow');
+    expect(accessDecision(trial(addDays(NOW, 1)), NOW)).toBe('allow');
   });
 
   it('trialing vencida (o justo en el borde) pide pasar a past_due', () => {
-    expect(accessDecision({ status: 'trialing', trialEndsAt: addDays(NOW, -1) }, NOW)).toBe(
-      'expire_trial',
-    );
-    expect(accessDecision({ status: 'trialing', trialEndsAt: NOW }, NOW)).toBe('expire_trial');
+    expect(accessDecision(trial(addDays(NOW, -1)), NOW)).toBe('expire_trial');
+    expect(accessDecision(trial(NOW), NOW)).toBe('expire_trial');
   });
 
-  it.each(['past_due', 'suspended', 'canceled'] as const)('%s bloquea', (status) => {
-    expect(accessDecision({ status, trialEndsAt: null }, NOW)).toBe('block');
+  it.each(['suspended', 'canceled'] as const)('%s bloquea', (status) => {
+    expect(accessDecision({ status, trialEndsAt: null, currentPeriodEnd: NOW }, NOW)).toBe('block');
+  });
+
+  it('past_due de un período pagado atiende durante la gracia, con aviso', () => {
+    const due = addDays(NOW, -2);
+    const pastDue = {
+      status: 'past_due' as const,
+      trialEndsAt: addDays(NOW, -60),
+      currentPeriodEnd: due,
+    };
+    expect(accessDecision(pastDue, NOW)).toBe('grace');
+    expect(graceEndsAt(pastDue, NOW)).toEqual(addDays(due, GRACE_DAYS));
+    // Sin prueba registrada (marca creada por script) también.
+    expect(accessDecision({ ...pastDue, trialEndsAt: null }, NOW)).toBe('grace');
+  });
+
+  it('past_due con la gracia vencida bloquea (el ciclo todavía no la suspendió)', () => {
+    const due = addDays(NOW, -GRACE_DAYS);
+    const pastDue = { status: 'past_due' as const, trialEndsAt: null, currentPeriodEnd: due };
+    expect(accessDecision(pastDue, NOW)).toBe('block');
+    expect(accessDecision(pastDue, addDays(NOW, -1))).toBe('grace');
+  });
+
+  it('past_due por prueba vencida sin pago no tiene gracia: bloquea', () => {
+    const end = addDays(NOW, -1);
+    const expiredTrial = { status: 'past_due' as const, trialEndsAt: end, currentPeriodEnd: end };
+    expect(accessDecision(expiredTrial, NOW)).toBe('block');
+    expect(graceEndsAt(expiredTrial, NOW)).toBeNull();
+  });
+
+  it('past_due con el período todavía vigente (dato anómalo) bloquea, sin gracia', () => {
+    const odd = {
+      status: 'past_due' as const,
+      trialEndsAt: addDays(NOW, -1),
+      currentPeriodEnd: addDays(NOW, 300),
+    };
+    expect(accessDecision(odd, NOW)).toBe('block');
+    expect(graceEndsAt(odd, NOW)).toBeNull();
+  });
+
+  it('graceEndsAt solo existe en past_due', () => {
+    for (const status of ['active', 'trialing', 'suspended', 'canceled'] as const) {
+      expect(graceEndsAt({ status, trialEndsAt: null, currentPeriodEnd: NOW }, NOW)).toBeNull();
+    }
   });
 
   it('sin suscripción no corta el servicio (falla abierta)', () => {

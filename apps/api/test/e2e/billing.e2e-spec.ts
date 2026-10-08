@@ -424,6 +424,9 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       await cycle.run(later(due));
       let sub = await subscriptionOf(target);
       expect(sub).toMatchObject({ status: 'past_due', retryAt: addDays(due, 1) });
+      // El ciclo corre con reloj simulado: con el reloj real del request el período todavía no
+      // venció, y un past_due así no tiene gracia (402). La gracia con período vencido de verdad
+      // (TASK-007: menú y pedidos siguen) la cubre subscription-grace.e2e-spec.ts.
       await http().get('/api/menu').set('X-Tenant-Slug', target.tenant.slug).expect(402);
       await asOwner(http().get('/api/billing'), target).expect(200);
 
@@ -812,6 +815,7 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       expect(sub.status).toBe('past_due');
       expect(sub.retryAt).not.toBeNull();
       expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+      // Reloj simulado: período aún vigente con el reloj real → sin gracia (ver dunning arriba).
       await http().get('/api/menu').set('X-Tenant-Slug', target.tenant.slug).expect(402);
     });
 

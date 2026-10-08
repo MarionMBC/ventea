@@ -30,8 +30,10 @@ Todo lo que cuelga de `Tenant` lleva `tenantId`. Ver [multi-tenancy.md](multi-te
 
 `Subscription` (1:1 con `Tenant`) guarda plan, intervalo (`month` | `year`), estado
 (`trialing` | `active` | `past_due` | `suspended` | `canceled`), fin de la prueba y período.
-Una marca `suspended`, `canceled`, `past_due` o con la prueba vencida responde `402` en su
-API pública, pero existe: su staff entra al panel. `Tenant.isActive=false` sigue siendo
+Una marca `suspended`, `canceled` o con la prueba vencida responde `402` en su API pública,
+pero existe: su staff entra al panel. `past_due` de un período pagado sigue atendiendo durante
+la gracia (7 días desde `currentPeriodEnd`, TASK-007); una prueba vencida sin pago no tiene
+gracia (`currentPeriodEnd <= trialEndsAt`). `Tenant.isActive=false` sigue siendo
 "no existe" (404). Los campos de pago (`paymentToken`, `networkTransactionId`…) son para el
 cobro recurrente de TASK-005 y hoy quedan en null.
 

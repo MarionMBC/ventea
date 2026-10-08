@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App, createQueryClient } from '@/app/App';
 import { createApiClient } from '@/lib/api';
 import { createSessionStore } from '@/lib/session';
+import { formatDay } from '@/features/platform/labels';
 import { apiError, createFakeApi, json, STAFF_SESSION } from '@/test/fixtures';
+
+const text = (el: Element | null) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 9, 8, 15);
@@ -23,6 +26,7 @@ function overview(overrides: Record<string, unknown> = {}): Record<string, unkno
     currentPeriodEnd: new Date(NOW + 14 * DAY).toISOString(),
     cancelAtPeriodEnd: false,
     retryAt: null,
+    graceEndsAt: null,
     pendingPlan: null,
     card: null,
     events: [
@@ -229,5 +233,49 @@ describe('Facturación del dueño', () => {
       }),
     });
     expect(await screen.findByText('Reembolso')).toBeTruthy();
+  });
+});
+
+describe('Pago pendiente en gracia (TASK-007)', () => {
+  const graceEndsAt = new Date(Date.now() + 3 * DAY - 60_000);
+  const pastDue = () =>
+    overview({
+      status: 'past_due',
+      trialEndsAt: null,
+      currentPeriodEnd: new Date(Date.now() - 4 * DAY).toISOString(),
+      graceEndsAt: graceEndsAt.toISOString(),
+    });
+
+  it('Facturación: el servicio sigue activo hasta el fin de la gracia, con días restantes', async () => {
+    renderBilling({ billing: pastDue() });
+    await screen.findByRole('heading', { level: 1, name: 'Facturación' });
+    const banner = screen.getAllByRole('alert').find((el) => /pago está pendiente/.test(text(el)))!;
+    expect(text(banner)).toContain(
+      `Tu pago está pendiente. Tu servicio sigue activo hasta el ${formatDay(graceEndsAt)}; luego se suspenderá.`,
+    );
+    expect(text(banner)).toContain('Quedan 3 días.');
+    expect(banner.querySelector('a')?.getAttribute('href')).toBe('mailto:hola@ventea.tech');
+  });
+
+  it('panel de staff: el dueño ve el aviso también en Pedidos', async () => {
+    renderBilling({ billing: pastDue(), path: '/admin/orders' });
+    const banner = await screen.findByText(/Tu pago está pendiente/);
+    expect(text(banner)).toContain(`sigue activo hasta el ${formatDay(graceEndsAt)}`);
+  });
+
+  it('prueba vencida sin pago (past_due sin gracia): avisa que el servicio está pausado', async () => {
+    renderBilling({ billing: overview({ status: 'past_due', graceEndsAt: null }) });
+    await screen.findByRole('heading', { level: 1, name: 'Facturación' });
+    expect(document.body.textContent).toContain(
+      'Tu prueba terminó y tu servicio está pausado: tus clientes no pueden ver el menú ni hacer pedidos.',
+    );
+    expect(document.body.textContent).not.toContain('sigue activo');
+  });
+
+  it('una API sin graceEndsAt (anterior a TASK-007) no rompe la página', async () => {
+    const legacy = overview({ status: 'active', trialEndsAt: null });
+    delete legacy.graceEndsAt;
+    renderBilling({ billing: legacy });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Facturación' })).toBeTruthy();
   });
 });

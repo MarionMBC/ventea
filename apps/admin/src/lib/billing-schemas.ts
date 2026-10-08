@@ -24,6 +24,8 @@ export const panelOwnerBillingEventSchema = ownerBillingEventSchema.extend({ typ
 
 export const panelBillingOverviewSchema = billingOverviewSchema.extend({
   events: z.array(panelOwnerBillingEventSchema),
+  /** TASK-007; una API anterior no lo manda. */
+  graceEndsAt: billingOverviewSchema.shape.graceEndsAt.optional().default(null),
 });
 
 export type PanelBillingEvent = z.infer<typeof panelBillingEventSchema>;

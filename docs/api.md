@@ -12,8 +12,11 @@ en toda ruta de la marca salvo:
 - `GET /api/orders`, `GET /api/orders/:id` y `GET /api/me`: el cliente sigue viendo su cuenta y
   sus pedidos en curso. Crear o cancelar pedidos, el menú, registro y login dan 402.
 
-Pasa con la suscripción `suspended`, `canceled`, `past_due` o en prueba vencida. Una prueba
-vencida pasa a `past_due` con el primer request de la marca, también en las rutas abiertas. Los schemas de entrada y salida son los de `@ventea/shared`
+Pasa con la suscripción `suspended`, `canceled` o en prueba vencida. Una prueba vencida pasa a
+`past_due` con el primer request de la marca, también en las rutas abiertas, y sigue en 402.
+**Gracia (TASK-007):** un `past_due` de un período pagado que venció sin pago **sigue
+atendiendo** (menú, pedidos, todo) hasta `currentPeriodEnd + 7 días` (`graceEndsAt` en
+`GET /api/billing`); pasado eso, 402 aunque el ciclo todavía no la haya pasado a `suspended`. Los schemas de entrada y salida son los de `@ventea/shared`
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
 ## Autenticación
@@ -116,13 +119,13 @@ Valores por defecto del programa (`DEFAULT_REWARD_PROGRAM`), en unidades menores
 Solo staff con rol `owner` (manager y staff → `403`). Abiertas aunque la marca esté suspendida.
 Contratos en `packages/shared/src/contracts/billing.ts`. Montos en centavos USD.
 
-| Método | Ruta                          | Qué hace                                                                           |
-| ------ | ----------------------------- | ---------------------------------------------------------------------------------- |
-| GET    | `/api/billing`                | plan, precio, estado, fechas, tarjeta (marca, últimos 4), modo, últimos 20 eventos |
-| POST   | `/api/billing/payment-method` | alta o cambio de tarjeta + primer cobro (`establish`)                              |
-| POST   | `/api/billing/change-plan`    | `{planCode, interval?}`: se aplica al **próximo período**, sin prorrateo           |
-| POST   | `/api/billing/cancel`         | cancela al terminar el período (o la prueba)                                       |
-| POST   | `/api/billing/resume`         | anula la cancelación agendada                                                      |
+| Método | Ruta                          | Qué hace                                                                                          |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| GET    | `/api/billing`                | plan, precio, estado, fechas, `graceEndsAt`, tarjeta (marca, últimos 4), modo, últimos 20 eventos |
+| POST   | `/api/billing/payment-method` | alta o cambio de tarjeta + primer cobro (`establish`)                                             |
+| POST   | `/api/billing/change-plan`    | `{planCode, interval?}`: se aplica al **próximo período**, sin prorrateo                          |
+| POST   | `/api/billing/cancel`         | cancela al terminar el período (o la prueba)                                                      |
+| POST   | `/api/billing/resume`         | anula la cancelación agendada                                                                     |
 
 - **Alta de tarjeta:** `{card: {number, expiryMonth, expiryYear, cvv, holder}, billing: {country,
 city?, line1?, state?, zip?, phone?, email?}}`. Tokeniza y cobra el próximo período con CVV

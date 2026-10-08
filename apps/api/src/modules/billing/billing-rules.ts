@@ -1,6 +1,6 @@
 import type { BillingInterval, SubscriptionStatus } from '@ventea/shared';
 
-import { addDays } from '@/modules/subscriptions/subscription-state';
+import { addDays, GRACE_DAYS } from '@/modules/subscriptions/subscription-state';
 
 import type { ChargeResult, GatewayAmount } from './gateway/payment-gateway';
 
@@ -13,8 +13,11 @@ import type { ChargeResult, GatewayAmount } from './gateway/payment-gateway';
 export const RETRY_OFFSETS_DAYS = [1, 3, 7] as const;
 /** Cobro original + 3 reintentos. Al 4.º rechazo, `suspended`. */
 export const MAX_RENEWAL_ATTEMPTS = RETRY_OFFSETS_DAYS.length + 1;
-/** Días que una marca sin tarjeta (o en modo manual) sigue `past_due` antes de suspenderse. */
-export const GRACE_DAYS = 7;
+/**
+ * Días que una marca sin tarjeta (o en modo manual) sigue `past_due`, atendiendo, antes de
+ * suspenderse. Vive en subscription-state (lo usa también el middleware).
+ */
+export { GRACE_DAYS };
 /** `clientReferenceInformation.code` de CyberSource admite 50 caracteres. */
 export const ORDER_ID_MAX_LENGTH = 50;
 

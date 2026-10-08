@@ -102,6 +102,19 @@ La landing, el registro, las páginas legales y el panel de plataforma se sirven
 apex queda libre para un sitio institucional futuro sin mover el producto. Detalle en
 `deploy/nginx.conf` y `deploy/test-vps/README.md`.
 
+## Decisión (TASK-007, 2026-10-08): `past_due` atiende durante la gracia
+
+Decisión de producto: una marca cuyo período pagado venció sin pago (`past_due`) **sigue
+atendiendo** menú y pedidos durante `GRACE_DAYS` (7) desde `currentPeriodEnd`; el panel de
+staff (dueño) y Facturación muestran «Tu pago está pendiente. Tu servicio sigue activo hasta el
+<fecha>; luego se suspenderá» con los días restantes (`graceEndsAt` en `GET /api/billing`). Solo
+`suspended`/`canceled` responden 402, y también un `past_due` con la gracia vencida (aunque el
+ciclo todavía no corrió). Interpretación: una **prueba vencida sin pago** no es una gracia (no
+hubo período pagado; `currentPeriodEnd <= trialEndsAt`) y sigue en 402 de inmediato, como
+dicen los términos. Un `past_due` con el período todavía vigente es un dato anómalo y se trata
+como antes (402). Implementado en `accessDecision`/`graceEndsAt`
+(`modules/subscriptions/subscription-state.ts`).
+
 ## Alternativas descartadas
 
 - **Seguir con una instancia por cliente (0006)**: no cierra con precios de $25–$129 al

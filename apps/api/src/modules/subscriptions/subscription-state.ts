@@ -5,6 +5,7 @@ import type { BillingInterval, SubscriptionStatus } from '@ventea/shared';
  * propio, para poder probarla con fechas fijas.
  *
  *   trialing ──(vence la prueba)──▶ past_due ──(reactivar)──▶ active
+ *   active ──(vence sin pago)──▶ past_due (atiende GRACE_DAYS) ──(ciclo)──▶ suspended
  *      │ └──(extender)──▶ trialing ◀──(extender)──┘              │
  *      └────────────(suspender)──▶ suspended ◀──(suspender)──────┘
  *                                      └──(reactivar)──▶ active
@@ -16,17 +17,41 @@ import type { BillingInterval, SubscriptionStatus } from '@ventea/shared';
 
 export const TRIAL_DAYS = 14;
 
+/**
+ * Días que una marca `past_due` (período pagado que venció sin pago) sigue atendiendo antes de
+ * suspenderse. Decisión de producto TASK-007: durante la gracia el menú y los pedidos
+ * funcionan; el panel avisa con la fecha de fin. El ciclo de cobro la suspende al cumplirse.
+ */
+export const GRACE_DAYS = 7;
+
 /** Lo que el middleware necesita saber de la suscripción para decidir. */
 export interface SubscriptionSnapshot {
   status: SubscriptionStatus;
   trialEndsAt: Date | null;
+  currentPeriodEnd: Date;
 }
 
 /**
- * `allow` atiende; `block` responde 402; `expire_trial` también responde 402, pero antes
- * hay que pasar la suscripción a `past_due` (la prueba venció y nadie pagó).
+ * `allow` atiende; `grace` atiende pero el panel avisa (past_due en gracia); `block` responde
+ * 402; `expire_trial` también responde 402, pero antes hay que pasar la suscripción a
+ * `past_due` (la prueba venció y nadie pagó).
  */
-export type AccessDecision = 'allow' | 'block' | 'expire_trial';
+export type AccessDecision = 'allow' | 'grace' | 'block' | 'expire_trial';
+
+/**
+ * Fin de la gracia de una marca `past_due`: `currentPeriodEnd + GRACE_DAYS`. `null` (sin
+ * gracia) si no está `past_due`, si el período vencido era la prueba (`currentPeriodEnd <=
+ * trialEndsAt`: alta y extend-trial mueven las dos fechas juntas; una prueba vencida sin pago
+ * no tiene gracia) o si el período todavía no terminó (un `past_due` así es un dato anómalo: se
+ * trata como antes, bloqueado).
+ */
+export function graceEndsAt(subscription: SubscriptionSnapshot, now: Date): Date | null {
+  if (subscription.status !== 'past_due') return null;
+  const { trialEndsAt, currentPeriodEnd } = subscription;
+  if (currentPeriodEnd.getTime() > now.getTime()) return null;
+  if (trialEndsAt && currentPeriodEnd.getTime() <= trialEndsAt.getTime()) return null;
+  return addDays(currentPeriodEnd, GRACE_DAYS);
+}
 
 export function accessDecision(
   subscription: SubscriptionSnapshot | null,
@@ -48,7 +73,12 @@ export function accessDecision(
         return 'allow';
       }
       return 'expire_trial';
-    case 'past_due':
+    case 'past_due': {
+      // Gracia (TASK-007): sigue atendiendo hasta `graceEndsAt`; pasado eso bloquea aunque el
+      // ciclo (cada 15 min) todavía no la haya pasado a `suspended`.
+      const graceEnd = graceEndsAt(subscription, now);
+      return graceEnd && graceEnd.getTime() > now.getTime() ? 'grace' : 'block';
+    }
     case 'suspended':
     case 'canceled':
       return 'block';
