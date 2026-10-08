@@ -335,6 +335,57 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
     });
   });
 
+  describe('lo que ve el dueño (TASK-006 review)', () => {
+    it('GET /api/billing no expone emails, referencias, notas ni orderIds; la plataforma ve los intentos abiertos', async () => {
+      const target = await brand('dueno-privado');
+      fake.next({ timeout: 'approved' });
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(504);
+      const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+        where: { tenantId: target.tenant.id, status: 'unknown' },
+      });
+
+      // La plataforma ve el intento abierto con su orderId (para resolverlo).
+      const before = platformTenantDetailSchema.parse(
+        (await asPlatform(http().get(`/api/platform/tenants/${target.tenant.slug}`)).expect(200))
+          .body,
+      );
+      expect(before.openAttempts).toEqual([
+        expect.objectContaining({
+          orderId: attempt.orderId,
+          kind: 'establish',
+          status: 'unknown',
+          amountCents: attempt.amountCents,
+        }),
+      ]);
+
+      const resolved = await asPlatform(
+        http().post(`/api/platform/tenants/${target.tenant.slug}/resolve-payment`),
+      )
+        .send({ orderId: attempt.orderId, outcome: 'succeeded', note: 'nota-secreta-XYZ' })
+        .expect(200);
+      expect(platformTenantDetailSchema.parse(resolved.body).openAttempts).toEqual([]);
+      await asPlatform(http().post(`/api/platform/tenants/${target.tenant.slug}/record-payment`))
+        .send({ amountCents: 5900, reference: 'REF-SECRETA-123' })
+        .expect(200);
+
+      const response = await asOwner(http().get('/api/billing'), target).expect(200);
+      const raw = JSON.stringify(response.body);
+      for (const secret of ['REF-SECRETA-123', 'nota-secreta-XYZ', attempt.orderId, '@']) {
+        expect(raw).not.toContain(secret);
+      }
+      const overview = billingOverviewSchema.parse(response.body);
+      expect(overview.events.length).toBeGreaterThan(0);
+      for (const event of response.body.events as Record<string, unknown>[]) {
+        expect(Object.keys(event).sort()).toEqual(
+          ['amountCents', 'createdAt', 'description', 'status', 'type'].sort(),
+        );
+        expect(['billing_alert', 'payment_unknown']).not.toContain(event.type);
+      }
+      expect(overview.events.filter((e) => e.type === 'payment_succeeded')).toHaveLength(2);
+      expect(overview.events[0]?.description).toBe('Pago registrado');
+    });
+  });
+
   describe('ciclo de renovación (AC2, AC3, AC4)', () => {
     it('renovación aprobada avanza el período; cada cobro se ancla al networkTransactionId del establish', async () => {
       const target = await brand('ciclo-ok');

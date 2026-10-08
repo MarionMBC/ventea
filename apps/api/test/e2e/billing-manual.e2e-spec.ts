@@ -137,6 +137,27 @@ describe('Cobro en modo manual (TASK-005, AC5)', () => {
     expect(after.currentPeriodEnd).toEqual(periodEnd(before.currentPeriodEnd, 'month'));
   });
 
+  it('record-payment es idempotente por referencia en la misma marca (409)', async () => {
+    const tenant = await brand('manual-idempotente', 'active', 10);
+    const other = await brand('manual-idempotente-otra', 'active', 10);
+    await asPlatform(http().post(`/api/platform/tenants/${tenant.slug}/record-payment`))
+      .send({ amountCents: 2500, reference: 'TRF-DUP-1' })
+      .expect(200);
+    const dup = await asPlatform(http().post(`/api/platform/tenants/${tenant.slug}/record-payment`))
+      .send({ amountCents: 2500, reference: ' TRF-DUP-1 ' })
+      .expect(409);
+    expect(dup.body.message).toBe('Ese pago ya fue registrado');
+    expect(
+      await prisma.billingEvent.count({
+        where: { tenantId: tenant.id, type: 'payment_succeeded' },
+      }),
+    ).toBe(1);
+    // La misma referencia en otra marca es otro pago.
+    await asPlatform(http().post(`/api/platform/tenants/${other.slug}/record-payment`))
+      .send({ amountCents: 2500, reference: 'TRF-DUP-1' })
+      .expect(200);
+  });
+
   it('record-payment valida el body y la marca', async () => {
     const tenant = await brand('manual-validacion', 'active', 10);
     await asPlatform(http().post(`/api/platform/tenants/${tenant.slug}/record-payment`))

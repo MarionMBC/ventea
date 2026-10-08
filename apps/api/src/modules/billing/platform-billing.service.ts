@@ -11,6 +11,7 @@ import type { PlatformPrincipal } from '@/common/auth/auth.context';
 import { fitsLocationLimit } from '@/modules/subscriptions/plan-limits';
 import { addDays, periodEnd } from '@/modules/subscriptions/subscription-state';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
+import { isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { BillingLockService, subscriptionLockKey } from './billing-lock.service';
@@ -23,6 +24,12 @@ import {
 } from './billing.mapper';
 
 const SUMMARY_CURRENCY = 'USD';
+export const MANUAL_PAYMENT_DUPLICATE = 'Ese pago ya fue registrado';
+
+/** Clave idempotente de un pago manual: marca + referencia (sin mayúsculas ni espacios extremos). */
+export function manualPaymentKey(tenantId: string, reference: string): string {
+  return `manual:${tenantId}:${reference.trim().toLowerCase()}`;
+}
 const FAILURE_WINDOW_DAYS = 7;
 
 /**
@@ -63,20 +70,33 @@ export class PlatformBillingService {
           'Hay un cobro con tarjeta sin confirmar: resuélvelo primero (resolve-payment)',
         );
       }
+      // Idempotente por referencia y marca: el doble clic o el reintento tras un corte no
+      // abren dos períodos. La clave va en `orderId` (único en la base: también frena una
+      // carrera entre réplicas) y nunca sale hacia el dueño.
+      const orderId = manualPaymentKey(subscription.tenantId, input.reference);
+      const already = await this.prisma.billingEvent.count({
+        where: { tenantId: subscription.tenantId, orderId },
+      });
+      if (already > 0) throw new ConflictException(MANUAL_PAYMENT_DUPLICATE);
       const current = await this.load(subscription.tenantId);
       const { plan, interval } = await this.nextPlanThatFits(current);
       const periodStart = nextPeriodStart(current, new Date());
-      await this.outcomes.applyPaid({
-        tenantId: current.tenantId,
-        subscriptionId: current.id,
-        periodStart,
-        periodEnd: periodEnd(periodStart, interval),
-        plan: { id: plan.id, code: plan.code },
-        interval,
-        amountCents: input.amountCents,
-        orderId: null,
-        message: `Pago manual (${input.reference}) registrado por ${admin.email}`,
-      });
+      await this.outcomes
+        .applyPaid({
+          tenantId: current.tenantId,
+          subscriptionId: current.id,
+          periodStart,
+          periodEnd: periodEnd(periodStart, interval),
+          plan: { id: plan.id, code: plan.code },
+          interval,
+          amountCents: input.amountCents,
+          orderId,
+          message: `Pago manual (${input.reference}) registrado por ${admin.email}`,
+        })
+        .catch((error: unknown) => {
+          if (isUniqueViolation(error)) throw new ConflictException(MANUAL_PAYMENT_DUPLICATE);
+          throw error;
+        });
     });
   }
 

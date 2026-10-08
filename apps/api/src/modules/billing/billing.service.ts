@@ -10,11 +10,13 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type {
-  BillingChangePlanInput,
-  BillingOverview,
-  PaymentMethodInput,
-  SubscriptionStatus,
+import {
+  OWNER_BILLING_EVENT_TYPE,
+  type BillingChangePlanInput,
+  type BillingOverview,
+  type OwnerBillingEventType,
+  type PaymentMethodInput,
+  type SubscriptionStatus,
 } from '@ventea/shared';
 
 import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
@@ -70,14 +72,20 @@ export class BillingService {
   async overview(tenantId: string): Promise<BillingOverview> {
     const [subscription, events] = await Promise.all([
       this.load(tenantId),
+      // Lista blanca: alertas, cobros sin confirmar y tipos nuevos no llegan al dueño. Sin
+      // `message`: es interno (ver toOwnerBillingEvent).
       this.prisma.billingEvent.findMany({
-        where: { tenantId },
+        where: { tenantId, type: { in: [...OWNER_BILLING_EVENT_TYPE] } },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: OVERVIEW_EVENTS,
-        select: { type: true, amountCents: true, status: true, message: true, createdAt: true },
+        select: { type: true, amountCents: true, status: true, createdAt: true },
       }),
     ]);
-    return toBillingOverview(subscription, this.gateway.mode, events);
+    return toBillingOverview(
+      subscription,
+      this.gateway.mode,
+      events.map((event) => ({ ...event, type: event.type as OwnerBillingEventType })),
+    );
   }
 
   /**
