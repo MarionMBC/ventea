@@ -2,6 +2,7 @@ import { SUBSCRIPTION_STATUS } from '@ventea/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { BillingSummaryBar } from './BillingSummary';
 import { useTenantList, type StatusFilter } from './hooks';
 import { formatDay, INTERVAL_LABEL, PLAN_LABEL, periodEndOf, STATUS_LABEL } from './labels';
 import { StatusBadge } from './StatusBadge';
@@ -58,6 +59,8 @@ export function TenantList() {
           </p>
         )}
       </div>
+
+      <BillingSummaryBar />
 
       <div className="pf-filters" role="search">
         <label className="field pf-filters__search">

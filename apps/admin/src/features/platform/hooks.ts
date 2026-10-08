@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  billingSummarySchema,
   planSchema,
-  platformTenantDetailSchema,
   platformTenantPageSchema,
+  type BillingSummary,
   type ChangePlanInput,
+  type PaymentResolution,
   type Plan,
   type PlatformTenant,
-  type PlatformTenantDetail,
   type PlatformTenantPage,
   type SubscriptionStatus,
 } from '@ventea/shared';
 
-import { ApiError } from '@/lib/api';
+import { panelTenantDetailSchema, type PanelTenantDetail } from '@/lib/billing-schemas';
 
 import { usePlatform } from './services';
 
@@ -27,7 +28,7 @@ export const platformKeys = {
   everything: ['platform', 'tenants', 'all'] as const,
   detail: (slug: string) => ['platform', 'tenant', slug] as const,
   plans: ['platform', 'plans'] as const,
-  recordPayment: (slug: string) => ['platform', 'record-payment', slug] as const,
+  summary: ['platform', 'tenants', 'summary'] as const,
 };
 
 export type StatusFilter = SubscriptionStatus | 'all';
@@ -107,8 +108,8 @@ export function useTenantDetail(slug: string) {
   return useQuery({
     queryKey: platformKeys.detail(slug),
     queryFn: ({ signal }) =>
-      client.request<PlatformTenantDetail>(`/platform/tenants/${encodeURIComponent(slug)}`, {
-        schema: platformTenantDetailSchema,
+      client.request<PanelTenantDetail>(`/platform/tenants/${encodeURIComponent(slug)}`, {
+        schema: panelTenantDetailSchema,
         signal,
       }),
   });
@@ -129,28 +130,16 @@ export function usePlans() {
   });
 }
 
-/**
- * ¿Existe `POST …/record-payment` (llega con TASK-005)? Se sondea con un body vacío: si
- * la ruta existe, la validación responde `400` antes de llegar al handler (no escribe
- * nada); si no existe, Nest responde `404`. Cualquier otra cosa: oculto, por las dudas.
- */
-export function useRecordPaymentAvailable(slug: string) {
+/** `GET /api/platform/billing/summary`: MRR, marcas por estado, cobros sin resolver, alertas. */
+export function useBillingSummary() {
   const { client } = usePlatform();
   return useQuery({
-    queryKey: platformKeys.recordPayment(slug),
-    queryFn: async () => {
-      try {
-        await client.request(`/platform/tenants/${encodeURIComponent(slug)}/record-payment`, {
-          method: 'POST',
-          body: {},
-        });
-        return true;
-      } catch (error) {
-        return error instanceof ApiError && error.status === 400;
-      }
-    },
-    staleTime: Infinity,
-    retry: false,
+    queryKey: platformKeys.summary,
+    queryFn: ({ signal }) =>
+      client.request<BillingSummary>('/platform/billing/summary', {
+        schema: billingSummarySchema,
+        signal,
+      }),
   });
 }
 
@@ -159,7 +148,8 @@ export type TenantAction =
   | { kind: 'reactivate' }
   | { kind: 'change-plan'; input: ChangePlanInput }
   | { kind: 'extend-trial'; days: number }
-  | { kind: 'record-payment'; amountCents: number; reference: string };
+  | { kind: 'record-payment'; amountCents: number; reference: string }
+  | { kind: 'resolve-payment'; orderId: string; outcome: PaymentResolution; note?: string };
 
 function bodyOf(action: TenantAction): unknown {
   switch (action.kind) {
@@ -173,6 +163,8 @@ function bodyOf(action: TenantAction): unknown {
       return { days: action.days };
     case 'record-payment':
       return { amountCents: action.amountCents, reference: action.reference };
+    case 'resolve-payment':
+      return { orderId: action.orderId, outcome: action.outcome, note: action.note || undefined };
   }
 }
 
@@ -186,8 +178,8 @@ export function useTenantAction(slug: string) {
         `/platform/tenants/${encodeURIComponent(slug)}/${action.kind}`,
         { method: 'POST', body: bodyOf(action) },
       );
-      // record-payment (TASK-005) puede no devolver el detalle: entonces se recarga.
-      const parsed = platformTenantDetailSchema.safeParse(response);
+      // Todas devuelven el detalle; si no se puede leer, se recarga.
+      const parsed = panelTenantDetailSchema.safeParse(response);
       return parsed.success ? parsed.data : null;
     },
     onSuccess: async (detail) => {

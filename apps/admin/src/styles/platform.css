@@ -304,3 +304,82 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+.pf-radios {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pf-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+}
+
+.pf-radio input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Resumen de cobro en la cabecera de la lista */
+.pf-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.pf-summary > div {
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.pf-summary dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.pf-summary dd {
+  margin: 0.125rem 0 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-summary dd small {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.pf-summary .is-alert dd {
+  color: var(--danger);
+}
+
+/* Avisos de la página de facturación (staff) */
+.pf-banner {
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.pf-banner--danger {
+  background: var(--st-cancelled-bg);
+  color: var(--st-cancelled);
+}
+
+.pf-banner--warn {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.billing__note a {
+  font-weight: 700;
+}

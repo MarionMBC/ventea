@@ -22,6 +22,27 @@ function fakeJwt(expMs: number): string {
   return `h.${payload.replace(/=+$/, '')}.s`;
 }
 
+const PLANS = [
+  {
+    code: 'pro',
+    name: 'Pro',
+    priceMonthlyCents: 5900,
+    priceYearlyCents: 59000,
+    currency: 'USD',
+    maxLocations: 3,
+    features: { brandedApp: true, customDomain: true, reports: false, prioritySupport: false },
+  },
+];
+
+const SUMMARY = {
+  currency: 'USD',
+  mrrCents: 123400,
+  byStatus: { trialing: 5, active: 3, past_due: 0, suspended: 1, canceled: 0 },
+  failuresLast7Days: 1,
+  unresolvedPayments: 2,
+  alertsLast7Days: 0,
+};
+
 const SESSION: PlatformSession = {
   accessToken: fakeJwt(Date.now() + 60 * 60 * 1000),
   admin: { id: uuid(1), email: 'mario@ventea.tech', name: 'Mario' },
@@ -47,6 +68,7 @@ function makeTenant(n: number, status: SubscriptionStatus = 'trialing'): Platfor
       currentPeriodEnd: new Date(created.getTime() + 14 * DAY),
       cancelAtPeriodEnd: false,
     },
+    card: null,
     activeLocations: 1,
     billingEvents: [
       { type: 'trial_started', amountCents: null, status: null, message: null, createdAt: created },
@@ -63,7 +85,7 @@ interface Call {
 }
 
 /** API de plataforma falsa con estado: lista, detalle y transiciones. */
-function createFakePlatformApi(count = 30, options: { recordPayment?: boolean } = {}) {
+function createFakePlatformApi(count = 30) {
   const tenants = Array.from({ length: count }, (_, i) =>
     makeTenant(i + 1, i % 5 === 0 ? 'active' : 'trialing'),
   );
@@ -89,9 +111,10 @@ function createFakePlatformApi(count = 30, options: { recordPayment?: boolean } 
         ? json(SESSION)
         : apiError(401, 'Credenciales inválidas');
     }
-    if (call.path === '/api/platform/plans') return json([]);
+    if (call.path === '/api/platform/plans') return json(PLANS);
     if (call.auth !== `Bearer ${SESSION.accessToken}`) return apiError(401, 'Unauthorized');
 
+    if (call.path === '/api/platform/billing/summary') return json(SUMMARY);
     if (call.method === 'GET' && call.path === '/api/platform/tenants') {
       const page = Number(call.query.get('page') ?? 1);
       const pageSize = Number(call.query.get('pageSize') ?? 50);
@@ -126,8 +149,24 @@ function createFakePlatformApi(count = 30, options: { recordPayment?: boolean } 
         });
         return json(tenant);
       case 'record-payment':
-        if (!options.recordPayment) return apiError(404, `Cannot POST ${call.path}`);
-        return apiError(400, 'Datos inválidos');
+        sub.status = 'active';
+        tenant.billingEvents.unshift({
+          type: 'payment_succeeded',
+          amountCents: (call.body as { amountCents: number }).amountCents,
+          status: null,
+          message: `Pago manual (${(call.body as { reference: string }).reference})`,
+          createdAt: new Date(),
+        });
+        return json(tenant);
+      case 'resolve-payment':
+        tenant.billingEvents.unshift({
+          type: 'payment_succeeded',
+          amountCents: 5900,
+          status: null,
+          message: 'Renovación confirmada a mano',
+          createdAt: new Date(),
+        });
+        return json(tenant);
       default:
         return apiError(404, `Cannot POST ${call.path}`);
     }
@@ -150,10 +189,17 @@ function listItem(tenant: PlatformTenantDetail): PlatformTenant {
 
 function renderPlatform(
   path: string,
-  options: { loggedIn?: boolean; count?: number; recordPayment?: boolean; hostname?: string } = {},
+  options: {
+    loggedIn?: boolean;
+    count?: number;
+    hostname?: string;
+    /** Prepara la API falsa antes del primer render. */
+    before?: (api: ReturnType<typeof createFakePlatformApi>) => void;
+  } = {},
 ) {
-  const { loggedIn = true, count, recordPayment, hostname } = options;
-  const api = createFakePlatformApi(count, { recordPayment });
+  const { loggedIn = true, count, hostname, before } = options;
+  const api = createFakePlatformApi(count);
+  before?.(api);
   const platformSession = createPlatformSessionStore(null);
   if (loggedIn) platformSession.set(SESSION);
   const platform = {
@@ -303,10 +349,11 @@ describe('panel de plataforma (AC3)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Marca 2' })).toBeTruthy();
     expect(screen.getByText('marca-02.ventea.tech')).toBeTruthy();
     expect(screen.getByText('Prueba iniciada')).toBeTruthy();
-    await waitFor(() =>
-      expect(api.calls.some((c) => c.path.endsWith('/record-payment'))).toBe(true),
-    );
-    expect(screen.queryByRole('button', { name: 'Registrar pago' })).toBeNull();
+    expect(screen.getByText('Sin tarjeta')).toBeTruthy();
+    // Sin sondeo: «Registrar pago» está siempre y no se llama al endpoint al abrir.
+    expect(screen.getByRole('button', { name: 'Registrar pago' })).toBeTruthy();
+    expect(api.calls.some((c) => c.path.endsWith('/record-payment'))).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Resolver cobro' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reactivar' })).toBeNull();
 
     // Suspender: pide confirmación; cancelar no llama a la API.
@@ -361,9 +408,100 @@ describe('panel de plataforma (AC3)', () => {
     );
   });
 
-  it('muestra «Registrar pago» si el endpoint existe (400 al sondear)', async () => {
-    renderPlatform('/admin/plataforma/marcas/marca-02', { recordPayment: true });
-    expect(await screen.findByRole('button', { name: 'Registrar pago' })).toBeTruthy();
+  it('registrar pago: precarga el precio del plan, pide referencia y confirma', async () => {
+    const { api } = renderPlatform('/admin/plataforma/marcas/marca-02');
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar pago' }));
+    const dialog = screen.getByRole('dialog', { name: 'Registrar pago manual' });
+    const amount = within(dialog).getByLabelText('Monto (USD)') as HTMLInputElement;
+    await waitFor(() => expect(amount.value).toBe('59.00')); // Pro mensual
+    fireEvent.change(within(dialog).getByLabelText(/Referencia/), {
+      target: { value: 'TRF-123' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+
+    expect((await screen.findByRole('status')).textContent).toContain('Pago registrado');
+    const call = api.calls.find((c) => c.path.endsWith('/record-payment'));
+    expect(call?.body).toEqual({ amountCents: 5900, reference: 'TRF-123' });
+    expect(screen.getAllByText('Pago recibido').length).toBeGreaterThan(0);
+  });
+
+  it('registrar pago con un cobro en curso: muestra el 409 en el diálogo', async () => {
+    const { api } = renderPlatform('/admin/plataforma/marcas/marca-02');
+    api.setOverride((c) =>
+      c.path.endsWith('/record-payment')
+        ? apiError(409, 'Hay un cobro con tarjeta sin confirmar: resuélvelo primero')
+        : undefined,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar pago' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Monto (USD)'), { target: { value: '59' } });
+    fireEvent.change(within(dialog).getByLabelText(/Referencia/), { target: { value: 'x' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toContain(
+      'cobro con tarjeta sin confirmar',
+    );
+  });
+
+  it('resolver cobro: aparece con un payment_unknown y precarga el orderId', async () => {
+    const { api } = renderPlatform('/admin/plataforma/marcas/marca-03');
+    api.tenants[2]!.card = { brand: 'visa', last4: '4242' };
+    api.tenants[2]!.billingEvents.unshift({
+      type: 'payment_unknown',
+      amountCents: 5900,
+      status: 'unknown',
+      message: 'Cobro sub-abc-20261008-a1 sin confirmar: se consulta a la pasarela, no se recobra',
+      createdAt: new Date(),
+    });
+    // Recarga el detalle con el evento nuevo.
+    fireEvent.click(await screen.findByRole('link', { name: '← Marcas' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Marca 3' }));
+    await screen.findByText('visa ••••4242');
+    expect(screen.getByText('Cobro sin confirmar')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resolver cobro' }));
+    const dialog = screen.getByRole('dialog', { name: 'Resolver cobro sin confirmar' });
+    expect((within(dialog).getByLabelText('orderId') as HTMLInputElement).value).toBe(
+      'sub-abc-20261008-a1',
+    );
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Se cobró/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Resolver' }));
+    expect((await screen.findByRole('status')).textContent).toBe('Cobro resuelto.');
+    expect(api.calls.find((c) => c.path.endsWith('/resolve-payment'))?.body).toEqual({
+      orderId: 'sub-abc-20261008-a1',
+      outcome: 'succeeded',
+    });
+  });
+
+  it('un tipo de evento desconocido no rompe el detalle: «Evento: <tipo>»', async () => {
+    renderPlatform('/admin/plataforma/marcas/marca-04', {
+      before: (api) =>
+        api.setOverride((c) => {
+          if (c.path !== '/api/platform/tenants/marca-04') return undefined;
+          const tenant = { ...api.tenants[3]!, card: undefined };
+          return json({
+            ...tenant,
+            billingEvents: [
+              {
+                type: 'refund_issued',
+                amountCents: 100,
+                status: null,
+                message: null,
+                createdAt: new Date(),
+              },
+            ],
+          });
+        }),
+    });
+    expect(await screen.findByText('Evento: refund_issued')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Marca 4' })).toBeTruthy();
+  });
+
+  it('cabecera de la lista con el resumen de cobro', async () => {
+    renderPlatform('/admin/plataforma');
+    const bar = await screen.findByLabelText('Resumen de cobro');
+    expect(bar.textContent).toContain('$1,234.00');
+    expect(bar.textContent).toContain('Activa 3');
+    expect(bar.textContent).toContain('Cobros sin resolver2');
   });
 
   it('token rechazado (401) en uso: vuelve al login avisando que expiró', async () => {

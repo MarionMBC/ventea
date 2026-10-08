@@ -33,11 +33,23 @@ export const EVENT_LABEL: Record<BillingEventType, string> = {
   suspended: 'Suspendida',
   reactivated: 'Reactivada',
   canceled: 'Cancelada',
+  payment_succeeded: 'Pago recibido',
+  payment_failed: 'Pago rechazado',
+  payment_unknown: 'Cobro sin confirmar',
+  payment_method_updated: 'Tarjeta actualizada',
+  plan_change_scheduled: 'Cambio de plan agendado',
+  cancel_scheduled: 'Cancelación agendada',
+  cancel_resumed: 'Cancelación anulada',
+  past_due: 'Pago pendiente',
+  billing_alert: 'Alerta de cobro',
 };
 
-/** Etiqueta de un tipo de evento; si llega uno nuevo (TASK-005) se muestra tal cual. */
+/**
+ * Etiqueta de un tipo de evento. Uno que este panel todavía no conoce (API más nueva que el
+ * web) se muestra como «Evento: <tipo>»: el schema de lectura del panel lo deja pasar.
+ */
 export function eventLabel(type: string): string {
-  return (EVENT_LABEL as Record<string, string>)[type] ?? type;
+  return (EVENT_LABEL as Record<string, string>)[type] ?? `Evento: ${type}`;
 }
 
 export type PlatformAction = 'suspend' | 'reactivate' | 'extend_trial' | 'change_plan';
@@ -82,4 +94,12 @@ export const formatDateTime = (date: Date) => dateTimeFormat.format(date);
 
 export function formatUsdCents(cents: number): string {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** `Visa ••••4242`, o «Sin tarjeta». Nunca hay más datos: la API no los expone. */
+export function cardLabel(card: { brand: string | null; last4: string | null } | null): string {
+  if (!card) return 'Sin tarjeta';
+  return [card.brand ?? 'Tarjeta', card.last4 ? `••••${card.last4}` : null]
+    .filter(Boolean)
+    .join(' ');
 }

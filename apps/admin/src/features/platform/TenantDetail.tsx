@@ -1,23 +1,21 @@
 import {
   BILLING_INTERVAL,
+  PAYMENT_RESOLUTION,
   type BillingInterval,
+  type PaymentResolution,
   type PlanCode,
-  type PlatformTenantDetail,
 } from '@ventea/shared';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import type { PanelBillingEvent, PanelTenantDetail } from '@/lib/billing-schemas';
+
 import { ConfirmDialog } from './ConfirmDialog';
 import { BASE_DOMAIN } from './host';
-import {
-  usePlans,
-  useRecordPaymentAvailable,
-  useTenantAction,
-  useTenantDetail,
-  type TenantAction,
-} from './hooks';
+import { usePlans, useTenantAction, useTenantDetail, type TenantAction } from './hooks';
 import {
   canDo,
+  cardLabel,
   eventLabel,
   formatDateTime,
   formatDay,
@@ -34,14 +32,43 @@ const DONE_MESSAGE: Record<DialogKind, string> = {
   reactivate: 'Marca reactivada: período nuevo desde hoy.',
   'change-plan': 'Plan actualizado.',
   'extend-trial': 'Prueba extendida.',
-  'record-payment': 'Pago registrado.',
+  'record-payment': 'Pago registrado: período nuevo abierto.',
+  'resolve-payment': 'Cobro resuelto.',
 };
+
+/** El `orderId` de un cobro sin confirmar sale en el mensaje de su evento `payment_unknown`. */
+const UNKNOWN_ORDER_RE = /Cobro (\S+) sin confirmar/;
+
+/** orderId del cobro sin confirmar más reciente, si los eventos lo muestran. */
+export function pendingOrderId(events: PanelBillingEvent[]): string | null {
+  for (const event of events) {
+    if (event.type !== 'payment_unknown') continue;
+    const match = event.message?.match(UNKNOWN_ORDER_RE);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+/** ¿Hay algo para resolver a mano? `payment_unknown` o una alerta (`needs_review`). */
+function needsResolution(events: PanelBillingEvent[]): boolean {
+  return events.some((e) => e.type === 'payment_unknown' || e.type === 'billing_alert');
+}
+
+/** Precio del plan e intervalo actuales, para precargar un pago manual. */
+function currentPriceCents(
+  plans: { code: string; priceMonthlyCents: number; priceYearlyCents: number }[] | undefined,
+  sub: { planCode: string; interval: BillingInterval } | null,
+): number | undefined {
+  const plan = sub && plans?.find((p) => p.code === sub.planCode);
+  if (!plan || !sub) return undefined;
+  return sub.interval === 'year' ? plan.priceYearlyCents : plan.priceMonthlyCents;
+}
 
 /** Detalle de una marca: datos, suscripción, eventos y acciones con confirmación. */
 export function TenantDetail() {
   const { slug = '' } = useParams();
   const detail = useTenantDetail(slug);
-  const recordPayment = useRecordPaymentAvailable(slug);
+  const plans = usePlans();
   const action = useTenantAction(slug);
   const [dialog, setDialog] = useState<DialogKind | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -142,6 +169,7 @@ export function TenantDetail() {
                 {formatDay(sub.currentPeriodStart)} – {formatDay(sub.currentPeriodEnd)}
               </Fact>
               <Fact label="Cancela al terminar">{sub.cancelAtPeriodEnd ? 'Sí' : 'No'}</Fact>
+              <Fact label="Tarjeta">{cardLabel(tenant.card)}</Fact>
             </dl>
           ) : (
             <p className="pf-muted">La marca no tiene suscripción.</p>
@@ -168,13 +196,22 @@ export function TenantDetail() {
                 Extender prueba
               </button>
             )}
-            {recordPayment.data === true && (
+            {sub && (
               <button
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => open('record-payment')}
               >
                 Registrar pago
+              </button>
+            )}
+            {sub && needsResolution(tenant.billingEvents) && (
+              <button
+                type="button"
+                className="btn btn--warning"
+                onClick={() => open('resolve-payment')}
+              >
+                Resolver cobro
               </button>
             )}
           </div>
@@ -261,11 +298,23 @@ export function TenantDetail() {
       )}
       {dialog === 'record-payment' && (
         <RecordPaymentDialog
+          suggestedCents={currentPriceCents(plans.data, sub)}
           pending={pending}
           error={error}
           onCancel={() => setDialog(null)}
           onConfirm={(amountCents, reference) =>
             run({ kind: 'record-payment', amountCents, reference })
+          }
+        />
+      )}
+      {dialog === 'resolve-payment' && (
+        <ResolvePaymentDialog
+          suggestedOrderId={pendingOrderId(tenant.billingEvents)}
+          pending={pending}
+          error={error}
+          onCancel={() => setDialog(null)}
+          onConfirm={(orderId, outcome, note) =>
+            run({ kind: 'resolve-payment', orderId, outcome, note })
           }
         />
       )}
@@ -300,7 +349,7 @@ function SuspendDialog({
   tenant,
   onConfirm,
   ...props
-}: DialogProps & { tenant: PlatformTenantDetail; onConfirm: (reason?: string) => void }) {
+}: DialogProps & { tenant: PanelTenantDetail; onConfirm: (reason?: string) => void }) {
   const [reason, setReason] = useState('');
   return (
     <ConfirmDialog
@@ -422,10 +471,17 @@ function ExtendTrialDialog({
 }
 
 function RecordPaymentDialog({
+  suggestedCents,
   onConfirm,
   ...props
-}: DialogProps & { onConfirm: (amountCents: number, reference: string) => void }) {
-  const [amount, setAmount] = useState('');
+}: DialogProps & {
+  suggestedCents?: number;
+  onConfirm: (amountCents: number, reference: string) => void;
+}) {
+  // Precarga el precio del plan e intervalo actuales; se puede corregir.
+  const [amount, setAmount] = useState(
+    suggestedCents === undefined ? '' : (suggestedCents / 100).toFixed(2),
+  );
   const [reference, setReference] = useState('');
   const cents = Math.round(Number(amount) * 100);
   const valid = Number.isFinite(cents) && cents > 0 && reference.trim().length > 0;
@@ -436,6 +492,11 @@ function RecordPaymentDialog({
       confirmLabel="Registrar pago"
       onConfirm={() => valid && onConfirm(cents, reference.trim())}
     >
+      <p className="pf-muted">
+        Pago recibido por fuera (transferencia, depósito): abre un período nuevo y deja la marca
+        activa. Con un cobro con tarjeta sin confirmar la API lo rechaza: primero hay que
+        resolverlo.
+      </p>
       <label className="field">
         <span className="field__label">Monto (USD)</span>
         <input
@@ -460,6 +521,73 @@ function RecordPaymentDialog({
       {!valid && (amount || reference) && (
         <p className="pf-muted">Completa un monto mayor a 0 y una referencia.</p>
       )}
+    </ConfirmDialog>
+  );
+}
+
+const OUTCOME_LABEL: Record<PaymentResolution, string> = {
+  succeeded: 'Se cobró (aprobado en el procesador)',
+  failed: 'No se cobró',
+};
+
+function ResolvePaymentDialog({
+  suggestedOrderId,
+  onConfirm,
+  ...props
+}: DialogProps & {
+  suggestedOrderId: string | null;
+  onConfirm: (orderId: string, outcome: PaymentResolution, note?: string) => void;
+}) {
+  const [orderId, setOrderId] = useState(suggestedOrderId ?? '');
+  const [outcome, setOutcome] = useState<PaymentResolution | null>(null);
+  const [note, setNote] = useState('');
+  const valid = orderId.trim().length > 0 && outcome !== null;
+  return (
+    <ConfirmDialog
+      {...props}
+      title="Resolver cobro sin confirmar"
+      confirmLabel="Resolver"
+      onConfirm={() => {
+        if (valid && outcome) onConfirm(orderId.trim(), outcome, note.trim() || undefined);
+      }}
+    >
+      <p className="pf-muted">
+        Solo después de revisar el cobro en el panel del procesador. «Se cobró» aplica el período
+        pagado; «No se cobró» lo cuenta como rechazo.
+      </p>
+      <label className="field">
+        <span className="field__label">orderId</span>
+        <input
+          className="field__input"
+          maxLength={64}
+          value={orderId}
+          onChange={(event) => setOrderId(event.target.value)}
+        />
+      </label>
+      <fieldset className="pf-radios">
+        <legend className="field__label">Resultado</legend>
+        {PAYMENT_RESOLUTION.map((value) => (
+          <label key={value} className="pf-radio">
+            <input
+              type="radio"
+              name="outcome"
+              value={value}
+              checked={outcome === value}
+              onChange={() => setOutcome(value)}
+            />
+            {OUTCOME_LABEL[value]}
+          </label>
+        ))}
+      </fieldset>
+      <label className="field">
+        <span className="field__label">Nota (opcional)</span>
+        <input
+          className="field__input"
+          maxLength={500}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </label>
     </ConfirmDialog>
   );
 }
