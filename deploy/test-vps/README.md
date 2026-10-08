@@ -22,8 +22,8 @@ API responde `402` al resto):
 | `<slug>.ventea.tech`          | `/api`, `/api/*` | `api` (priority 100)                        |
 | `<slug>.ventea.tech`          | el resto         | `web` (`ventea-test-web-1:80`, priority 10) |
 | `ventea.tech` (apex)          | `/api`, `/api/*` | `api` (priority 100)                        |
-| `ventea.tech` (apex)          | el resto         | `web` (priority 10): landing y registro     |
-| `www.ventea.tech`             | todo             | `web`: nginx responde `301` al apex         |
+| `ventea.tech` (apex)          | el resto         | `web` (priority 50): landing y registro     |
+| `www.ventea.tech`             | todo             | `web` (priority 50): nginx `301` al apex    |
 
 En `web` (nginx, `deploy/Dockerfile.web`) el panel de staff vive en `/admin` y llama a `/api`
 del mismo origen, así que no hay CORS de por medio. En `/` queda el build web de `apps/mobile`.
@@ -33,7 +33,20 @@ En el apex, el mismo nginx (otro `server` por `Host`, ver `deploy/nginx.conf`) s
 (`apps/landing`) en `/` y `/registro`, y el panel en `/admin/` — el de plataforma en
 `https://ventea.tech/admin/plataforma` (`/plataforma` redirige). La landing y el panel llaman a
 `ventea.tech/api` (mismo origen). Las rutas del apex y de `www` son fijas: las publica
-`sync-routes.sh` en cada corrida, cada una con su certificado.
+`sync-routes.sh` en cada corrida, cada una con su certificado. Priority explícita 50 (no 10)
+en el web del apex y de `www`: sin ella Traefik usa el largo de la regla, y cualquier otro
+router del Traefik compartido que declare `Host(ventea.tech)` ganaría en silencio. Antes del
+primer deploy: `grep -rn "ventea.tech" /etc/traefik/dynamic` (solo debe aparecer
+`ventea-test.yml`). El panel de plataforma existe **solo** en el apex: en
+`<slug>.ventea.tech/admin/plataforma` nginx responde `301` al apex (y la app no monta su login
+fuera del apex).
+
+nginx agrega en todas las respuestas (`deploy/nginx-security-headers.conf`) HSTS (1 año,
+`includeSubDomains`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin` y una CSP del mismo origen
+(`frame-ancestors 'none'`; `style-src 'unsafe-inline'` por Ionic; `img-src https:` por los
+logos de cada marca). Verificar después del deploy:
+`curl -sI https://ventea.tech/ | grep -iE "strict-transport|content-security|x-frame"`.
 
 ### Rutas automáticas (cron)
 

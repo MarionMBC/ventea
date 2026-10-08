@@ -57,6 +57,8 @@ if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 1048576 ]; then
 fi
 
 set -a; . ./.env; set +a
+# Vacío daría routers `Host(www.)` / `Host(api.)`: mejor fallar.
+: "${TENANT_BASE_DOMAIN:?falta TENANT_BASE_DOMAIN en .env}"
 
 DYNAMIC_DIR=/etc/traefik/dynamic
 PUBLISHED="$DYNAMIC_DIR/ventea-test.yml"
@@ -100,13 +102,18 @@ trap 'rm -f "$NEW"' EXIT
   done
   # El apex (landing + registro + panel de plataforma en /admin/plataforma) lleva los
   # mismos dos routers que una marca: su /api va a la API (mismo origen, sin CORS).
+  # Priority web 50 (no 10) en apex y www: Traefik usa por defecto el largo de la regla
+  # (Host de ventea.tech ≈ 19), así que con 10 cualquier otro router del Traefik
+  # compartido que declare ese host ganaría en silencio. /api del apex sigue en 100 > 50.
   for h in $apex_host $tenant_hosts; do
     name="ventea-test-$(echo "$h" | tr '.' '-')"
+    web_priority=10
+    [ "$h" = "$apex_host" ] && web_priority=50
     router "$name-api" "Host(\`$h\`) && (PathPrefix(\`/api/\`) || Path(\`/api\`))" ventea-test 100
-    router "$name-web" "Host(\`$h\`)" ventea-test-web 10
+    router "$name-web" "Host(\`$h\`)" ventea-test-web "$web_priority"
   done
   # www: nginx responde 301 al apex (necesita su propio certificado para el https://www).
-  router "ventea-test-$(echo "$www_host" | tr '.' '-')-web" "Host(\`$www_host\`)" ventea-test-web 10
+  router "ventea-test-$(echo "$www_host" | tr '.' '-')-web" "Host(\`$www_host\`)" ventea-test-web 50
   echo "  services:"
   echo "    ventea-test:"
   echo "      loadBalancer:"

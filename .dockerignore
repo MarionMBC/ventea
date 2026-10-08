@@ -1,0 +1,29 @@
+# Contexto de `docker build` (Dockerfile.api / Dockerfile.web desde la raíz). Las
+# dependencias y los builds se generan DENTRO de la imagen (`npm ci`, `npm run build`):
+# copiar los del host (node_modules de Windows, dist viejos) los pisaría.
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/coverage
+*.tsbuildinfo
+
+# Nunca secretos ni estado local en la imagen.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!deploy/.env.production.example
+
+.git
+.agent
+AGENTS.md
+graphify-out
+.atl
+screenshots
+apps/mobile/android
+apps/mobile/ios
+deploy/test-vps/*.log
+deploy/test-vps/*.tmp
+deploy/test-vps/.sync-routes.lock
