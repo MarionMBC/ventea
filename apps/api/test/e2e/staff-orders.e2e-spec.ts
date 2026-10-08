@@ -229,7 +229,7 @@ describe('Pedidos de staff (AC6)', () => {
     await http()
       .post('/api/staff/auth/login')
       .set('X-Tenant-Slug', tenant.slug)
-      .send({ email: tenant.staffEmail, password: 'incorrecta-123' })
+      .send({ email: tenant.staffEmail, password: 'incorrecta-123' }) // gitleaks:allow — clave de prueba
       .expect(401);
   });
 });

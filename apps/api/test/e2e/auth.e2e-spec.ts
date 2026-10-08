@@ -114,7 +114,7 @@ describe('Auth (AC1, AC2)', () => {
       const wrongPassword = await http()
         .post('/api/auth/login')
         .set('X-Tenant-Slug', tenantX.slug)
-        .send({ email, password: 'otra-clave-123' })
+        .send({ email, password: 'otra-clave-123' }) // gitleaks:allow — clave de prueba
         .expect(401);
       const unknownEmail = await http()
         .post('/api/auth/login')
