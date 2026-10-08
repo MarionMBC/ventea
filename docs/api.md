@@ -137,6 +137,12 @@ interval, country?, currency?}`. Crea en una transacción la marca, su branding,
   `SIGNUP_WEEKLY_LIMIT` (25) altas por registro; lleno → `429 "Registro temporalmente
 cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login`, `pagos`…),
   todo lo que empiece con `admin` y todo lo que contenga `ventea`.
+- **Clientes:** la landing (`apps/landing`, `https://ventea.tech`) usa `plans`,
+  `slug-available` y `signup`; el panel de plataforma (`apps/admin`,
+  `https://ventea.tech/admin/plataforma`) el login y `tenants/*`. Los dos llaman a `/api` del
+  mismo origen (Traefik manda `ventea.tech/api/*` a la API). En producción el CORS acepta
+  además el apex `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio
+  (`src/cors-origins.ts`), por si la landing se sirve aparte y llama a `api.ventea.tech`.
 - **Token de plataforma:** lleva `ver` (`PlatformAdmin.tokenVersion`); resetear la clave lo sube
   y todos los tokens vivos dejan de valer.
 - **Región:** la asigna `REGIONS` por país: el del body, si no `CF-IPCountry` / `X-Country`.
