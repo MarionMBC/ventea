@@ -12,11 +12,14 @@ import {
   AUTH_KIND_KEY,
   AUTH_REQUEST_KEY,
   AUTH_ROLES_KEY,
+  PLATFORM_AUTH_REQUEST_KEY,
   type AuthPrincipal,
   type CustomerPrincipal,
+  type PlatformPrincipal,
   type StaffPrincipal,
 } from '@/common/auth/auth.context';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { PlatformAuthGuard } from '@/common/guards/platform-auth.guard';
 
 /** Roles de staff admitidos en la ruta. Sin roles: cualquier staff del tenant. */
 export const Roles = (...roles: TenantRole[]) => SetMetadata(AUTH_ROLES_KEY, roles);
@@ -61,5 +64,21 @@ export const CurrentStaff = createParamDecorator(
       tenantId: principal.tenantId,
       role: principal.role ?? 'staff',
     };
+  },
+);
+
+/** La ruta exige sesión de administrador de la plataforma (JWT `kind: "platform"`). */
+export const PlatformAuth = () => applyDecorators(UseGuards(PlatformAuthGuard), ApiBearerAuth());
+
+/** Administrador de la plataforma autenticado (lo deja `@PlatformAuth()`). */
+export const CurrentPlatformAdmin = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): PlatformPrincipal => {
+    const request = ctx.switchToHttp().getRequest<Record<string, unknown>>();
+    const principal = request[PLATFORM_AUTH_REQUEST_KEY] as PlatformPrincipal | undefined;
+    if (!principal) {
+      // Programación defensiva: la ruta usa el decorador sin `@PlatformAuth()`.
+      throw new Error('No hay sesión de plataforma en el request: falta @PlatformAuth().');
+    }
+    return principal;
   },
 );

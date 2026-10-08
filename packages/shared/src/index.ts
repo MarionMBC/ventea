@@ -3,6 +3,7 @@ export * from './domain/tenant.js';
 export * from './contracts/auth.js';
 export * from './contracts/catalog.js';
 export * from './contracts/orders.js';
+export * from './contracts/platform.js';
 export * from './contracts/rewards.js';
 export * from './contracts/tenant.js';
 export * from './utils/money.js';

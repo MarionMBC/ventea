@@ -22,7 +22,8 @@ import { TokenService } from '@/modules/auth/token.service';
  *
  * Rechaza (401) un token firmado para otra marca (`tid` distinto al tenant que
  * resolvió el TenantMiddleware), un refresh usado como access y un token de
- * cliente en una ruta de staff o al revés. El mensaje es siempre el mismo:
+ * cliente en una ruta de staff o al revés. Un token de plataforma (`kind: "platform"`,
+ * sin `tid`) no pasa `TokenService.verify`: también 401. El mensaje es siempre el mismo:
  * distinguir los casos le diría a un atacante qué parte del token falló.
  *
  * No se usa suelto: lo aplican `@CustomerAuth()` y `@StaffAuth()`.
@@ -72,7 +73,8 @@ export class JwtAuthGuard implements CanActivate {
   }
 }
 
-function bearerToken(request: Record<string, unknown>): string | undefined {
+/** Token del header `Authorization: Bearer <token>`, si viene bien formado. */
+export function bearerToken(request: Record<string, unknown>): string | undefined {
   const headers = request.headers as Record<string, string | string[] | undefined>;
   const header = headers.authorization;
   if (typeof header !== 'string') return undefined;

@@ -10,16 +10,28 @@ import {
 } from '@ventea/shared';
 import { z } from 'zod';
 
-import type { JwtClaims } from '@/common/auth/auth.context';
+import type { PlatformJwtClaims, TenantJwtClaims } from '@/common/auth/auth.context';
 
-/** Lo que tiene que traer un JWT para ser aceptado, además de la firma válida. */
-const claimsSchema = z.object({
+/** Lo que tiene que traer un JWT de marca para ser aceptado, además de la firma válida. */
+const tenantClaimsSchema = z.object({
   sub: z.string().min(1),
   tid: z.string().min(1),
   typ: z.enum(['access', 'refresh']),
   kind: z.enum(AUTH_KIND),
   role: z.enum(TENANT_ROLE).optional(),
 });
+
+/** JWT de plataforma: sin `tid` (estricto: un `tid` colado lo invalida) y solo access. */
+const platformClaimsSchema = z
+  .object({
+    sub: z.string().min(1),
+    typ: z.literal('access'),
+    kind: z.literal('platform'),
+  })
+  .strict();
+
+/** Duración del token de plataforma: sin refresh, se vuelve a entrar con la clave. */
+const PLATFORM_ACCESS_TTL = '1h';
 
 /** Valor de `.env.example`: público, nunca puede firmar tokens en producción. */
 const EXAMPLE_JWT_SECRET = 'cambiar-en-cada-entorno';
@@ -69,6 +81,7 @@ export function parseTtl(value: string): number {
 export class TokenService {
   private readonly accessTtl: number;
   private readonly refreshTtl: number;
+  private readonly platformTtl: number;
 
   constructor(
     private readonly jwt: JwtService,
@@ -76,6 +89,13 @@ export class TokenService {
   ) {
     this.accessTtl = parseTtl(config.get<string>('JWT_ACCESS_TTL') || '15m');
     this.refreshTtl = parseTtl(config.get<string>('JWT_REFRESH_TTL') || '30d');
+    this.platformTtl = parseTtl(config.get<string>('PLATFORM_JWT_TTL') || PLATFORM_ACCESS_TTL);
+  }
+
+  /** Access token de un `PlatformAdmin`: `kind: "platform"`, sin `tid` ni refresh. */
+  async issuePlatformAccess(adminId: string): Promise<string> {
+    const claims: PlatformJwtClaims = { sub: adminId, typ: 'access', kind: 'platform' };
+    return this.jwt.signAsync(claims, { expiresIn: this.platformTtl });
   }
 
   async issuePair(input: {
@@ -92,9 +112,27 @@ export class TokenService {
     return { accessToken, refreshToken };
   }
 
-  /** Devuelve los claims si la firma es válida, no expiró y el `typ` coincide; si no, `null`. */
-  async verify(token: string, typ: JwtClaims['typ']): Promise<JwtClaims | null> {
-    let payload: unknown;
+  /**
+   * Claims de un token de MARCA (cliente o staff) si la firma es válida, no expiró y el
+   * `typ` coincide; si no, `null`. Un token de plataforma devuelve `null`: no tiene `tid`.
+   */
+  async verify(token: string, typ: TenantJwtClaims['typ']): Promise<TenantJwtClaims | null> {
+    const payload = await this.decode(token);
+    const claims = tenantClaimsSchema.safeParse(payload);
+    if (!claims.success || claims.data.typ !== typ) return null;
+    return claims.data;
+  }
+
+  /** Claims de un access token de PLATAFORMA; `null` para cualquier otro token. */
+  async verifyPlatform(token: string): Promise<PlatformJwtClaims | null> {
+    const payload = await this.decode(token);
+    const claims = platformClaimsSchema.safeParse(payload);
+    return claims.success ? claims.data : null;
+  }
+
+  /** Payload sin los claims registrados (`iat`, `exp`) si la firma vale; si no, `null`. */
+  private async decode(token: string): Promise<Record<string, unknown> | null> {
+    let payload: Record<string, unknown>;
     try {
       payload = await this.jwt.verifyAsync<Record<string, unknown>>(token, {
         algorithms: ['HS256'],
@@ -102,9 +140,7 @@ export class TokenService {
     } catch {
       return null;
     }
-
-    const claims = claimsSchema.safeParse(payload);
-    if (!claims.success || claims.data.typ !== typ) return null;
-    return claims.data;
+    const { iat: _iat, exp: _exp, ...claims } = payload;
+    return claims;
   }
 }

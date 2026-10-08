@@ -13,6 +13,33 @@ export const tenantSlugSchema = z
 export type TenantSlug = z.infer<typeof tenantSlugSchema>;
 
 /**
+ * Subdominios que el proxy o la plataforma usan para otra cosa: ninguna marca puede
+ * llamarse así. Los usan el registro self-service y el script `create-tenant`.
+ */
+export const RESERVED_TENANT_SLUGS: readonly string[] = [
+  'www',
+  'api',
+  'admin',
+  'app',
+  'mail',
+  'status',
+  'docs',
+  'platform',
+  'ventea',
+  'billing',
+  'help',
+  'support',
+  'blog',
+  'static',
+  'cdn',
+  'traefik',
+];
+
+export function isReservedTenantSlug(slug: string): boolean {
+  return RESERVED_TENANT_SLUGS.includes(slug);
+}
+
+/**
  * Contexto de tenant resuelto por request. Todo acceso a datos lo exige:
  * sin `tenantId` no se consulta nada (ver docs/multi-tenancy.md).
  */
