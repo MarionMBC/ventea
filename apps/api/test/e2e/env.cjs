@@ -1,0 +1,24 @@
+/*
+ * Entorno de los e2e. Todo explícito: el AppModule también lee ../../.env, y
+ * cualquier variable que no se fije acá se colaría desde la config de desarrollo.
+ *
+ * E2E_DATABASE_URL apunta a otra base si hace falta (CI, otro puerto). El nombre
+ * de la base tiene que terminar en `_test`: global-setup la borra y la recrea.
+ */
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL ||
+  'postgresql://ventea:ventea_local_dev@localhost:5432/ventea_test?schema=public';
+
+Object.assign(process.env, {
+  NODE_ENV: 'test',
+  DATABASE_URL: E2E_DATABASE_URL,
+  JWT_SECRET: 'e2e-only-not-a-real-secret',
+  JWT_ACCESS_TTL: '15m',
+  JWT_REFRESH_TTL: '30d',
+  TENANT_MODE: 'multi',
+  TENANT_SLUG: '',
+  TENANT_BASE_DOMAIN: 'ventea.tech',
+  DEFAULT_TENANT_SLUG: '',
+});
+
+module.exports = { E2E_DATABASE_URL };
