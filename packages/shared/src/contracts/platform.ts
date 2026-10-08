@@ -116,6 +116,19 @@ export const platformTenantSchema = z.object({
   ordersLast30Days: z.number().int().nonnegative(),
 });
 
+/** `GET /api/platform/tenants?page=&pageSize=`: la más nueva primero, hasta 100 por página. */
+export const platformTenantListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const platformTenantPageSchema = z.object({
+  items: z.array(platformTenantSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+});
+
 export const billingEventSchema = z.object({
   type: z.enum(BILLING_EVENT_TYPE),
   amountCents: z.number().int().nullable(),
@@ -152,6 +165,8 @@ export type PlatformAuthResponse = z.infer<typeof platformAuthResponseSchema>;
 export type PlatformSubscription = z.infer<typeof platformSubscriptionSchema>;
 export type PlatformTenant = z.infer<typeof platformTenantSchema>;
 export type PlatformTenantDetail = z.infer<typeof platformTenantDetailSchema>;
+export type PlatformTenantListQuery = z.infer<typeof platformTenantListQuerySchema>;
+export type PlatformTenantPage = z.infer<typeof platformTenantPageSchema>;
 export type BillingEvent = z.infer<typeof billingEventSchema>;
 export type SuspendTenantInput = z.infer<typeof suspendTenantSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;

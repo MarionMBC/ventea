@@ -25,6 +25,9 @@ model PlatformAdmin {
   email        String   @unique
   passwordHash String
   name         String
+  /// Va en el JWT (`ver`) y el guard lo compara: subirlo (--reset-password) invalida
+  /// en el acto todos los tokens vivos del admin.
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
   @@map("platform_admins")

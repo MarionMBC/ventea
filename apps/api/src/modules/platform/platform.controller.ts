@@ -16,6 +16,7 @@ import {
   countryCodeSchema,
   extendTrialSchema,
   loginSchema,
+  platformTenantListQuerySchema,
   signupSchema,
   slugAvailabilityQuerySchema,
   suspendTenantSchema,
@@ -24,8 +25,9 @@ import {
   type LoginInput,
   type Plan,
   type PlatformAuthResponse,
-  type PlatformTenant,
   type PlatformTenantDetail,
+  type PlatformTenantListQuery,
+  type PlatformTenantPage,
   type SignupInput,
   type SignupResponse,
   type SlugAvailability,
@@ -106,8 +108,10 @@ export class PlatformTenantsController {
   constructor(private readonly tenants: PlatformTenantsService) {}
 
   @Get()
-  list(): Promise<PlatformTenant[]> {
-    return this.tenants.list();
+  list(
+    @Query(new ZodValidationPipe(platformTenantListQuerySchema)) query: PlatformTenantListQuery,
+  ): Promise<PlatformTenantPage> {
+    return this.tenants.list(query);
   }
 
   @Get(':slug')

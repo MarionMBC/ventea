@@ -6,7 +6,8 @@
  *   node apps/api/dist/scripts/create-platform-admin.js --email yo@ventea.tech --reset-password
  *
  * La contraseña se genera acá y se imprime UNA vez; no se guarda en ningún otro lado. Si
- * el email ya existe, falla salvo con `--reset-password`, que le genera una nueva.
+ * el email ya existe, falla salvo con `--reset-password`, que le genera una nueva y sube
+ * `tokenVersion`: los tokens que ya tenía (TTL 1 h) dejan de valer en el acto.
  */
 import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
@@ -55,7 +56,10 @@ async function main(): Promise<void> {
     const passwordHash = await argon2.hash(password);
 
     if (existing) {
-      await prisma.platformAdmin.update({ where: { id: existing.id }, data: { passwordHash } });
+      await prisma.platformAdmin.update({
+        where: { id: existing.id },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      });
     } else {
       await prisma.platformAdmin.create({
         data: { email: email.data, name: values.name!, passwordHash },

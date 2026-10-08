@@ -27,6 +27,7 @@ const platformClaimsSchema = z
     sub: z.string().min(1),
     typ: z.literal('access'),
     kind: z.literal('platform'),
+    ver: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -93,8 +94,13 @@ export class TokenService {
   }
 
   /** Access token de un `PlatformAdmin`: `kind: "platform"`, sin `tid` ni refresh. */
-  async issuePlatformAccess(adminId: string): Promise<string> {
-    const claims: PlatformJwtClaims = { sub: adminId, typ: 'access', kind: 'platform' };
+  async issuePlatformAccess(adminId: string, tokenVersion: number): Promise<string> {
+    const claims: PlatformJwtClaims = {
+      sub: adminId,
+      typ: 'access',
+      kind: 'platform',
+      ver: tokenVersion,
+    };
     return this.jwt.signAsync(claims, { expiresIn: this.platformTtl });
   }
 

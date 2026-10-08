@@ -8,8 +8,9 @@ import {
 import type { Prisma } from '@prisma/client';
 import type {
   ChangePlanInput,
-  PlatformTenant,
   PlatformTenantDetail,
+  PlatformTenantListQuery,
+  PlatformTenantPage,
   SubscriptionStatus,
 } from '@ventea/shared';
 
@@ -52,13 +53,25 @@ export class PlatformTenantsService {
     private readonly limits: PlanLimitsService,
   ) {}
 
-  async list(): Promise<PlatformTenant[]> {
-    const tenants = await this.prisma.tenant.findMany({
-      include: PLATFORM_TENANT_INCLUDE,
-      orderBy: { createdAt: 'desc' },
-    });
+  async list({ page, pageSize }: PlatformTenantListQuery): Promise<PlatformTenantPage> {
+    const [tenants, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        include: PLATFORM_TENANT_INCLUDE,
+        // `id` desempata altas en el mismo milisegundo: sin él, una página podría repetir
+        // o saltarse marcas.
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.tenant.count(),
+    ]);
     const counts = await this.recentOrderCounts(tenants.map((t) => t.id));
-    return tenants.map((tenant) => toPlatformTenant(tenant, counts.get(tenant.id) ?? 0));
+    return {
+      items: tenants.map((tenant) => toPlatformTenant(tenant, counts.get(tenant.id) ?? 0)),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async detail(slug: string): Promise<PlatformTenantDetail> {

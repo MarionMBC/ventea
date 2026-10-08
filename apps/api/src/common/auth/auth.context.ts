@@ -25,6 +25,8 @@ export interface PlatformJwtClaims {
   sub: string;
   typ: 'access';
   kind: 'platform';
+  /** `PlatformAdmin.tokenVersion` al emitir: si cambió (reset de clave), el token muere. */
+  ver: number;
 }
 
 export type JwtClaims = TenantJwtClaims | PlatformJwtClaims;

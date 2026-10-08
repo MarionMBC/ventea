@@ -17,8 +17,8 @@ import { bearerToken } from './jwt-auth.guard';
  * Verifica el access token de un `PlatformAdmin` (`kind: "platform"`, sin `tid`).
  *
  * Rechaza (401) los tokens de cliente y de staff: aunque estén bien firmados, no son de
- * plataforma. Revisa además que la cuenta siga existiendo: borrar un admin corta su
- * sesión sin esperar a que expire el token.
+ * plataforma. Revisa además que la cuenta siga existiendo y que su `tokenVersion` sea
+ * la del token: borrar un admin o resetearle la clave corta su sesión en el acto.
  *
  * No se usa suelto: lo aplica `@PlatformAuth()`.
  */
@@ -36,11 +36,12 @@ export class PlatformAuthGuard implements CanActivate {
     const admin = claims
       ? await this.prisma.platformAdmin.findUnique({
           where: { id: claims.sub },
-          select: { id: true, email: true },
+          select: { id: true, email: true, tokenVersion: true },
         })
       : null;
 
-    if (!admin) throw new UnauthorizedException('Sesión inválida o expirada');
+    if (!admin || admin.tokenVersion !== claims?.ver)
+      throw new UnauthorizedException('Sesión inválida o expirada');
 
     const principal: PlatformPrincipal = { adminId: admin.id, email: admin.email };
     request[PLATFORM_AUTH_REQUEST_KEY] = principal;
