@@ -23,6 +23,7 @@ import {
   signupSchema,
   slugAvailabilityQuerySchema,
   suspendTenantSchema,
+  tenantReadyQuerySchema,
   type BillingSummary,
   type ChangePlanInput,
   type ExtendTrialInput,
@@ -38,6 +39,7 @@ import {
   type SignupResponse,
   type SlugAvailability,
   type SuspendTenantInput,
+  type TenantReady,
 } from '@ventea/shared';
 
 import type { PlatformPrincipal } from '@/common/auth/auth.context';
@@ -49,6 +51,7 @@ import { PlatformAuthService } from './platform-auth.service';
 import { PlatformTenantsService } from './platform-tenants.service';
 import { RateLimit, RateLimitGuard } from './rate-limit.guard';
 import { SignupService } from './signup.service';
+import { TenantReadyService } from './tenant-ready.service';
 
 /**
  * Rutas públicas de la plataforma (landing y registro). Fuera del TenantMiddleware:
@@ -57,7 +60,10 @@ import { SignupService } from './signup.service';
 @ApiTags('platform')
 @Controller('platform')
 export class PlatformPublicController {
-  constructor(private readonly signups: SignupService) {}
+  constructor(
+    private readonly signups: SignupService,
+    private readonly tenantReady: TenantReadyService,
+  ) {}
 
   @Get('plans')
   plans(): Promise<Plan[]> {
@@ -69,6 +75,23 @@ export class PlatformPublicController {
     @Query(new ZodValidationPipe(slugAvailabilityQuerySchema)) query: { slug: string },
   ): Promise<SlugAvailability> {
     return this.signups.slugAvailability(query.slug);
+  }
+
+  /**
+   * ¿`https://<slug>.<dominio>` ya responde con un certificado válido? La pantalla de éxito del
+   * registro lo consulta cada 5 s antes de habilitar «Entrar a mi panel». 404 si no existe.
+   */
+  @Get('tenant-ready')
+  @RateLimit({
+    bucket: 'tenant-ready',
+    envKey: 'TENANT_READY_RATE_LIMIT_PER_HOUR',
+    defaultPerHour: 240,
+  })
+  @UseGuards(RateLimitGuard)
+  async tenantReadyCheck(
+    @Query(new ZodValidationPipe(tenantReadyQuerySchema)) query: { slug: string },
+  ): Promise<TenantReady> {
+    return { ready: await this.tenantReady.isReady(query.slug) };
   }
 
   @Post('signup')

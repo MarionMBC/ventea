@@ -12,11 +12,13 @@ const logger = new Logger('PrismaTenantGuard');
  * - `Plan`: catálogo global de planes del SaaS, igual para todas las marcas (TASK-004).
  *   `Subscription` y `BillingEvent` NO están exentos: llevan tenantId y se filtran por él;
  *   el panel de plataforma los lee vía `Tenant` (include) o con `tenantId: { in }`.
+ * - `FunnelDailyCount`: contadores globales del embudo de la landing, sin marca (TASK-007).
  */
 const TENANT_EXEMPT_MODELS = new Set<string>([
   'PlatformAdmin',
   'Tenant',
   'Plan',
+  'FunnelDailyCount',
   'MenuItemModifierGroup',
 ]);
 

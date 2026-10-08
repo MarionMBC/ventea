@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 import type { INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { planSchema, signupResponseSchema, slugAvailabilitySchema } from '@ventea/shared';
+import {
+  planSchema,
+  signupResponseSchema,
+  slugAvailabilitySchema,
+  TERMS_VERSION,
+} from '@ventea/shared';
 import request from 'supertest';
 
 import { createApp, createRawPrisma, seedTenant, type TestTenant } from './helpers';
@@ -19,6 +24,7 @@ function signupBody(overrides: Record<string, unknown> = {}) {
     ownerPassword: OWNER_PASSWORD,
     planCode: 'pro',
     interval: 'month',
+    acceptedTermsVersion: TERMS_VERSION,
     ...overrides,
   };
 }
@@ -142,6 +148,10 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
     });
     expect(tenant.subscription?.trialEndsAt?.getTime()).toBe(result.trialEndsAt.getTime());
     expect(tenant.billingEvents).toEqual([expect.objectContaining({ type: 'trial_started' })]);
+    // TASK-007: queda registrada la versión de términos aceptada y cuándo.
+    expect(tenant.termsVersion).toBe(TERMS_VERSION);
+    expect(tenant.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(tenant.termsAcceptedAt?.getTime()).toBeLessThanOrEqual(Date.now());
 
     // El dueño entra al panel con la contraseña que eligió, y la API pública atiende.
     await http()
@@ -204,6 +214,28 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
     ]) {
       await http().post('/api/platform/signup').send(signupBody(overrides)).expect(400);
     }
+  });
+
+  it('sin aceptar los términos (o con una versión que no existe) → 400 y no crea nada', async () => {
+    const { acceptedTermsVersion: _omit, ...withoutTerms } = signupBody();
+    const missing = await http().post('/api/platform/signup').send(withoutTerms).expect(400);
+    expect(missing.body.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'acceptedTermsVersion' })]),
+    );
+    expect(await prisma.tenant.findUnique({ where: { slug: withoutTerms.slug } })).toBeNull();
+
+    const unknown = signupBody({ acceptedTermsVersion: '1999-01-01' });
+    await http().post('/api/platform/signup').send(unknown).expect(400);
+    expect(await prisma.tenant.findUnique({ where: { slug: unknown.slug } })).toBeNull();
+  });
+
+  it('GET /api/platform/tenant-ready: 404 si la marca no existe, 400 si el slug no es válido', async () => {
+    await http()
+      .get('/api/platform/tenant-ready')
+      .query({ slug: `nadie-${randomUUID().slice(0, 8)}` })
+      .expect(404);
+    await http().get('/api/platform/tenant-ready').query({ slug: 'No Vale' }).expect(400);
+    await http().get('/api/platform/tenant-ready').expect(400);
   });
 
   it('honeypot lleno → 400 y no crea nada', async () => {

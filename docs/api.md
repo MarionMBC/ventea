@@ -220,9 +220,14 @@ Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 | POST   | `/api/platform/tenants/:slug/record-payment`  | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período; `409` con un cobro sin confirmar |
 | POST   | `/api/platform/tenants/:slug/resolve-payment` | plataforma · `{orderId, outcome: succeeded·failed, note?}`: cierra un cobro sin confirmar                           |
 | GET    | `/api/platform/billing/summary`               | plataforma · `{currency, mrrCents, byStatus, failuresLast7Days, unresolvedPayments, alertsLast7Days}`               |
+| GET    | `/api/platform/tenant-ready?slug=`            | público · `{ready}`: ¿`https://<slug>.<dominio>` ya responde con HTTPS válido? `404` si no existe; 240/IP/h         |
+| POST   | `/api/platform/analytics/event`               | público · `{event}` del embudo → `204`; sin cookies ni PII; 120/IP/h (`ANALYTICS_RATE_LIMIT_PER_HOUR`)              |
+| GET    | `/api/platform/analytics/funnel?days=`        | plataforma · `{timezone, days: [{day, counts}], totals}` (1–90 días, default 30, más nuevo primero)                 |
 
 - **Registro:** `{restaurantName, slug, ownerName, ownerEmail, ownerPassword (≥ 10), planCode,
-interval, country?, currency?}`. Crea en una transacción la marca, su branding, el programa
+interval, acceptedTermsVersion, country?, currency?}`. `acceptedTermsVersion` (TASK-007) es
+  obligatorio y tiene que ser una de `TERMS_VERSIONS` (`@ventea/shared`); se guarda en
+  `tenants.termsVersion` con la fecha en `termsAcceptedAt`. Sin él → `400`. Crea en una transacción la marca, su branding, el programa
   de puntos por defecto, «Sucursal principal», el dueño con esa contraseña y la suscripción en
   prueba de 14 días. Responde `201 {tenant: {slug, url, adminUrl, region}, trialEndsAt}`. Slug
   tomado → `409`; reservado o inválido → `400`. El campo oculto `website` (honeypot) tiene que
@@ -236,6 +241,16 @@ cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login
   mismo origen (Traefik manda `ventea.tech/api/*` a la API). En producción el CORS acepta
   además el apex `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio
   (`src/cors-origins.ts`), por si la landing se sirve aparte y llama a `api.ventea.tech`.
+- **Dirección lista (`tenant-ready`):** tras el alta, la dirección tarda 1-2 min (ruta en
+  Traefik + certificado de Let's Encrypt; mientras tanto el navegador da
+  `ERR_CERT_AUTHORITY_INVALID` y, con HSTS, no deja seguir). La API hace un GET a
+  `https://<slug>.<TENANT_BASE_DOMAIN>/api/health` con verificación TLS normal (timeout 3 s) y
+  cachea la respuesta 10 s por slug. Solo slugs existentes y activos: no sirve para sondear hosts
+  arbitrarios. La pantalla de éxito del registro la consulta cada 5 s.
+- **Embudo (`analytics`):** `event` ∈ `visit · cta_click · signup_start · signup_step_2 ·
+signup_step_3 · signup_complete`. Body estricto (un campo extra es `400`). Se guarda solo
+  `funnel_daily_counts (day, event, count)`, con el día en `America/Tegucigalpa`; la IP solo la
+  usa el rate limit en memoria. La landing lo manda con `navigator.sendBeacon`.
 - **Detalle de marca:** incluye `openAttempts` (`{orderId, kind, status, amountCents,
 createdAt}` de los cobros `pending`/`unknown`/`needs_review`): son los que se cierran con
   `resolve-payment`.

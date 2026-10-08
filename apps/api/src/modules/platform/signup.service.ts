@@ -78,7 +78,8 @@ export class SignupService {
   /**
    * Crea en una transacción: tenant, branding, programa de puntos por defecto, la
    * sucursal «Sucursal principal», el dueño con la contraseña elegida, la suscripción en
-   * prueba y el asiento `trial_started`.
+   * prueba y el asiento `trial_started`. Deja registrada la versión de términos que aceptó el
+   * dueño (`acceptedTermsVersion`, exigida por el schema) y la fecha.
    *
    * `headerCountry` es el país que informa el proxy (`CF-IPCountry` / `X-Country`); el del
    * body, si viene, manda.
@@ -121,6 +122,8 @@ export class SignupService {
             timezone: region.timezone,
             region: region.code,
             createdVia: 'signup',
+            termsVersion: input.acceptedTermsVersion,
+            termsAcceptedAt: now,
             branding: { create: { appDisplayName: input.restaurantName } },
             rewardProgram: { create: { ...DEFAULT_REWARD_PROGRAM } },
             staff: {
