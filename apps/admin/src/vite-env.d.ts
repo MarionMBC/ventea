@@ -1,7 +1,11 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_API_URL: string;
+  /**
+   * Solo desarrollo: slug del tenant que se manda en `X-Tenant-Slug`, porque en
+   * `localhost` no hay subdominio. En producción va vacío y manda el subdominio.
+   */
+  readonly VITE_TENANT_SLUG?: string;
 }
 
 interface ImportMeta {

@@ -1,0 +1,202 @@
+/* Reset mínimo, tipografía y componentes base (botones, campos, estados). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* Foco visible solo con teclado; nunca se quita el contorno sin reemplazo. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Botones ─────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0.625rem 1.125rem;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color 120ms ease,
+    transform 80ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn--primary {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.btn--ghost {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn--ghost[aria-pressed='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+
+.btn--danger {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.btn--accent {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.btn--small {
+  font-size: var(--fs-sm);
+  padding: 0.5rem 0.875rem;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ── Campos ──────────────────────────────────────────────────────────── */
+.field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.field__label {
+  font-weight: 600;
+}
+
+.field__input {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+
+.field__input:focus-visible {
+  border-color: var(--focus);
+}
+
+.form-error {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--st-cancelled-bg);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ── Estados de pantalla (carga, vacío, error) ───────────────────────── */
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  max-width: 36rem;
+  margin: 3rem auto;
+  padding: 2rem var(--gutter);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+}
+
+.state h1,
+.state h2 {
+  color: var(--text);
+  font-size: var(--fs-xl);
+  line-height: 1.2;
+}
+
+.state--error h2 {
+  color: var(--danger);
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
