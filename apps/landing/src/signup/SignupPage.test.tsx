@@ -159,10 +159,12 @@ describe('Registro (AC2)', () => {
     api();
     render(<SignupPage search="" />);
     await fillRestaurant();
-    const honeypot = document.getElementById('website') as HTMLInputElement;
+    const honeypot = document.getElementById('hp-ref') as HTMLInputElement;
     expect(honeypot.tabIndex).toBe(-1);
+    expect(honeypot.autocomplete).toBe('off');
+    expect(honeypot.name).not.toMatch(/website|url|company|email|name/i);
     expect(honeypot.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Sitio web' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'No completar' })).toBeNull();
   });
 
   it('409: vuelve al paso de la dirección y la marca tomada', async () => {
@@ -219,6 +221,31 @@ describe('Registro (AC2)', () => {
     const alert = await screen.findByRole('alert');
     expect(text(alert)).toContain('Registro temporalmente cerrado, escríbenos.');
     expect(alert.querySelector('a')?.getAttribute('href')).toBe('mailto:hola@ventea.tech');
+  });
+
+  it('409 tras un envío cortado: avisa que quizá ya se creó, con el link al panel', async () => {
+    let calls = 0;
+    api(() => {
+      calls += 1;
+      if (calls === 1) throw new TypeError('Failed to fetch'); // el server creó, la respuesta se perdió
+      return json({ statusCode: 409, message: 'Ese subdominio ya está en uso' }, 409);
+    });
+    render(<SignupPage search="" />);
+    await fillRestaurant();
+    fillOwner();
+    submit();
+    expect(text(await screen.findByRole('alert'))).toContain('No pudimos conectar');
+
+    submit();
+    await waitFor(() =>
+      expect(text(screen.getByRole('alert'))).toContain(
+        'Puede que tu restaurante ya se haya creado',
+      ),
+    );
+    expect(text(screen.getByRole('alert'))).not.toContain('otro restaurante');
+    const link = screen.getByRole('link', { name: 'https://pollos-dona-ana.ventea.tech/admin' });
+    expect(link.getAttribute('href')).toBe('https://pollos-dona-ana.ventea.tech/admin');
+    expect(screen.getByLabelText('Correo')).toBeTruthy(); // se queda en el paso 3
   });
 
   it('sin red: avisa y deja reintentar sin perder los datos', async () => {

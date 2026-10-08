@@ -32,7 +32,11 @@ export function readInitialChoice(search: string): { plan: string; interval: Bil
   };
 }
 
-type SubmitError = { kind: 'closed' } | { kind: 'message'; message: string; step: Step };
+type SubmitError =
+  | { kind: 'closed' }
+  | { kind: 'message'; message: string; step: Step }
+  /** 409 tras un intento cortado (timeout/red) con el mismo slug: quizá la creó esta persona. */
+  | { kind: 'maybe-created'; adminUrl: string };
 
 export function SignupPage({ search = window.location.search }: { search?: string }) {
   const initial = readInitialChoice(search);
@@ -54,6 +58,8 @@ export function SignupPage({ search = window.location.search }: { search?: strin
   const [done, setDone] = useState<SignupResponse | null>(null);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // Slug del último envío que se cortó sin respuesta: el servidor pudo haber creado la marca.
+  const unansweredSlug = useRef<string | null>(null);
   const firstRender = useRef(true);
   const slugCheck = useSlugCheck(slug);
 
@@ -133,8 +139,16 @@ export function SignupPage({ search = window.location.search }: { search?: strin
       });
       setDone(response);
     } catch (error) {
+      const status = error instanceof ApiError ? error.status : 0;
+      if (status === 409 && unansweredSlug.current === slug) {
+        // El envío anterior se cortó y ahora el slug está tomado: lo más probable es que
+        // sea su propia marca. No se le dice «otro restaurante».
+        setSubmitError({ kind: 'maybe-created', adminUrl: `https://${slug}.${BASE_DOMAIN}/admin` });
+        return;
+      }
+      unansweredSlug.current = status === 0 ? slug : null;
       setSubmitError(describeError(error));
-      if (error instanceof ApiError && error.status === 409) {
+      if (status === 409) {
         slugCheck.markTaken();
         goTo(2);
       } else if (error instanceof ApiError && error.status === 400 && isSlugError(error)) {
@@ -197,6 +211,17 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                   <strong>Registro temporalmente cerrado, escríbenos.</strong> Recibimos muchas
                   altas hoy. Escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> y
                   te abrimos tu cuenta.
+                </p>
+              </div>
+            )}
+            {submitError?.kind === 'maybe-created' && (
+              <div className="notice notice--warn" role="alert">
+                <p>
+                  <strong>Puede que tu restaurante ya se haya creado.</strong> El envío anterior se
+                  cortó antes de recibir respuesta. Intenta entrar a{' '}
+                  <a href={submitError.adminUrl}>{submitError.adminUrl}</a> con tu correo y la
+                  contraseña que elegiste. Si no funciona, escríbenos a{' '}
+                  <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
                 </p>
               </div>
             )}
@@ -352,10 +377,10 @@ export function SignupPage({ search = window.location.search }: { search?: strin
 
                 {/* Honeypot: una persona no lo ve ni llega con el teclado; un bot lo llena. */}
                 <div className="hp" aria-hidden="true">
-                  <label htmlFor="website">Sitio web</label>
+                  <label htmlFor="hp-ref">No completar</label>
                   <input
-                    id="website"
-                    name="website"
+                    id="hp-ref"
+                    name="hp_ref_9x"
                     type="text"
                     tabIndex={-1}
                     autoComplete="off"
