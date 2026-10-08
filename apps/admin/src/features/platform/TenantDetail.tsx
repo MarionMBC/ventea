@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ConfirmDialog } from './ConfirmDialog';
+import { BASE_DOMAIN } from './host';
 import {
   usePlans,
   useRecordPaymentAvailable,
@@ -35,8 +36,6 @@ const DONE_MESSAGE: Record<DialogKind, string> = {
   'extend-trial': 'Prueba extendida.',
   'record-payment': 'Pago registrado.',
 };
-
-const BASE_DOMAIN = 'ventea.tech';
 
 /** Detalle de una marca: datos, suscripción, eventos y acciones con confirmación. */
 export function TenantDetail() {

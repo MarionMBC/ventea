@@ -7,6 +7,7 @@ import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
 import { OrdersHistory } from '@/features/orders/OrdersHistory';
 import { OrdersSection } from '@/features/orders/OrdersSection';
+import { isPlatformHost, PlatformElsewhere } from '@/features/platform/host';
 import { PlatformLayout } from '@/features/platform/PlatformLayout';
 import { PlatformLogin } from '@/features/platform/PlatformLogin';
 import {
@@ -49,11 +50,14 @@ export function App({
   platform: providedPlatform,
   queryClient: providedClient,
   basename = '/admin',
+  hostname = window.location.hostname,
 }: {
   services: Services;
   platform?: PlatformServices;
   queryClient?: QueryClient;
   basename?: string;
+  /** Host actual; el panel de plataforma solo se monta en el apex (ver `isPlatformHost`). */
+  hostname?: string;
 }) {
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
   const [platform] = useState(() => providedPlatform ?? createDefaultPlatformServices());
@@ -64,12 +68,18 @@ export function App({
           <QueryClientProvider client={queryClient}>
             <BrowserRouter basename={basename}>
               <Routes>
-                <Route path="/plataforma/login" element={<PlatformLogin />} />
-                <Route path="/plataforma" element={<PlatformLayout />}>
-                  <Route index element={<TenantList />} />
-                  <Route path="marcas/:slug" element={<TenantDetail />} />
-                  <Route path="*" element={<Navigate to="/plataforma" replace />} />
-                </Route>
+                {isPlatformHost(hostname) ? (
+                  <>
+                    <Route path="/plataforma/login" element={<PlatformLogin />} />
+                    <Route path="/plataforma" element={<PlatformLayout />}>
+                      <Route index element={<TenantList />} />
+                      <Route path="marcas/:slug" element={<TenantDetail />} />
+                      <Route path="*" element={<Navigate to="/plataforma" replace />} />
+                    </Route>
+                  </>
+                ) : (
+                  <Route path="/plataforma/*" element={<PlatformElsewhere />} />
+                )}
                 <Route path="/login" element={<LoginPage />} />
                 <Route element={<RequireStaff />}>
                   <Route element={<AppShell />}>

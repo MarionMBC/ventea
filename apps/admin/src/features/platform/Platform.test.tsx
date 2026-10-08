@@ -8,6 +8,7 @@ import { createSessionStore } from '@/lib/session';
 import { apiError, json } from '@/test/fixtures';
 
 import { createPlatformClient } from './client';
+import { isPlatformHost } from './host';
 import { createPlatformSessionStore, PLATFORM_SESSION_KEY, type PlatformSession } from './session';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -149,9 +150,9 @@ function listItem(tenant: PlatformTenantDetail): PlatformTenant {
 
 function renderPlatform(
   path: string,
-  options: { loggedIn?: boolean; count?: number; recordPayment?: boolean } = {},
+  options: { loggedIn?: boolean; count?: number; recordPayment?: boolean; hostname?: string } = {},
 ) {
-  const { loggedIn = true, count, recordPayment } = options;
+  const { loggedIn = true, count, recordPayment, hostname } = options;
   const api = createFakePlatformApi(count, { recordPayment });
   const platformSession = createPlatformSessionStore(null);
   if (loggedIn) platformSession.set(SESSION);
@@ -167,7 +168,9 @@ function renderPlatform(
   const queryClient = createQueryClient();
   queryClient.setDefaultOptions({ queries: { retry: false } });
   window.history.pushState({}, '', path);
-  render(<App services={services} platform={platform} queryClient={queryClient} />);
+  render(
+    <App services={services} platform={platform} queryClient={queryClient} hostname={hostname} />,
+  );
   return { api, platformSession };
 }
 
@@ -207,6 +210,29 @@ describe('sesión de plataforma', () => {
     expect(init.headers).not.toHaveProperty('x-tenant-slug');
     expect(session.get()).toBeNull();
     expect(session.wasExpired()).toBe(true);
+  });
+});
+
+describe('host del panel de plataforma', () => {
+  it('solo el apex y localhost', () => {
+    expect(isPlatformHost('ventea.tech')).toBe(true);
+    expect(isPlatformHost('VENTEA.TECH.')).toBe(true);
+    expect(isPlatformHost('localhost')).toBe(true);
+    expect(isPlatformHost('pollos-juan.ventea.tech')).toBe(false);
+    expect(isPlatformHost('ventea.tech.evil.com')).toBe(false);
+  });
+
+  it('en el subdominio de una marca no monta el login: manda al apex', async () => {
+    const { api } = renderPlatform('/admin/plataforma', {
+      loggedIn: false,
+      hostname: 'pollos-juan.ventea.tech',
+    });
+    expect(await screen.findByRole('heading', { name: /no está acá/ })).toBeTruthy();
+    expect(screen.queryByLabelText('Contraseña')).toBeNull();
+    expect(screen.getByRole('link').getAttribute('href')).toBe(
+      'https://ventea.tech/admin/plataforma',
+    );
+    expect(api.calls).toHaveLength(0);
   });
 });
 
