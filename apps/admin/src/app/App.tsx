@@ -16,6 +16,7 @@ import {
   PlatformProvider,
   type PlatformServices,
 } from '@/features/platform/services';
+import { Funnel } from '@/features/platform/Funnel';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
 import { ApiError } from '@/lib/api';
@@ -75,6 +76,7 @@ export function App({
                     <Route path="/plataforma" element={<PlatformLayout />}>
                       <Route index element={<TenantList />} />
                       <Route path="marcas/:slug" element={<TenantDetail />} />
+                      <Route path="embudo" element={<Funnel />} />
                       <Route path="*" element={<Navigate to="/plataforma" replace />} />
                     </Route>
                   </>

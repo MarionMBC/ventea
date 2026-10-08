@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   billingSummarySchema,
+  funnelReportSchema,
   planSchema,
   platformTenantPageSchema,
   type BillingSummary,
   type ChangePlanInput,
+  type FunnelReport,
   type PaymentResolution,
   type Plan,
   type PlatformTenant,
@@ -29,6 +31,7 @@ export const platformKeys = {
   detail: (slug: string) => ['platform', 'tenant', slug] as const,
   plans: ['platform', 'plans'] as const,
   summary: ['platform', 'tenants', 'summary'] as const,
+  funnel: (days: number) => ['platform', 'funnel', days] as const,
 };
 
 export type StatusFilter = SubscriptionStatus | 'all';
@@ -138,6 +141,19 @@ export function useBillingSummary() {
     queryFn: ({ signal }) =>
       client.request<BillingSummary>('/platform/billing/summary', {
         schema: billingSummarySchema,
+        signal,
+      }),
+  });
+}
+
+/** `GET /api/platform/analytics/funnel?days=`: embudo de registro de la landing. */
+export function useFunnel(days: number) {
+  const { client } = usePlatform();
+  return useQuery({
+    queryKey: platformKeys.funnel(days),
+    queryFn: ({ signal }) =>
+      client.request<FunnelReport>(`/platform/analytics/funnel?days=${days}`, {
+        schema: funnelReportSchema,
         signal,
       }),
   });

@@ -395,3 +395,29 @@
   margin: 0 auto;
   padding: 1.5rem var(--gutter) 3rem;
 }
+
+/* Navegación del panel (TASK-007: Marcas · Embudo de registro) */
+.pf__nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.pf__nav a {
+  padding: 0.5rem 0;
+  color: #d6ccbd;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pf__nav a:hover,
+.pf__nav a.active {
+  color: #fbf8f3;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.pf-table tfoot th,
+.pf-table tfoot td {
+  font-weight: 800;
+  border-top: 2px solid var(--border);
+}
