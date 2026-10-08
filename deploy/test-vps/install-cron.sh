@@ -11,16 +11,25 @@
 # de root: sync-routes.sh no necesita más permisos que esos.
 #
 # Solo toca SU línea, reconocida por el comentario `# ventea-sync-routes`: el resto del
-# crontab (otras entradas, comentarios, líneas en blanco) queda byte a byte igual.
+# crontab (otras entradas, comentarios, líneas en blanco intermedias) queda igual.
 # Que dos corridas no se pisen lo resuelve sync-routes.sh con flock.
 set -euo pipefail
 
 MARKER='# ventea-sync-routes'
 LINE="* * * * * cd ~/ventea-test && ./sync-routes.sh --quiet >> sync-routes.log 2>&1 $MARKER"
 
-current=$(crontab -l 2>/dev/null || true)
-# Todo menos nuestra línea (sea cual sea su versión), sin tocar nada más.
-others=$(printf '%s' "$current" | awk -v m="$MARKER" 'index($0, m) == 0')
+# `crontab -l` falla igual si el usuario no tiene crontab que ante cualquier otro error.
+# Solo el primer caso se trata como "vacío": en el segundo, seguir reescribiría el
+# crontab ajeno con lo poco que hayamos leído.
+if ! current=$(crontab -l 2>&1); then
+  case "$current" in
+    "no crontab for"*) current="" ;;
+    *) echo "✗ no se pudo leer el crontab: $current" >&2; exit 1 ;;
+  esac
+fi
+# Todo menos nuestra línea (sea cual sea su versión, incluida la de 2564ae4 que no
+# llevaba marcador), sin tocar nada más.
+others=$(printf '%s' "$current" | awk -v m="$MARKER" 'index($0, m) == 0 && index($0, "ventea-test && ./sync-routes.sh") == 0')
 
 write_crontab() {
   # $1 = contenido completo. Vacío → crontab vacío (no `crontab -r`: no borra el archivo).

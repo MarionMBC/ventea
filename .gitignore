@@ -48,3 +48,5 @@ graphify-out/
 
 # estado local de herramientas de agentes (regenerable)
 .atl/
+deploy/test-vps/.sync-routes.lock
+deploy/test-vps/*.tmp
