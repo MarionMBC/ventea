@@ -80,5 +80,13 @@ jobs:
       - name: Tests
         run: npm run test
 
+      # e2e: la API completa contra el Postgres del servicio. global-setup recrea la
+      # base (`ventea_test`) y le aplica las migraciones; necesita la URL del servicio
+      # porque el default de test/e2e/env.cjs usa las credenciales de desarrollo.
+      - name: Tests e2e
+        run: npm run test:e2e -w @ventea/api
+        env:
+          E2E_DATABASE_URL: ${{ env.DATABASE_URL }}
+
       - name: Build
         run: npm run build
