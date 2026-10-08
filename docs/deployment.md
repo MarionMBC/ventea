@@ -40,6 +40,8 @@ réplica y un `pg_try_advisory_lock` deja cobrar a una sola. No hace falta cron.
 | `BILLING_CYCLE_INTERVAL_MINUTES` | `15`          | Cada cuánto corre el ciclo                                                                      |
 | `BILLING_SCHEDULER_ENABLED`      | `true`        | `false` apaga el scheduler (el script `run-billing-cycle.js` sigue funcionando)                 |
 | `BILLING_RATE_LIMIT_PER_HOUR`    | `5`           | Altas de tarjeta por marca y hora                                                               |
+| `BILLING_IP_RATE_LIMIT_PER_DAY`  | `10`          | Altas de tarjeta por IP y día, entre todas las marcas (card-testing con el registro público)    |
+| `ALLOW_RAW_CARD_API`             | —             | `true` permite el alta con número crudo en producción con `ms-payments` (ver PCI, abajo)        |
 
 Con `BILLING_MODE=ms-payments` y sin URL o clave, **la API no arranca**: falla al desplegar, no
 en la primera renovación.
@@ -56,7 +58,15 @@ curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \
 ```
 
 Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) y deja la marca
-`active`.
+`active`. No toca una cancelación agendada por el dueño. Con un cobro con tarjeta sin
+confirmar responde `409`: primero `resolve-payment`.
+
+### Alertas
+
+`GET /api/platform/billing/summary` trae `unresolvedPayments` (cobros sin confirmar y
+rechazados por la pasarela antes del banco) y `alertsLast7Days` (`billing_alert`: posible
+doble pago, monto aprobado distinto del pedido, card-testing). Los dos tienen que estar en 0;
+si no, revisar el detalle de la marca y EBC.
 
 ### Puesta en marcha con CyberSource (no verificada: faltan credenciales)
 
@@ -82,9 +92,14 @@ Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) 
 6. **Rollback:** `BILLING_MODE=manual` y redeploy de la API. Los intentos en vuelo quedan en
    `payment_attempts`; los `unknown` se cierran con `resolve-payment` tras mirarlos en EBC.
 
-**PCI:** el número de tarjeta pasa por la memoria de la API y de ms-payments (alcance SAQ D);
-no se guarda ni se loguea. El camino a SAQ A es tokenizar en el navegador (Microform de
-CyberSource, `capture-context` de ms-payments) y mandarle a la API solo el token.
+**PCI — requisito antes de cobrar en producción:** hoy `POST /api/billing/payment-method`
+recibe el número de tarjeta: pasa por la memoria de la API y de ms-payments (alcance SAQ D),
+aunque no se guarda ni se loguea. **Antes de activar `BILLING_MODE=ms-payments` en
+producción hay que migrar a `capture-context` (Microform de CyberSource)**: el navegador
+tokeniza contra el procesador y la API recibe solo el token (SAQ A). Mientras tanto, con
+`NODE_ENV=production` y `BILLING_MODE=ms-payments`, el endpoint responde `503` salvo
+`ALLOW_RAW_CARD_API=true`, que es una decisión explícita (y documentada en el cambio de
+configuración) de aceptar SAQ D. En sandbox y en desarrollo no aplica.
 
 ## Instalación dedicada (modo single, excepcional)
 
