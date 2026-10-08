@@ -1,11 +1,16 @@
 import type { BillingInterval } from '@ventea/shared';
 import { useEffect, useState } from 'react';
 
-import { CONTACT_EMAIL, TRIAL_DAYS } from '@/config';
+import { TRIAL_DAYS } from '@/config';
+import { track, trackOnce } from '@/lib/track';
 import { usePlans } from '@/lib/usePlans';
+import { SiteFooter } from '@/site/SiteFooter';
+import { WhatsAppButton } from '@/site/WhatsAppButton';
 
 import { Brand } from './Brand';
 import { Comparison } from './Comparison';
+import { Demo } from './Demo';
+import { DemoRequest } from './DemoRequest';
 import { Faq } from './Faq';
 import { HeroArt } from './HeroArt';
 import { Pricing } from './Pricing';
@@ -53,8 +58,15 @@ export function LandingPage() {
   const [interval, setBillingInterval] = useState<BillingInterval>('month');
   const pro = plans.status === 'ready' ? plans.plans.find((p) => p.code === 'pro') : undefined;
 
+  // Embudo: una visita por pestaña y cada clic en un link al registro (hero, precios, CTA…).
   useEffect(() => {
-    document.title = 'Ventea · Tu restaurante con app propia, pedidos y puntos, sin comisiones';
+    trackOnce('visit');
+    const onClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.('a[href^="/registro"]');
+      if (link) track('cta_click');
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
   }, []);
 
   return (
@@ -68,6 +80,7 @@ export function LandingPage() {
           <nav className="topbar__nav" aria-label="Secciones">
             <a href="#como-funciona">Cómo funciona</a>
             <a href="#funciones">Funciones</a>
+            <a href="#demo">Demo</a>
             <a href="#precios">Precios</a>
             <a href="#preguntas">Preguntas</a>
           </nav>
@@ -155,11 +168,15 @@ export function LandingPage() {
           </div>
         </section>
 
+        <Demo />
+
         <Comparison plan={pro} />
 
         <Pricing plans={plans} interval={interval} onIntervalChange={setBillingInterval} />
 
         <Faq />
+
+        <DemoRequest />
 
         <section className="cta" aria-labelledby="cta-title">
           <div className="container cta__inner">
@@ -173,22 +190,8 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="footer">
-        <div className="container footer__inner">
-          <div>
-            <Brand />
-            <p className="footer__text">Pedidos, app propia y lealtad para restaurantes.</p>
-          </div>
-          <div>
-            <h2 className="footer__title">Contacto</h2>
-            <p className="footer__text">
-              ¿Dudas o quieres una demostración? Escríbenos a{' '}
-              <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
-            </p>
-          </div>
-          <p className="footer__legal">© {new Date().getFullYear()} Ventea</p>
-        </div>
-      </footer>
+      <SiteFooter />
+      <WhatsAppButton />
     </>
   );
 }

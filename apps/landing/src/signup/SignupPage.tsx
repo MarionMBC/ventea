@@ -1,16 +1,18 @@
 import type { BillingInterval, PlanCode, SignupResponse } from '@ventea/shared';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
-import { BASE_DOMAIN, CONTACT_EMAIL, TRIAL_DAYS } from '@/config';
+import { BASE_DOMAIN, CONTACT_EMAIL, TERMS_VERSION, TRIAL_DAYS } from '@/config';
 import { Brand } from '@/landing/Brand';
 import { IntervalToggle } from '@/landing/IntervalToggle';
 import { ApiError, NETWORK_ERROR_MESSAGE, signup } from '@/lib/api';
 import { formatDate, formatUsd, MIN_PASSWORD_LENGTH, priceFor, slugify } from '@/lib/format';
 import { locationsLabel } from '@/lib/plans';
+import { track, trackOnce } from '@/lib/track';
 import { FEATURED_PLAN, usePlans } from '@/lib/usePlans';
 
 import { PasswordField } from './PasswordField';
 import { SLUG_MESSAGE, useSlugCheck } from './useSlugCheck';
+import { useTenantReady, type TenantReadyStatus } from './useTenantReady';
 
 type Step = 1 | 2 | 3;
 
@@ -21,6 +23,9 @@ const STEP_TITLES: Record<Step, string> = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const TERMS_ERROR =
+  'Para crear tu restaurante tienes que aceptar los términos y la política de privacidad.';
 
 /** `?plan=pro&intervalo=anual` desde la sección de precios. */
 export function readInitialChoice(search: string): { plan: string; interval: BillingInterval } {
@@ -52,6 +57,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
   const [website, setWebsite] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
@@ -64,7 +70,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
   const slugCheck = useSlugCheck(slug);
 
   useEffect(() => {
-    document.title = 'Crea tu restaurante · Ventea';
+    trackOnce('signup_start');
   }, []);
 
   // Al cambiar de paso (o terminar) el foco va al título: el lector de pantalla anuncia
@@ -94,9 +100,13 @@ export function SignupPage({ search = window.location.search }: { search?: strin
       ? `La contraseña necesita al menos ${MIN_PASSWORD_LENGTH} caracteres.`
       : undefined;
 
+  const termsError = acceptedTerms ? undefined : TERMS_ERROR;
+
   const goTo = (next: Step) => {
     setShowErrors(false);
     setStep(next);
+    if (next === 2) trackOnce('signup_step_2');
+    if (next === 3) trackOnce('signup_step_3');
   };
 
   const onRestaurantName = (value: string) => {
@@ -120,7 +130,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
       goTo(3);
       return;
     }
-    if (ownerNameError || emailError || passwordError || !selectedPlan) {
+    if (ownerNameError || emailError || passwordError || termsError || !selectedPlan) {
       setShowErrors(true);
       return;
     }
@@ -136,8 +146,10 @@ export function SignupPage({ search = window.location.search }: { search?: strin
         planCode: selectedPlan.code as PlanCode,
         interval,
         website,
+        acceptedTermsVersion: TERMS_VERSION,
       });
       setDone(response);
+      track('signup_complete');
     } catch (error) {
       const status = error instanceof ApiError ? error.status : 0;
       if (status === 409 && unansweredSlug.current === slug) {
@@ -375,6 +387,41 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                   error={showErrors ? passwordError : undefined}
                 />
 
+                <div className="field terms">
+                  <div className="terms__row">
+                    <input
+                      id="acceptTerms"
+                      className="terms__check"
+                      type="checkbox"
+                      name="acceptTerms"
+                      checked={acceptedTerms}
+                      aria-invalid={showErrors && termsError ? true : undefined}
+                      aria-describedby={showErrors && termsError ? 'acceptTerms-error' : undefined}
+                      onChange={(event) => setAcceptedTerms(event.target.checked)}
+                    />
+                    <label htmlFor="acceptTerms" className="terms__label">
+                      Acepto los términos y la política de privacidad
+                    </label>
+                  </div>
+                  <p className="field__hint terms__links">
+                    Léelos antes:{' '}
+                    <a href="/terminos" target="_blank" rel="noopener">
+                      Términos del servicio
+                      <span className="sr-only"> (se abre en otra pestaña)</span>
+                    </a>{' '}
+                    ·{' '}
+                    <a href="/privacidad" target="_blank" rel="noopener">
+                      Política de privacidad
+                      <span className="sr-only"> (se abre en otra pestaña)</span>
+                    </a>
+                  </p>
+                  {showErrors && termsError && (
+                    <p className="field__error" id="acceptTerms-error" role="alert">
+                      {termsError}
+                    </p>
+                  )}
+                </div>
+
                 {/* Honeypot: una persona no lo ve ni llega con el teclado; un bot lo llena. */}
                 <div className="hp" aria-hidden="true">
                   <label htmlFor="hp-ref">No completar</label>
@@ -492,6 +539,12 @@ function PlanStep({
   );
 }
 
+export const READY_MESSAGE: Record<TenantReadyStatus, string> = {
+  checking: 'Preparando tu dirección segura… (puede tardar hasta 2 minutos)',
+  ready: '¡Tu dirección ya está lista! Ya puedes entrar a tu panel.',
+  slow: 'Está tardando más de lo normal. Intenta entrar en unos minutos con el botón de abajo.',
+};
+
 function Success({
   response,
   restaurantName,
@@ -503,6 +556,8 @@ function Success({
   email: string;
   headingRef: RefObject<HTMLHeadingElement | null>;
 }) {
+  const ready = useTenantReady(response.tenant.slug);
+  const pageHost = response.tenant.url.replace(/^https?:\/\//, '');
   return (
     <section className="signup__card signup__done" aria-labelledby="done-title">
       <div className="done__badge" aria-hidden="true">
@@ -511,20 +566,36 @@ function Success({
       <h1 className="signup__title" id="done-title" ref={headingRef} tabIndex={-1}>
         ¡Listo! {restaurantName} ya está en Ventea
       </h1>
-      <p className="done__notice" role="status">
-        Tu dirección queda activa en 1-2 minutos. Si el enlace todavía no abre, espera un momento y
-        vuelve a intentarlo.
+      <p className={`done__notice done__notice--${ready}`} role="status">
+        {READY_MESSAGE[ready]}
+        {ready === 'slow' && (
+          <>
+            {' '}
+            Si sigue sin abrir, escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+            .
+          </>
+        )}
       </p>
-      <a className="btn btn--primary btn--lg btn--block" href={response.tenant.adminUrl}>
-        Entrar a mi panel
-      </a>
+      {ready === 'checking' ? (
+        // Sin href hasta que la dirección tenga certificado: el clic daría un error de seguridad.
+        <a
+          className="btn btn--primary btn--lg btn--block is-waiting"
+          role="link"
+          aria-disabled="true"
+        >
+          <span className="spinner" aria-hidden="true" />
+          Entrar a mi panel
+        </a>
+      ) : (
+        <a className="btn btn--primary btn--lg btn--block" href={response.tenant.adminUrl}>
+          Entrar a mi panel
+        </a>
+      )}
       <p className="done__url">{response.tenant.adminUrl}</p>
       <dl className="done__facts">
         <div>
           <dt>Tu página de pedidos</dt>
-          <dd>
-            <a href={response.tenant.url}>{response.tenant.url.replace(/^https?:\/\//, '')}</a>
-          </dd>
+          <dd>{ready === 'checking' ? pageHost : <a href={response.tenant.url}>{pageHost}</a>}</dd>
         </div>
         <div>
           <dt>Usuario del panel</dt>

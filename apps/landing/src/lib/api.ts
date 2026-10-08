@@ -109,3 +109,12 @@ export async function signup(
   );
   return { ...response, trialEndsAt: new Date(response.trialEndsAt) };
 }
+
+/** ¿La dirección de la marca ya responde con HTTPS válido? (cert emitido y ruta publicada). */
+export async function checkTenantReady(slug: string, options: ApiOptions = {}): Promise<boolean> {
+  const response = await request<{ ready: boolean }>(
+    `/platform/tenant-ready?slug=${encodeURIComponent(slug)}`,
+    options,
+  );
+  return response.ready === true;
+}

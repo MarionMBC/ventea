@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
+import { seoPlugin } from './seo-plugin';
+
 /**
  * Landing pública de Ventea (`https://ventea.tech`) con el registro self-service.
  *
@@ -21,7 +23,7 @@ const proxy = {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), seoPlugin()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: { port: 5175, proxy },
   preview: { port: 4175, proxy },

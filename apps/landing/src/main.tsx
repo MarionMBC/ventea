@@ -6,6 +6,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/landing.css';
 import './styles/signup.css';
+import './styles/legal.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Falta #root en index.html');
