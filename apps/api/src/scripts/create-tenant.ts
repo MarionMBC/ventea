@@ -50,7 +50,8 @@ async function main(): Promise<void> {
   const slug = tenantSlugSchema.safeParse(values.slug);
   if (!slug.success) fail(slug.error.issues[0]?.message ?? 'slug inválido');
   if (RESERVED_SLUGS.has(slug.data)) fail(`"${slug.data}" es un subdominio reservado`);
-  if (!/^[A-Z]{3}$/.test(values.currency)) fail('currency: código ISO 4217 de 3 letras (HNL, USD…)');
+  if (!/^[A-Z]{3}$/.test(values.currency))
+    fail('currency: código ISO 4217 de 3 letras (HNL, USD…)');
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) fail('Falta DATABASE_URL');
