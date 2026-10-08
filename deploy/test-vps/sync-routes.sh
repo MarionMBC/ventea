@@ -34,6 +34,24 @@ case "${1:-}" in
   *) echo "uso: $0 [--quiet]" >&2; exit 2 ;;
 esac
 
+# Una corrida a la vez: si una tarda más de un minuto (docker lento, primer pull de
+# alpine), la siguiente del cron sale sin hacer nada en vez de pisarla.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>.sync-routes.lock
+  if ! flock -n 9; then
+    [ "$QUIET" = 1 ] || echo "= otra corrida de sync-routes en curso; nada que hacer"
+    exit 0
+  fi
+fi
+
+# Rotación del log del cron: si pasa de 1 MB (p. ej. postgres caído = un error por
+# minuto), quedan las últimas 500 líneas. `cat >` conserva el archivo (y el `>>` del
+# cron sigue escribiendo al final).
+LOG=sync-routes.log
+if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 1048576 ]; then
+  tail -n 500 "$LOG" > "$LOG.tmp" && cat "$LOG.tmp" > "$LOG" && rm -f "$LOG.tmp"
+fi
+
 set -a; . ./.env; set +a
 
 DYNAMIC_DIR=/etc/traefik/dynamic

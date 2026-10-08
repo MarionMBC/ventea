@@ -32,7 +32,9 @@ Un cron del usuario de la instancia (`henry`, grupo docker) corre `sync-routes.s
 minuto. El script compara el sha256 del archivo nuevo con el publicado y **solo lo reescribe si
 cambió**; con `--quiet` no escribe nada en el log si no hubo cambios. Así una marca que se
 registra sola (`POST /api/platform/signup`) queda con certificado en ≤ 2 min, sin reiniciar
-Traefik, y una marca desactivada pierde su ruta en el minuto siguiente.
+Traefik, y una marca desactivada pierde su ruta en el minuto siguiente. Corre con `flock -n`
+(`.sync-routes.lock`): si una corrida tarda más de un minuto, la siguiente no la pisa. Si
+`sync-routes.log` pasa de 1 MB, el propio script lo recorta a las últimas 500 líneas.
 
 ```bash
 cd ~/ventea-test
@@ -41,13 +43,16 @@ cd ~/ventea-test
 tail -f sync-routes.log    # una entrada con fecha por cada publicación (o error)
 ```
 
-La línea que instala:
-`* * * * * cd ~/ventea-test && ./sync-routes.sh --quiet >> sync-routes.log 2>&1`.
+La línea que instala (el comentario final es la marca con que la reconoce; el resto del
+crontab no se toca):
+`* * * * * cd ~/ventea-test && ./sync-routes.sh --quiet >> sync-routes.log 2>&1 # ventea-sync-routes`.
 Si `docker` no está en `/usr/bin` (PATH de cron), agregar `PATH=...` arriba del crontab.
 
 ## Alta de una marca
 
-Registro self-service (prueba de 14 días; el cron publica el subdominio):
+Registro self-service (prueba de 14 días; el cron publica el subdominio). Cupo global en la
+base: 10 altas por día y 25 por semana (`SIGNUP_DAILY_LIMIT`, `SIGNUP_WEEKLY_LIMIT`), por el
+límite de 50 certificados semanales de Let's Encrypt; lleno → `429`.
 
 ```bash
 curl -sS https://api.ventea.tech/api/platform/signup -H 'Content-Type: application/json' -d '{
@@ -73,6 +78,8 @@ cd ~/ventea-test
 docker compose exec -T api node apps/api/dist/scripts/create-platform-admin.js   --email <tu-email> --name "<tu nombre>"
 # login → token (1 h)
 curl -sS https://api.ventea.tech/api/platform/auth/login -H 'Content-Type: application/json'   -d '{"email":"<tu-email>","password":"<la impresa>"}'
+# resetear la clave (invalida en el acto los tokens vivos: tokenVersion)
+docker compose exec -T api node apps/api/dist/scripts/create-platform-admin.js   --email <tu-email> --reset-password
 # suspender / reactivar / cambiar plan / extender prueba
 curl -sS -X POST https://api.ventea.tech/api/platform/tenants/pollos-juan/suspend -H "Authorization: Bearer $T"
 curl -sS -X POST https://api.ventea.tech/api/platform/tenants/pollos-juan/reactivate -H "Authorization: Bearer $T"
@@ -102,6 +109,7 @@ chmod +x *.sh
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > backup-$(date +%F-%H%M).sql.gz
 docker compose up -d
 docker compose logs migrate | tail -5     # "All migrations have been successfully applied"
+curl -fsS https://api.ventea.tech/api/health   # REGIONS mal escrito = la API no arranca (todas las marcas)
 ./sync-routes.sh
 ./install-cron.sh                          # una vez (idempotente)
 curl https://api.ventea.tech/api/health

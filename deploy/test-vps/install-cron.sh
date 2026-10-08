@@ -9,19 +9,27 @@
 #
 # Va en el crontab del usuario que corre la instancia (henry, grupo docker), no en el
 # de root: sync-routes.sh no necesita más permisos que esos.
+#
+# Solo toca SU línea, reconocida por el comentario `# ventea-sync-routes`: el resto del
+# crontab (otras entradas, comentarios, líneas en blanco) queda byte a byte igual.
+# Que dos corridas no se pisen lo resuelve sync-routes.sh con flock.
 set -euo pipefail
 
-LINE='* * * * * cd ~/ventea-test && ./sync-routes.sh --quiet >> sync-routes.log 2>&1'
-# Toda línea que corra sync-routes.sh se considera nuestra: una versión vieja de la
-# línea se reemplaza en vez de duplicarse.
-MATCH='ventea-test && ./sync-routes.sh'
+MARKER='# ventea-sync-routes'
+LINE="* * * * * cd ~/ventea-test && ./sync-routes.sh --quiet >> sync-routes.log 2>&1 $MARKER"
 
 current=$(crontab -l 2>/dev/null || true)
-others=$(printf '%s\n' "$current" | grep -vF "$MATCH" | sed '/^$/d' || true)
+# Todo menos nuestra línea (sea cual sea su versión), sin tocar nada más.
+others=$(printf '%s' "$current" | awk -v m="$MARKER" 'index($0, m) == 0')
+
+write_crontab() {
+  # $1 = contenido completo. Vacío → crontab vacío (no `crontab -r`: no borra el archivo).
+  if [ -n "$1" ]; then printf '%s\n' "$1" | crontab -; else printf '' | crontab -; fi
+}
 
 case "${1:-}" in
   --remove)
-    printf '%s\n' "$others" | sed '/^$/d' | crontab -
+    write_crontab "$others"
     echo "✓ cron de sync-routes quitado"
     exit 0
     ;;
@@ -32,7 +40,7 @@ esac
 if printf '%s\n' "$current" | grep -qxF "$LINE"; then
   echo "= cron ya instalado:"
 else
-  { [ -n "$others" ] && printf '%s\n' "$others"; printf '%s\n' "$LINE"; } | crontab -
+  if [ -n "$others" ]; then write_crontab "$others"$'\n'"$LINE"; else write_crontab "$LINE"; fi
   echo "✓ cron instalado:"
 fi
-crontab -l | grep -F "$MATCH"
+crontab -l | grep -F "$MARKER"
