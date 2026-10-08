@@ -51,7 +51,7 @@ export interface ApiClientOptions {
 }
 
 /** Mensaje legible de una respuesta de error de la API, con fallback por status. */
-async function errorFrom(response: Response): Promise<ApiError> {
+export async function errorFrom(response: Response): Promise<ApiError> {
   let message = '';
   try {
     const body = (await response.json()) as { message?: unknown };
