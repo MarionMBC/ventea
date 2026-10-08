@@ -27,6 +27,16 @@ async function signupsCountedToday(prisma: PrismaClient): Promise<number> {
   return row?.count ?? 0;
 }
 
+/** Repite `read` (hasta ~3 s) hasta que devuelva `expected`; devuelve el último valor. */
+async function eventually<T>(read: () => Promise<T>, expected: T): Promise<T> {
+  let value = await read();
+  for (let i = 0; i < 30 && value !== expected; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    value = await read();
+  }
+  return value;
+}
+
 function signupBody(overrides: Record<string, unknown> = {}) {
   return {
     restaurantName: 'Pollos Juan',
@@ -161,8 +171,10 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
     });
     expect(tenant.subscription?.trialEndsAt?.getTime()).toBe(result.trialEndsAt.getTime());
     expect(tenant.billingEvents).toEqual([expect.objectContaining({ type: 'trial_started' })]);
-    // TASK-007: el embudo cuenta el registro completo desde la API.
-    expect(await signupsCountedToday(prisma)).toBe(completedBefore + 1);
+    // TASK-007: el embudo cuenta el registro completo desde la API (sin esperar: se sondea).
+    expect(await eventually(() => signupsCountedToday(prisma), completedBefore + 1)).toBe(
+      completedBefore + 1,
+    );
     // TASK-007: queda registrada la versión de términos aceptada y cuándo.
     expect(tenant.termsVersion).toBe(TERMS_VERSION);
     expect(tenant.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);

@@ -176,8 +176,8 @@ export class SignupService {
     }
 
     // Embudo (TASK-007): el registro completo lo cuenta la API, no el navegador. Después del
-    // commit y sin bloquear: una falla del contador no le quita el alta a nadie.
-    await this.analytics.record('signup_complete').catch((error: unknown) => {
+    // commit y sin esperar (fire-and-forget): ni una falla ni una base lenta demoran el 201.
+    void this.analytics.record('signup_complete').catch((error: unknown) => {
       this.logger.warn(`No se pudo contar signup_complete: ${(error as Error).message}`);
     });
 
