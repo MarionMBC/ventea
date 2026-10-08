@@ -12,14 +12,18 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  billingSummarySchema,
   changePlanSchema,
   countryCodeSchema,
   extendTrialSchema,
   loginSchema,
   platformTenantListQuerySchema,
+  recordPaymentSchema,
+  resolvePaymentSchema,
   signupSchema,
   slugAvailabilityQuerySchema,
   suspendTenantSchema,
+  type BillingSummary,
   type ChangePlanInput,
   type ExtendTrialInput,
   type LoginInput,
@@ -28,6 +32,8 @@ import {
   type PlatformTenantDetail,
   type PlatformTenantListQuery,
   type PlatformTenantPage,
+  type RecordPaymentInput,
+  type ResolvePaymentInput,
   type SignupInput,
   type SignupResponse,
   type SlugAvailability,
@@ -37,6 +43,7 @@ import {
 import type { PlatformPrincipal } from '@/common/auth/auth.context';
 import { CurrentPlatformAdmin, PlatformAuth } from '@/common/decorators/auth.decorators';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe';
+import { PlatformBillingService } from '@/modules/billing/platform-billing.service';
 
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformTenantsService } from './platform-tenants.service';
@@ -105,7 +112,10 @@ export class PlatformAuthController {
 @PlatformAuth()
 @Controller('platform/tenants')
 export class PlatformTenantsController {
-  constructor(private readonly tenants: PlatformTenantsService) {}
+  constructor(
+    private readonly tenants: PlatformTenantsService,
+    private readonly billing: PlatformBillingService,
+  ) {}
 
   @Get()
   list(
@@ -156,5 +166,42 @@ export class PlatformTenantsController {
     @Body(new ZodValidationPipe(extendTrialSchema)) input: ExtendTrialInput,
   ): Promise<PlatformTenantDetail> {
     return this.tenants.extendTrial(slug, admin, input.days);
+  }
+
+  /** Pago recibido por fuera (modo manual o transferencia): abre un período nuevo. */
+  @Post(':slug/record-payment')
+  @HttpCode(HttpStatus.OK)
+  async recordPayment(
+    @Param('slug') slug: string,
+    @CurrentPlatformAdmin() admin: PlatformPrincipal,
+    @Body(new ZodValidationPipe(recordPaymentSchema)) input: RecordPaymentInput,
+  ): Promise<PlatformTenantDetail> {
+    await this.billing.recordPayment(slug, admin, input);
+    return this.tenants.detail(slug);
+  }
+
+  /** Cierra a mano un cobro que la pasarela no pudo confirmar. */
+  @Post(':slug/resolve-payment')
+  @HttpCode(HttpStatus.OK)
+  async resolvePayment(
+    @Param('slug') slug: string,
+    @CurrentPlatformAdmin() admin: PlatformPrincipal,
+    @Body(new ZodValidationPipe(resolvePaymentSchema)) input: ResolvePaymentInput,
+  ): Promise<PlatformTenantDetail> {
+    await this.billing.resolvePayment(slug, admin, input);
+    return this.tenants.detail(slug);
+  }
+}
+
+/** Facturación del SaaS. Solo tokens `kind: "platform"`. */
+@ApiTags('platform')
+@PlatformAuth()
+@Controller('platform/billing')
+export class PlatformBillingController {
+  constructor(private readonly billing: PlatformBillingService) {}
+
+  @Get('summary')
+  async summary(): Promise<BillingSummary> {
+    return billingSummarySchema.parse(await this.billing.summary());
   }
 }

@@ -20,7 +20,7 @@ export const SUSPENDED_MESSAGE = 'Servicio suspendido';
  * Rutas de marca que atienden aunque la suscripción no lo haga (sin prefijo `api`, regla
  * de Nest 12):
  * - lo que el dueño necesita para entrar al panel a pagar: `staff/*` (login, tablero),
- *   `tenant` (branding del panel) y `auth/refresh`;
+ *   `tenant` (branding del panel), `auth/refresh` y `billing/*` (TASK-005: tarjeta, plan);
  * - lo que el cliente final necesita para seguir sus pedidos en curso: `GET orders`,
  *   `GET orders/:id` y `GET me`. Crear pedidos, el menú, registro y login siguen en 402.
  */
@@ -28,6 +28,8 @@ export const SUBSCRIPTION_OPEN_ROUTES: { path: string; method: RequestMethod }[]
   { path: 'staff/{*path}', method: RequestMethod.ALL },
   { path: 'tenant', method: RequestMethod.ALL },
   { path: 'auth/refresh', method: RequestMethod.ALL },
+  { path: 'billing', method: RequestMethod.ALL },
+  { path: 'billing/{*path}', method: RequestMethod.ALL },
   { path: 'orders', method: RequestMethod.GET },
   { path: 'orders/:id', method: RequestMethod.GET },
   { path: 'me', method: RequestMethod.GET },

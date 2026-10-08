@@ -39,8 +39,9 @@ export function accessDecision(
 
   switch (subscription.status) {
     case 'active':
-      // El período no se mira todavía: sin cobro automático (TASK-005), un `active`
-      // vencido es un cobro que no corrió, no un cliente que dejó de pagar.
+      // El período no se mira acá: el ciclo de cobro (TASK-005) cobra la renovación o pasa
+      // la suscripción a `past_due`. Un `active` vencido es un cobro en curso o sin
+      // confirmar con el banco, no un cliente que dejó de pagar.
       return 'allow';
     case 'trialing':
       if (!subscription.trialEndsAt || subscription.trialEndsAt.getTime() > now.getTime()) {

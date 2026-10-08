@@ -79,7 +79,7 @@ export class PlatformTenantsService {
       where: { slug },
       include: {
         ...PLATFORM_TENANT_INCLUDE,
-        billingEvents: { orderBy: { createdAt: 'desc' }, take: DETAIL_EVENTS },
+        billingEvents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: DETAIL_EVENTS },
       },
     });
     if (!tenant) throw new NotFoundException('Tenant no encontrado');
@@ -99,6 +99,9 @@ export class PlatformTenantsService {
         message: event.message,
         createdAt: event.createdAt,
       })),
+      card: tenant.subscription?.paymentToken
+        ? { brand: tenant.subscription.cardBrand, last4: tenant.subscription.cardLast4 }
+        : null,
     };
   }
 
@@ -153,9 +156,12 @@ export class PlatformTenantsService {
       if (current.planCode === plan.code && current.interval === interval) return;
 
       await this.limits.assertFitsPlan(current.tenantId, plan, tx);
+      // Cambio inmediato del admin: un cambio agendado por el dueño queda sin efecto.
       await this.updateSubscription(tx, current.tenantId, current.status, {
         planId: plan.id,
         interval,
+        pendingPlanId: null,
+        pendingInterval: null,
       });
       await tx.billingEvent.create({
         data: {

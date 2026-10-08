@@ -10,6 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 
+import { TENANT_REQUEST_KEY } from '@/common/tenant.context';
+
 import { SlidingWindowLimiter } from './rate-limit';
 
 const RATE_LIMIT_KEY = 'ventea:rate-limit';
@@ -21,9 +23,14 @@ export interface RateLimitOptions {
   /** Variable de entorno que fija el límite por hora, y su valor por defecto. */
   envKey: string;
   defaultPerHour: number;
+  /**
+   * Qué se cuenta: la IP (default) o la marca del request (`tenant`, rutas de marca
+   * autenticadas: el cobro de la suscripción limita por marca, no por conexión).
+   */
+  key?: 'ip' | 'tenant';
 }
 
-/** Límite de intentos por IP y por hora en la ruta. Usar con `@UseGuards(RateLimitGuard)`. */
+/** Límite de intentos por IP (o por marca) y por hora. Usar con `@UseGuards(RateLimitGuard)`. */
 export const RateLimit = (options: RateLimitOptions) => SetMetadata(RATE_LIMIT_KEY, options);
 
 /**
@@ -69,7 +76,7 @@ export class RateLimitGuard implements CanActivate {
 
     const limit = this.limitFor(options);
     const request = context.switchToHttp().getRequest<Request>();
-    const key = request.ip ?? request.socket.remoteAddress ?? 'unknown';
+    const key = options.key === 'tenant' ? tenantKey(request) : ipKey(request);
 
     const retryInMs = this.store.limiter(options.bucket).hit(key, limit, Date.now());
     if (retryInMs === null) return true;
@@ -89,4 +96,18 @@ export class RateLimitGuard implements CanActivate {
     const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
     return Number.isInteger(parsed) && parsed > 0 ? parsed : options.defaultPerHour;
   }
+}
+
+function ipKey(request: Request): string {
+  return request.ip ?? request.socket.remoteAddress ?? 'unknown';
+}
+
+function tenantKey(request: Request): string {
+  const tenant = (request as unknown as Record<string, unknown>)[TENANT_REQUEST_KEY] as
+    { tenantId: string } | undefined;
+  if (!tenant) {
+    // Programación defensiva: `key: 'tenant'` en una ruta fuera del TenantMiddleware.
+    throw new Error('RateLimit por tenant en una ruta sin tenant');
+  }
+  return `tenant:${tenant.tenantId}`;
 }
