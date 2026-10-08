@@ -72,6 +72,23 @@ export const orderSchema = z.object({
   scheduledFor: z.coerce.date().nullable(),
 });
 
+/**
+ * Pedido tal como lo ve el panel de staff: el del cliente más quién lo pidió y sus
+ * notas, que el mostrador necesita para cantar el pedido y llamar al cliente.
+ * `customer` es null si la cuenta se borró después del pedido (la FK queda en SetNull).
+ * `orderSchema` (lo que ve la app del cliente) no cambia.
+ */
+export const staffOrderSchema = orderSchema.extend({
+  customer: z
+    .object({
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+      phone: z.string().nullable(),
+    })
+    .nullable(),
+  customerNotes: z.string().nullable(),
+});
+
 /** Cambio de estado desde el panel de staff. Las transiciones válidas las decide la API. */
 export const updateOrderStatusSchema = z.object({
   status: z.enum(ORDER_STATUS),
@@ -80,11 +97,15 @@ export const updateOrderStatusSchema = z.object({
 /** Filtro del listado de staff. */
 export const staffOrdersQuerySchema = z.object({
   status: z.enum(ORDER_STATUS).optional(),
+  // Solo pedidos hechos desde este instante (ISO 8601). El historial del día lo usa
+  // con la medianoche local del mostrador, que la API no conoce.
+  since: z.coerce.date().optional(),
 });
 
 export type CartLine = z.infer<typeof cartLineSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type OrderLine = z.infer<typeof orderLineSchema>;
 export type Order = z.infer<typeof orderSchema>;
+export type StaffOrder = z.infer<typeof staffOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
 export type StaffOrdersQuery = z.infer<typeof staffOrdersQuerySchema>;

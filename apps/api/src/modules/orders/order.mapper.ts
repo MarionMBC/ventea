@@ -1,4 +1,4 @@
-import type { Order } from '@ventea/shared';
+import type { Order, StaffOrder } from '@ventea/shared';
 import type { Prisma } from '@prisma/client';
 
 /** Include de un pedido con sus líneas y opciones, acotado al tenant también en lo anidado. */
@@ -43,5 +43,35 @@ export function toOrder(row: OrderRow): Order {
     pointsRedeemed: row.pointsRedeemed,
     placedAt: row.placedAt ?? row.createdAt,
     scheduledFor: row.scheduledFor,
+  };
+}
+
+/**
+ * Include del panel de staff: el del pedido más el cliente. `customer` es una relación
+ * a uno (no admite `where`); el pedido ya está filtrado por tenant y su `customerId`
+ * siempre es del mismo tenant, porque lo pone la API al crearlo.
+ */
+export function staffOrderInclude(tenantId: string) {
+  return {
+    ...orderInclude(tenantId),
+    customer: { select: { firstName: true, lastName: true, phone: true } },
+  } satisfies Prisma.OrderInclude;
+}
+
+export type StaffOrderRow = Prisma.OrderGetPayload<{
+  include: ReturnType<typeof staffOrderInclude>;
+}>;
+
+export function toStaffOrder(row: StaffOrderRow): StaffOrder {
+  return {
+    ...toOrder(row),
+    customer: row.customer
+      ? {
+          firstName: row.customer.firstName,
+          lastName: row.customer.lastName,
+          phone: row.customer.phone,
+        }
+      : null,
+    customerNotes: row.customerNotes,
   };
 }

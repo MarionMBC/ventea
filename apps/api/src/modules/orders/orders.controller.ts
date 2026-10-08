@@ -21,6 +21,7 @@ import {
   updateOrderStatusSchema,
   type CreateOrderInput,
   type Order,
+  type StaffOrder,
   type StaffOrdersQuery,
   type TenantContext,
   type UpdateOrderStatusInput,
@@ -94,8 +95,8 @@ export class StaffOrdersController {
   list(
     @CurrentStaff() staff: StaffPrincipal,
     @Query(new ZodValidationPipe(staffOrdersQuerySchema)) query: StaffOrdersQuery,
-  ): Promise<Order[]> {
-    return this.orders.listForStaff(staff.tenantId, query.status);
+  ): Promise<StaffOrder[]> {
+    return this.orders.listForStaff(staff.tenantId, query);
   }
 
   @Patch(':id/status')
@@ -103,7 +104,7 @@ export class StaffOrdersController {
     @CurrentStaff() staff: StaffPrincipal,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateOrderStatusSchema)) input: UpdateOrderStatusInput,
-  ): Promise<Order> {
+  ): Promise<StaffOrder> {
     return this.orders.updateStatusByStaff(staff.tenantId, id, input.status);
   }
 }
