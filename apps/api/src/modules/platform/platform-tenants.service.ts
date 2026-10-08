@@ -15,7 +15,9 @@ import type {
 } from '@ventea/shared';
 
 import type { PlatformPrincipal } from '@/common/auth/auth.context';
+import { BillingLockService, subscriptionLockKey } from '@/modules/billing/billing-lock.service';
 import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
+import { OPEN_ATTEMPT_STATUSES } from '@/modules/subscriptions/subscriptions.service';
 import {
   addDays,
   extendedTrialEnd,
@@ -51,6 +53,7 @@ export class PlatformTenantsService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly limits: PlanLimitsService,
+    private readonly locks: BillingLockService,
   ) {}
 
   async list({ page, pageSize }: PlatformTenantListQuery): Promise<PlatformTenantPage> {
@@ -79,7 +82,7 @@ export class PlatformTenantsService {
       where: { slug },
       include: {
         ...PLATFORM_TENANT_INCLUDE,
-        billingEvents: { orderBy: { createdAt: 'desc' }, take: DETAIL_EVENTS },
+        billingEvents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: DETAIL_EVENTS },
       },
     });
     if (!tenant) throw new NotFoundException('Tenant no encontrado');
@@ -99,6 +102,9 @@ export class PlatformTenantsService {
         message: event.message,
         createdAt: event.createdAt,
       })),
+      card: tenant.subscription?.paymentToken
+        ? { brand: tenant.subscription.cardBrand, last4: tenant.subscription.cardLast4 }
+        : null,
     };
   }
 
@@ -121,20 +127,57 @@ export class PlatformTenantsService {
   }
 
   /** Reactivar = pago manual del admin (sin cobro todavía): abre un período desde hoy. */
+  /**
+   * Reactivar = pago manual del admin: abre un período desde hoy, salvo que el vigente ya esté
+   * pagado (p. ej. una renovación conciliada mientras estaba suspendida): ese se conserva.
+   * Toma el lock de cobro de la suscripción y da `409` con un cobro con tarjeta sin confirmar
+   * (podría ser el mismo período: doble pago). Suspender, en cambio, siempre gana.
+   */
   async reactivate(slug: string, admin: PlatformPrincipal): Promise<PlatformTenantDetail> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug },
+      select: { id: true, subscription: { select: { id: true } } },
+    });
+    if (!tenant) throw new NotFoundException('Tenant no encontrado');
+    if (!tenant.subscription) throw new ConflictException('La marca no tiene suscripción');
+    const subscriptionId = tenant.subscription.id;
+
+    const lock = await this.locks.withTryLock(subscriptionLockKey(subscriptionId), async () => {
+      const open = await this.prisma.paymentAttempt.count({
+        where: { tenantId: tenant.id, subscriptionId, status: { in: OPEN_ATTEMPT_STATUSES } },
+      });
+      if (open > 0) {
+        throw new ConflictException(
+          'Hay un cobro con tarjeta sin confirmar: resuélvelo primero (resolve-payment)',
+        );
+      }
+      await this.reactivateUnlocked(slug, admin);
+    });
+    if (!lock.acquired) {
+      throw new ConflictException('Hay un cobro en curso para esta marca; intenta en un momento');
+    }
+    return this.detail(slug);
+  }
+
+  private async reactivateUnlocked(slug: string, admin: PlatformPrincipal): Promise<void> {
     await this.transition(slug, 'reactivate', async (tx, { tenantId, status, interval }) => {
       const now = new Date();
+      const current = await tx.subscription.findUnique({
+        where: { tenantId },
+        select: { currentPeriodEnd: true },
+      });
+      const paidPeriodLeft = current && current.currentPeriodEnd.getTime() > now.getTime();
       await this.updateSubscription(tx, tenantId, status, {
         status: 'active',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd(now, interval),
+        ...(paidPeriodLeft
+          ? {}
+          : { currentPeriodStart: now, currentPeriodEnd: periodEnd(now, interval) }),
         cancelAtPeriodEnd: false,
       });
       await tx.billingEvent.create({
         data: { tenantId, type: 'reactivated', message: `Reactivada por ${admin.email}` },
       });
     });
-    return this.detail(slug);
   }
 
   async changePlan(
@@ -153,9 +196,12 @@ export class PlatformTenantsService {
       if (current.planCode === plan.code && current.interval === interval) return;
 
       await this.limits.assertFitsPlan(current.tenantId, plan, tx);
+      // Cambio inmediato del admin: un cambio agendado por el dueño queda sin efecto.
       await this.updateSubscription(tx, current.tenantId, current.status, {
         planId: plan.id,
         interval,
+        pendingPlanId: null,
+        pendingInterval: null,
       });
       await tx.billingEvent.create({
         data: {
