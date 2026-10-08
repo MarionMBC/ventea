@@ -1,4 +1,5 @@
 import {
+  useIsMutating,
   useMutation,
   useMutationState,
   useQuery,
@@ -24,12 +25,17 @@ import { applyStatus, upsertOrder } from './transitions';
 /** Cada cuánto se recarga el tablero solo (AC4: un pedido nuevo aparece en ≤ 10 s). */
 export const BOARD_REFRESH_MS = 10_000;
 
+const UPDATE_STATUS_KEY = ['orders', 'update-status'] as const;
+
 export function useActiveOrders() {
   const client = useApi();
+  // Con un cambio de estado en vuelo no se recarga: una lectura que cae entre el PATCH
+  // y su commit haría saltar la tarjeta para atrás. Al terminar, onSettled recarga.
+  const mutating = useIsMutating({ mutationKey: UPDATE_STATUS_KEY });
   return useQuery({
     queryKey: ACTIVE_ORDERS_QUERY_KEY,
     queryFn: ({ signal }) => fetchActiveOrders(client, signal),
-    refetchInterval: BOARD_REFRESH_MS,
+    refetchInterval: mutating > 0 ? false : BOARD_REFRESH_MS,
     // La pestaña del panel puede quedar detrás de otra: el contador del título sigue.
     refetchIntervalInBackground: true,
   });
@@ -91,8 +97,6 @@ export function useNotices(timeoutMs = 6_000) {
 
   return { notices, push, dismiss };
 }
-
-const UPDATE_STATUS_KEY = ['orders', 'update-status'] as const;
 
 export interface StatusChange {
   order: StaffOrder;

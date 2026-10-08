@@ -8,18 +8,27 @@ export const PANEL_LOCALE = 'es-HN';
 
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
 
+/**
+ * La moneda es un dato del tenant (el schema solo exige 3 caracteres): un código que
+ * Intl no acepta tira RangeError. En ese caso se muestra `CODE 12.34` en vez de
+ * romper la pantalla.
+ */
 export function formatMoney(cents: Cents, currency: string, locale = PANEL_LOCALE): string {
   const key = `${locale}|${currency}`;
-  let formatter = moneyFormatters.get(key);
-  if (!formatter) {
-    formatter = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      currencyDisplay: 'narrowSymbol',
-    });
-    moneyFormatters.set(key, formatter);
+  try {
+    let formatter = moneyFormatters.get(key);
+    if (!formatter) {
+      formatter = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+        currencyDisplay: 'narrowSymbol',
+      });
+      moneyFormatters.set(key, formatter);
+    }
+    return formatter.format(fromCents(cents));
+  } catch {
+    return `${currency} ${fromCents(cents).toFixed(2)}`;
   }
-  return formatter.format(fromCents(cents));
 }
 
 /** Como `formatMoney`, pero sin moneda (marca todavía cargando) muestra solo el número. */

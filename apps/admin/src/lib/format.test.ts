@@ -22,6 +22,10 @@ describe('formatMoney', () => {
     expect(formatMoney(1290, 'CLP')).toBe('$13');
   });
 
+  it('un código de moneda que Intl no acepta no rompe: CODE monto', () => {
+    expect(formatMoney(2580, 'L$1')).toBe('L$1 25.80');
+  });
+
   it('sin moneda (marca cargando) muestra solo el número', () => {
     expect(formatAmount(2580, undefined)).toBe('25.80');
     expect(formatAmount(2580, 'USD')).toBe('$25.80');

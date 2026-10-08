@@ -56,7 +56,7 @@ export function OrderCard({
             type="button"
             className="badge badge--fresh"
             onClick={() => onSeen(order.id)}
-            title="Marcar como visto"
+            aria-label={`Nuevo: marcar ${order.code} como visto`}
           >
             Nuevo
           </button>
@@ -128,9 +128,15 @@ export function OrderCard({
               type="button"
               className="btn btn--danger"
               disabled={isPending}
-              onClick={() => {
+              onClick={(event) => {
+                // La tarjeta sale del tablero: el foco pasa al título de su columna en vez
+                // de perderse en <body>.
+                const heading = event.currentTarget
+                  .closest('section')
+                  ?.querySelector<HTMLElement>('h2');
                 setConfirmingCancel(false);
                 onChangeStatus(order, { to: 'cancelled', label: 'Cancelar' });
+                heading?.focus();
               }}
             >
               Sí, cancelar

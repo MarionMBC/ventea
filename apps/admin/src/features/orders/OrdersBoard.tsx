@@ -8,12 +8,31 @@ import { useOrdersContext } from './OrdersSection';
 import { BOARD_COLUMNS, ordersInColumn, type BoardStatus } from './transitions';
 
 /**
+ * Si el foco quedó en <body> (p. ej. se canceló el último pedido y su tarjeta y su
+ * columna desaparecieron), lo toma este elemento para no dejar al teclado perdido.
+ */
+function focusIfLost(element: HTMLElement | null) {
+  if (element && (!document.activeElement || document.activeElement === document.body)) {
+    element.focus();
+  }
+}
+
+/**
  * Tablero del mostrador: tres columnas (Nuevos, En cocina, Listos) lado a lado desde
  * 768 px; en teléfono, una columna a la vez con un selector arriba.
  */
 export function OrdersBoard() {
-  const { activeOrders, fresh, acknowledge, currency, soundEnabled, toggleSound, changeStatus } =
-    useOrdersContext();
+  const {
+    activeOrders,
+    fresh,
+    acknowledge,
+    currency,
+    soundEnabled,
+    soundBlocked,
+    toggleSound,
+    unlockSound,
+    changeStatus,
+  } = useOrdersContext();
   const pendingIds = usePendingOrderIds();
   const now = useNow();
   const [mobileColumn, setMobileColumn] = useState<BoardStatus>('confirmed');
@@ -57,6 +76,11 @@ export function OrdersBoard() {
               Marcar vistos ({fresh.size})
             </button>
           )}
+          {soundBlocked && (
+            <button type="button" className="btn btn--warning" onClick={unlockSound}>
+              Toca para activar el sonido
+            </button>
+          )}
           <button
             type="button"
             className="btn btn--ghost"
@@ -78,7 +102,9 @@ export function OrdersBoard() {
 
       {orders.length === 0 ? (
         <div className="state state--empty">
-          <h2>No hay pedidos activos</h2>
+          <h2 tabIndex={-1} ref={focusIfLost}>
+            No hay pedidos activos
+          </h2>
           <p>Los pedidos nuevos aparecen aquí solos.</p>
         </div>
       ) : (
@@ -110,9 +136,14 @@ export function OrdersBoard() {
                   aria-labelledby={headingId}
                 >
                   <header className="column__head">
-                    <h2 id={headingId}>{column.title}</h2>
-                    <span className="count" aria-label={`${items.length} pedidos`}>
+                    <h2 id={headingId} tabIndex={-1}>
+                      {column.title}
+                    </h2>
+                    <span className="count" aria-hidden="true">
                       {items.length}
+                    </span>
+                    <span className="sr-only">
+                      {items.length} {items.length === 1 ? 'pedido' : 'pedidos'}
                     </span>
                   </header>
                   {items.length === 0 ? (

@@ -169,6 +169,7 @@
 }
 
 .column__head h2 {
+  border-radius: var(--radius-sm);
   color: var(--col-accent);
   font-size: var(--fs-lg);
   font-weight: 800;

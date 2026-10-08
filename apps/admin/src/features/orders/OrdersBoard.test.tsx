@@ -64,8 +64,8 @@ describe('Tablero de pedidos', () => {
     renderPanel([nuevo, makeOrder({ status: 'preparing' }), makeOrder({ status: 'preparing' })]);
 
     expect(await screen.findByText('CHC-1234')).toBeTruthy();
-    expect(within(column('Nuevos')).getByLabelText('1 pedidos')).toBeTruthy();
-    expect(within(column('En cocina')).getByLabelText('2 pedidos')).toBeTruthy();
+    expect(within(column('Nuevos')).getByText('1 pedido')).toBeTruthy();
+    expect(within(column('En cocina')).getByText('2 pedidos')).toBeTruthy();
     expect(within(column('Listos')).getByText('Sin pedidos')).toBeTruthy();
 
     const c = within(card('CHC-1234'));
@@ -185,25 +185,39 @@ describe('Tablero de pedidos', () => {
     ).toBeTruthy();
     expect(api.calls.find((c) => c.method === 'PATCH')?.body).toEqual({ status: 'cancelled' });
     await waitFor(() => expect(screen.queryByTestId('order-CHC-5000')).toBeNull());
+    // Era el último pedido: el foco no se pierde en <body>, lo toma el estado vacío.
+    expect(document.activeElement?.textContent).toBe('No hay pedidos activos');
+  });
+
+  it('tras cancelar, el foco queda en el título de la columna', async () => {
+    renderPanel([makeOrder({ code: 'CHC-5100' }), makeOrder({ code: 'CHC-5101' })]);
+    await screen.findByText('CHC-5100');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido CHC-5100' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
+    await waitFor(() => expect(screen.queryByTestId('order-CHC-5100')).toBeNull());
+    expect(document.activeElement?.textContent).toBe('Nuevos');
   });
 
   it('un pedido nuevo en la siguiente carga se resalta y suma al título', async () => {
     const { api } = renderPanel([makeOrder({ code: 'CHC-6000' })]);
     await screen.findByText('CHC-6000');
     await waitFor(() => expect(document.title).toBe('Pedidos · Carolina Hot Chicken'));
-    expect(screen.queryByRole('button', { name: 'Nuevo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
 
     api.state.orders.push(makeOrder({ code: 'CHC-6001' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
 
     await screen.findByText('CHC-6001');
-    expect(within(card('CHC-6001')).getByRole('button', { name: 'Nuevo' })).toBeTruthy();
-    expect(within(card('CHC-6000')).queryByRole('button', { name: 'Nuevo' })).toBeNull();
+    expect(
+      within(card('CHC-6001')).getByRole('button', { name: 'Nuevo: marcar CHC-6001 como visto' }),
+    ).toBeTruthy();
+    expect(screen.getByText('1 pedido nuevo')).toBeTruthy();
+    expect(within(card('CHC-6000')).queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
     await waitFor(() => expect(document.title).toBe('(1) Pedidos · Carolina Hot Chicken'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Marcar vistos (1)' }));
     await waitFor(() => expect(document.title).toBe('Pedidos · Carolina Hot Chicken'));
-    expect(screen.queryByRole('button', { name: 'Nuevo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
   });
 
   it('el sonido arranca apagado y el toggle recuerda la elección', async () => {

@@ -84,6 +84,25 @@ describe('createApiClient', () => {
     expect(refreshes).toHaveLength(1);
   });
 
+  it('si otro request ya renovó el token, reintenta con el nuevo sin refrescar otra vez', async () => {
+    const { client, session, fetchMock } = setup((url, init) => {
+      if (url === '/api/auth/refresh') return json({ accessToken: 'x', refreshToken: 'y' });
+      if (authOf(init) === 'Bearer access-1') {
+        // Mientras este request viajaba, otro completó el refresh.
+        session.updateTokens({ accessToken: 'access-2', refreshToken: 'refresh-2' });
+        return apiError(401, 'Sesión inválida');
+      }
+      return json('ok');
+    });
+
+    await expect(client.request('/staff/orders')).resolves.toBe('ok');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/staff/orders',
+      '/api/staff/orders',
+    ]);
+    expect(authOf(fetchMock.mock.calls[1]![1] as RequestInit)).toBe('Bearer access-2');
+  });
+
   it.each([400, 401, 403])('refresh rechazado (%i) borra la sesión', async (status) => {
     const { client, session } = setup((url) =>
       url === '/api/auth/refresh' ? apiError(status, 'Token inválido') : apiError(401, 'x'),

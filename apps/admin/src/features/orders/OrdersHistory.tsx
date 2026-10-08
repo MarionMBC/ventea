@@ -1,18 +1,17 @@
-import { useState } from 'react';
-
 import { customerName, formatAmount, formatClock, fulfillmentLabel } from '@/lib/format';
 
 import { startOfLocalDay } from './api';
-import { useOrderHistory } from './hooks';
+import { useNow, useOrderHistory } from './hooks';
 import { useOrdersContext } from './OrdersSection';
 import { statusLabel } from './transitions';
 
 /** Entregados y cancelados de hoy (día del dispositivo). Solo lectura. */
 export function OrdersHistory() {
   const { currency } = useOrdersContext();
-  // El día se fija al abrir la vista; si queda abierta pasada la medianoche,
-  // recargar la página muestra el día nuevo.
-  const [since] = useState(() => startOfLocalDay(new Date()));
+  // «Hoy» se recalcula con el reloj: pasada la medianoche cambia la clave de la
+  // consulta y la vista carga el día nuevo sola.
+  const now = useNow(60_000);
+  const since = startOfLocalDay(new Date(now));
   const { data: orders, error, isPending, refetch } = useOrderHistory(since);
 
   if (isPending) {

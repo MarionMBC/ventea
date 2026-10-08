@@ -10,6 +10,7 @@ import { OrdersSection } from '@/features/orders/OrdersSection';
 import { ApiError } from '@/lib/api';
 
 import { AppShell, Placeholder } from './AppShell';
+import { ErrorBoundary } from './ErrorBoundary';
 import { ServicesProvider, type Services } from './services';
 
 export function createQueryClient(): QueryClient {
@@ -42,29 +43,31 @@ export function App({
 }) {
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
   return (
-    <ServicesProvider services={services}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename={basename}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<RequireStaff />}>
-              <Route element={<AppShell />}>
-                <Route path="/orders" element={<OrdersSection />}>
-                  <Route index element={<OrdersBoard />} />
-                  <Route path="history" element={<OrdersHistory />} />
+    <ErrorBoundary>
+      <ServicesProvider services={services}>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter basename={basename}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<RequireStaff />}>
+                <Route element={<AppShell />}>
+                  <Route path="/orders" element={<OrdersSection />}>
+                    <Route index element={<OrdersBoard />} />
+                    <Route path="history" element={<OrdersHistory />} />
+                  </Route>
+                  {/* TODO: features/menu, locations, rewards, staff y reports (fuera de TASK-003). */}
+                  <Route path="/menu" element={<Placeholder title="Menú" />} />
+                  <Route path="/locations" element={<Placeholder title="Sucursales" />} />
+                  <Route path="/rewards" element={<Placeholder title="Puntos" />} />
+                  <Route path="/staff" element={<Placeholder title="Equipo" />} />
+                  <Route path="/reports" element={<Placeholder title="Reportes" />} />
                 </Route>
-                {/* TODO: features/menu, locations, rewards, staff y reports (fuera de TASK-003). */}
-                <Route path="/menu" element={<Placeholder title="Menú" />} />
-                <Route path="/locations" element={<Placeholder title="Sucursales" />} />
-                <Route path="/rewards" element={<Placeholder title="Puntos" />} />
-                <Route path="/staff" element={<Placeholder title="Equipo" />} />
-                <Route path="/reports" element={<Placeholder title="Reportes" />} />
               </Route>
-            </Route>
-            <Route path="*" element={<Navigate to="/orders" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </ServicesProvider>
+              <Route path="*" element={<Navigate to="/orders" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ServicesProvider>
+    </ErrorBoundary>
   );
 }

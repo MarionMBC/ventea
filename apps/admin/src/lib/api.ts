@@ -146,7 +146,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     let response = await send(path, method, body, token, signal);
 
     if (auth && response.status === 401) {
-      await refreshOnce();
+      // Si otro request ya renovó el token mientras este viajaba, se reintenta con el
+      // nuevo sin pedir otro refresh.
+      if (session.get()?.accessToken === token) await refreshOnce();
       response = await send(path, method, body, session.get()?.accessToken, signal);
       if (response.status === 401) {
         session.set(null);

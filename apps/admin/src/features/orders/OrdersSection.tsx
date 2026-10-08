@@ -3,7 +3,15 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
 
 import { useTenant } from '@/app/tenant';
-import { playChime, readSoundEnabled, writeSoundEnabled } from '@/lib/preferences';
+import {
+  getSoundStatus,
+  playChime,
+  readSoundEnabled,
+  subscribeSound,
+  unlockSound,
+  writeSoundEnabled,
+  type SoundStatus,
+} from '@/lib/preferences';
 
 import { createArrivalTracker } from './arrivals';
 import { useActiveOrders, useNotices, useUpdateOrderStatus, type Notice } from './hooks';
@@ -11,13 +19,19 @@ import type { StatusAction } from './transitions';
 
 const DEFAULT_TITLE = 'Ventea · Panel';
 
+const noSubscribe = () => () => {};
+const soundOff = (): SoundStatus => 'unsupported';
+
 export interface OrdersContext {
   activeOrders: ReturnType<typeof useActiveOrders>;
   fresh: ReadonlySet<string>;
   acknowledge: (orderId?: string) => void;
   currency: string | undefined;
   soundEnabled: boolean;
+  /** Sonido activado pero el navegador lo tiene suspendido (falta un toque). */
+  soundBlocked: boolean;
   toggleSound: () => void;
+  unlockSound: () => void;
   changeStatus: (order: StaffOrder, action: StatusAction) => void;
 }
 
@@ -52,12 +66,19 @@ export function OrdersSection() {
   }, [fresh, tenant?.name]);
   useEffect(() => () => void (document.title = DEFAULT_TITLE), []);
 
+  // El AudioContext solo existe con el sonido activado (sin gesto, Chrome avisa en consola).
+  const soundStatus = useSyncExternalStore(
+    soundEnabled ? subscribeSound : noSubscribe,
+    soundEnabled ? getSoundStatus : soundOff,
+  );
+
   const toggleSound = useCallback(() => {
-    setSoundEnabled((enabled) => {
-      writeSoundEnabled(!enabled);
-      return !enabled;
-    });
-  }, []);
+    const next = !soundEnabled;
+    writeSoundEnabled(next);
+    setSoundEnabled(next);
+    // El click es el gesto que el navegador exige para dejar sonar.
+    if (next) void unlockSound();
+  }, [soundEnabled]);
 
   const { mutate } = updateStatus;
   const changeStatus = useCallback(
@@ -74,7 +95,9 @@ export function OrdersSection() {
     acknowledge: tracker.acknowledge,
     currency: tenant?.currency,
     soundEnabled,
+    soundBlocked: soundEnabled && soundStatus === 'blocked',
     toggleSound,
+    unlockSound: () => void unlockSound(),
     changeStatus,
   };
 
@@ -85,13 +108,27 @@ export function OrdersSection() {
       <div className="orders__bar">
         <nav className="tabs" aria-label="Vistas de pedidos">
           <NavLink to="/orders" end className="tabs__tab">
-            Activos{activeCount !== undefined && <span className="tabs__count">{activeCount}</span>}
+            Activos
+            {activeCount !== undefined && (
+              <>
+                <span className="tabs__count" aria-hidden="true">
+                  {activeCount}
+                </span>
+                <span className="sr-only">, {activeCount} pedidos</span>
+              </>
+            )}
           </NavLink>
           <NavLink to="/orders/history" className="tabs__tab">
             Historial de hoy
           </NavLink>
         </nav>
       </div>
+      {/* Lectores de pantalla: anuncia los pedidos nuevos sin mover el foco. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {fresh.size > 0
+          ? `${fresh.size} ${fresh.size === 1 ? 'pedido nuevo' : 'pedidos nuevos'}`
+          : ''}
+      </p>
       <Outlet context={context} />
       <NoticeList notices={notices} onDismiss={dismiss} />
     </div>

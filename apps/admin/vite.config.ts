@@ -31,7 +31,9 @@ export default defineConfig({
       },
     },
   },
-  build: { outDir: 'dist', sourcemap: true },
+  // 'hidden': se generan los .map (para depurar errores reportados) pero el bundle no
+  // los referencia y nginx responde 404 a /admin/*.map: el fuente no queda público.
+  build: { outDir: 'dist', sourcemap: 'hidden' },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
