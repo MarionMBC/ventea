@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { LoginPage } from '@/features/auth/LoginPage';
+import { BillingPage } from '@/features/billing/BillingPage';
 import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
 import { OrdersHistory } from '@/features/orders/OrdersHistory';
@@ -93,6 +94,7 @@ export function App({
                     <Route path="/rewards" element={<Placeholder title="Puntos" />} />
                     <Route path="/staff" element={<Placeholder title="Equipo" />} />
                     <Route path="/reports" element={<Placeholder title="Reportes" />} />
+                    <Route path="/facturacion" element={<BillingPage />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/orders" replace />} />
