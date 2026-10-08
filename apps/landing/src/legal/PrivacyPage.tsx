@@ -74,11 +74,6 @@ const SECTIONS: LegalSection[] = [
           <li>direcciones de entrega;</li>
           <li>pedidos (productos, montos, notas y estado);</li>
           <li>puntos de lealtad ganados y canjeados;</li>
-          <li>
-            si usa la app y lo autoriza, el identificador de su teléfono y, si activa el ingreso con
-            huella o rostro, una referencia a esa credencial (el dato biométrico nunca sale del
-            teléfono).
-          </li>
         </ul>
         <p>
           Cada restaurante solo ve los datos de sus propios clientes. Si eres cliente de un
@@ -100,8 +95,8 @@ const SECTIONS: LegalSection[] = [
           identificador.
         </p>
         <p>
-          Como cualquier servidor web, el nuestro registra por un tiempo corto datos técnicos de las
-          conexiones (como la dirección IP) para seguridad y para limitar abusos.
+          Como cualquier servidor web, el nuestro guarda registros técnicos de las conexiones (como
+          la dirección IP) para seguridad y para limitar abusos.
         </p>
       </>
     ),
@@ -113,7 +108,8 @@ const SECTIONS: LegalSection[] = [
       <ul>
         <li>prestar el servicio: mostrar el menú, recibir pedidos y gestionar puntos;</li>
         <li>crear y administrar tu cuenta, tu suscripción y tus pagos;</li>
-        <li>mostrarte en tu panel avisos de tu cuenta (prueba, pagos, cambios del servicio);</li>
+        <li>mostrarte en tu panel el estado de tu cuenta (prueba, pagos pendientes);</li>
+        <li>escribirte al correo de tu cuenta cuando haya cambios importantes del servicio;</li>
         <li>responderte cuando nos escribes;</li>
         <li>proteger la plataforma contra fraudes y abusos, y cumplir obligaciones legales.</li>
       </ul>
@@ -158,9 +154,10 @@ const SECTIONS: LegalSection[] = [
     title: 'Seguridad',
     body: (
       <p>
-        Usamos conexiones cifradas (HTTPS), contraseñas cifradas, accesos separados por restaurante
-        y copias de seguridad. Ningún sistema es infalible: si ocurriera un incidente que afecte tus
-        datos, te lo comunicaremos por escrito y te diremos qué hacer.
+        Usamos conexiones cifradas (HTTPS), contraseñas cifradas y accesos separados por
+        restaurante, y nuestro equipo hace copias de seguridad de la base de datos. Ningún sistema
+        es infalible: si ocurriera un incidente que afecte tus datos, te lo comunicaremos por
+        escrito y te diremos qué hacer.
       </p>
     ),
   },
@@ -190,8 +187,9 @@ const SECTIONS: LegalSection[] = [
     title: 'Cambios a esta política',
     body: (
       <p>
-        Si cambiamos esta política de forma importante, lo anunciamos en esta página y en tu panel
-        antes de que el cambio entre en vigor, y actualizamos la fecha de arriba.
+        Si cambiamos esta política de forma importante, lo anunciamos en esta página y por escrito
+        al correo de tu cuenta antes de que el cambio entre en vigor, y actualizamos la fecha de
+        arriba.
       </p>
     ),
   },

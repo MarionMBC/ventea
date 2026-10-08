@@ -7,11 +7,11 @@ const QUESTIONS: { q: string; a: string }[] = [
   },
   {
     q: '¿Cómo se paga?',
-    a: 'Los planes se pagan en dólares (USD), mes a mes o por año. El pago anual equivale a diez meses: te regalamos dos. Antes de que termine tu prueba te avisamos cómo activar tu plan.',
+    a: 'Los planes se pagan en dólares (USD), mes a mes o por año. El pago anual equivale a diez meses: te regalamos dos. Hoy el pago se coordina con nuestro equipo (por ejemplo, por transferencia): en la sección Facturación de tu panel ves hasta cuándo dura tu prueba, y para activar tu plan nos escribes y coordinamos el pago contigo.',
   },
   {
     q: '¿Puedo cancelar cuando quiera?',
-    a: 'Sí. No hay permanencia ni multas. Si cancelas, tu servicio sigue funcionando hasta el final del período que ya pagaste.',
+    a: 'Sí, desde la sección Facturación de tu panel. No hay permanencia ni multas. Si cancelas, tu servicio sigue funcionando hasta el final del período que ya pagaste.',
   },
   {
     q: '¿De verdad no cobran comisión por pedido?',

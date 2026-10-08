@@ -91,10 +91,34 @@ describe('Legales: solo lo que el producto hace hoy (review TASK-007)', () => {
     const { container } = render(<TermsPage />);
     const body = text(container);
     expect(body).toContain(
-      'Un cambio de precio se anuncia en esta página y en tu panel con al menos 30 días de anticipación',
+      'Un cambio de precio se anuncia en esta página y por escrito al correo de tu cuenta con al menos 30 días de anticipación',
     );
-    expect(body).toContain('lo anunciamos en esta página y en tu panel con al menos 15 días');
+    expect(body).toContain(
+      'lo anunciamos en esta página y por escrito al correo de tu cuenta con al menos 15 días',
+    );
+    // El panel no tiene anuncios: solo el estado de la cuenta.
+    expect(body).not.toContain('en esta página y en tu panel');
     expect(body).toContain('comprobante de pago');
+  });
+
+  it('falta de pago: el servicio sigue 7 días (gracia), sin gracia al terminar la prueba', () => {
+    const { container } = render(<TermsPage />);
+    const body = text(container);
+    expect(body).toContain('tu servicio sigue activo durante 7 días');
+    expect(body).toContain('En tu panel ves un aviso con la fecha exacta en que termina ese plazo');
+    expect(body).toContain('tu página deja de recibir pedidos ese mismo día');
+    // Modo manual: nada se cobra ni se renueva solo.
+    expect(body).toContain('coordinamos el pago contigo antes del vencimiento');
+    expect(body).not.toMatch(/se renueva sola|cobro automático/i);
+  });
+
+  it('privacidad: sin datos de dispositivo ni biometría; registros técnicos y copias sin plazos', () => {
+    const { container } = render(<PrivacyPage />);
+    const body = text(container);
+    expect(body).not.toMatch(/biométric|huella|identificador de su teléfono/i);
+    expect(body).not.toMatch(/tiempo corto/);
+    expect(body).toContain('nuestro equipo hace copias de seguridad de la base de datos');
+    expect(body).not.toContain('en esta página y en tu panel');
   });
 
   it('borrado de datos a pedido por escrito, en un plazo razonable', () => {

@@ -10,7 +10,10 @@
  * Regla (review TASK-007): describir SOLO lo que el producto hace hoy. No hay correos
  * automáticos (BillingNotifier solo registra), ni facturación electrónica, ni purga
  * automática de datos, y el pago se coordina con el equipo (BILLING_MODE=manual). Los avisos
- * al dueño se ven en la sección Facturación de su panel.
+ * de estado (prueba, pago pendiente) se ven en el panel; los anuncios de cambios los manda el
+ * equipo por escrito al correo de la cuenta. Gracia de `past_due` (ADR 0007, TASK-007): el
+ * servicio sigue 7 días desde el vencimiento de un período pagado; una prueba vencida sin pago
+ * no tiene gracia.
  */
 import {
   CONTACT_EMAIL,
@@ -101,8 +104,9 @@ const SECTIONS: LegalSection[] = [
           los últimos cuatro dígitos.
         </li>
         <li>
-          Podemos cambiar los precios. Un cambio de precio se anuncia en esta página y en tu panel
-          con al menos 30 días de anticipación y se aplica desde tu siguiente renovación.
+          Podemos cambiar los precios. Un cambio de precio se anuncia en esta página y por escrito
+          al correo de tu cuenta con al menos 30 días de anticipación, y se aplica desde tu
+          siguiente renovación.
         </li>
       </ul>
     ),
@@ -112,9 +116,10 @@ const SECTIONS: LegalSection[] = [
     title: 'Renovación automática',
     body: (
       <p>
-        Tu suscripción se renueva al final de cada período (mes o año) por el mismo plan e
-        intervalo, salvo que la canceles antes. La fecha de renovación y el monto se ven en la
-        sección Facturación de tu panel.
+        Tu suscripción continúa por el mismo plan e intervalo (mes o año) al terminar cada período,
+        salvo que la canceles antes. Hoy el pago no se cobra solo: coordinamos el pago contigo antes
+        del vencimiento. La fecha de renovación y el monto se ven en la sección Facturación de tu
+        panel.
       </p>
     ),
   },
@@ -141,15 +146,21 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          Si el pago de una renovación no llega, tu suscripción queda con un pago pendiente: lo ves
-          como aviso en la sección Facturación de tu panel. Si después de unos días el pago no se
-          completa, suspendemos el servicio.
+          Si al vencer tu período el pago todavía no está registrado, tu suscripción queda con un
+          pago pendiente y tu servicio <strong>sigue activo durante 7 días</strong>: tu página y tu
+          app siguen recibiendo pedidos. En tu panel ves un aviso con la fecha exacta en que termina
+          ese plazo.
         </p>
         <p>
-          Con el servicio suspendido tu página y tu app dejan de recibir pedidos, pero tú sigues
-          pudiendo entrar a tu panel. Para reactivarlo, escríbenos a {mail}: al registrar tu pago el
-          servicio vuelve a funcionar. Tus datos se conservan como se explica en la{' '}
-          <a href="/privacidad#retencion">política de privacidad</a>.
+          Si en esos 7 días el pago no se registra, suspendemos el servicio: tu página y tu app
+          dejan de recibir pedidos, pero tú sigues pudiendo entrar a tu panel. Para reactivarlo,
+          escríbenos a {mail}: al registrar tu pago el servicio vuelve a funcionar. Tus datos se
+          conservan como se explica en la <a href="/privacidad#retencion">política de privacidad</a>
+          .
+        </p>
+        <p>
+          Este plazo es para períodos ya pagados. Al terminar la prueba gratis sin activar un plan,
+          tu página deja de recibir pedidos ese mismo día.
         </p>
       </>
     ),
@@ -207,8 +218,8 @@ const SECTIONS: LegalSection[] = [
       <p>
         Trabajamos para que Ventea esté disponible todo el tiempo, pero puede haber interrupciones
         por mantenimiento, fallas de proveedores o causas fuera de nuestro control. Podemos mejorar
-        o cambiar funciones; si quitamos algo importante de tu plan, lo anunciamos en esta página y
-        en tu panel con anticipación.
+        o cambiar funciones; si quitamos algo importante de tu plan, lo anunciamos con anticipación
+        en esta página y por escrito al correo de tu cuenta.
       </p>
     ),
   },
@@ -245,9 +256,9 @@ const SECTIONS: LegalSection[] = [
     title: 'Cambios a estos términos',
     body: (
       <p>
-        Si cambiamos estos términos de forma importante, lo anunciamos en esta página y en tu panel
-        con al menos 15 días de anticipación. Si no estás de acuerdo, puedes cancelar antes de que
-        entren en vigor. Versión vigente: {TERMS_VERSION}.
+        Si cambiamos estos términos de forma importante, lo anunciamos en esta página y por escrito
+        al correo de tu cuenta con al menos 15 días de anticipación. Si no estás de acuerdo, puedes
+        cancelar antes de que entren en vigor. Versión vigente: {TERMS_VERSION}.
       </p>
     ),
   },

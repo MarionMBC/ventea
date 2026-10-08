@@ -49,6 +49,16 @@ describe('Demo con capturas reales (TASK-007 AC2)', () => {
   });
 });
 
+describe('FAQ alineada con los términos (review TASK-007)', () => {
+  it('no promete avisos proactivos; el pago se coordina y la prueba se ve en Facturación', async () => {
+    const { container } = await renderLanding();
+    const faq = text(container.querySelector('#preguntas'));
+    expect(faq).not.toMatch(/te avisamos/i);
+    expect(faq).toContain('en la sección Facturación de tu panel ves hasta cuándo dura tu prueba');
+    expect(faq).toContain('coordinamos el pago contigo');
+  });
+});
+
 describe('Contacto (TASK-007)', () => {
   it('sin número configurado no hay botón de WhatsApp', async () => {
     await renderLanding();
