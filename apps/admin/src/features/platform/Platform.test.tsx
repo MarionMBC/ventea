@@ -69,6 +69,7 @@ function makeTenant(n: number, status: SubscriptionStatus = 'trialing'): Platfor
       cancelAtPeriodEnd: false,
     },
     card: null,
+    openAttempts: [],
     activeLocations: 1,
     billingEvents: [
       { type: 'trial_started', amountCents: null, status: null, message: null, createdAt: created },
@@ -159,6 +160,7 @@ function createFakePlatformApi(count = 30) {
         });
         return json(tenant);
       case 'resolve-payment':
+        tenant.openAttempts = [];
         tenant.billingEvents.unshift({
           type: 'payment_succeeded',
           amountCents: 5900,
@@ -183,7 +185,7 @@ function createFakePlatformApi(count = 30) {
 }
 
 function listItem(tenant: PlatformTenantDetail): PlatformTenant {
-  const { activeLocations: _a, billingEvents: _b, ...rest } = tenant;
+  const { activeLocations: _a, billingEvents: _b, card: _c, openAttempts: _o, ...rest } = tenant;
   return rest;
 }
 
@@ -353,6 +355,7 @@ describe('panel de plataforma (AC3)', () => {
     // Sin sondeo: «Registrar pago» está siempre y no se llama al endpoint al abrir.
     expect(screen.getByRole('button', { name: 'Registrar pago' })).toBeTruthy();
     expect(api.calls.some((c) => c.path.endsWith('/record-payment'))).toBe(false);
+    // Sin intentos abiertos no hay nada que resolver (aunque haya eventos de cobro).
     expect(screen.queryByRole('button', { name: 'Resolver cobro' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reactivar' })).toBeNull();
 
@@ -365,7 +368,7 @@ describe('panel de plataforma (AC3)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Suspender' }));
     dialog = screen.getByRole('dialog', { name: '¿Suspender Marca 2?' });
-    fireEvent.change(within(dialog).getByLabelText('Motivo (opcional)'), {
+    fireEvent.change(within(dialog).getByLabelText(/Motivo/), {
       target: { value: 'falta de pago' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Suspender' }));
@@ -412,6 +415,7 @@ describe('panel de plataforma (AC3)', () => {
     const { api } = renderPlatform('/admin/plataforma/marcas/marca-02');
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar pago' }));
     const dialog = screen.getByRole('dialog', { name: 'Registrar pago manual' });
+    expect(dialog.textContent).toContain('Estas notas son internas, el cliente no las ve.');
     const amount = within(dialog).getByLabelText('Monto (USD)') as HTMLInputElement;
     await waitFor(() => expect(amount.value).toBe('59.00')); // Pro mensual
     fireEvent.change(within(dialog).getByLabelText(/Referencia/), {
@@ -442,16 +446,25 @@ describe('panel de plataforma (AC3)', () => {
     );
   });
 
-  it('resolver cobro: aparece con un payment_unknown y precarga el orderId', async () => {
+  it('resolver cobro: solo con intentos abiertos; precarga el orderId del intento', async () => {
     const { api } = renderPlatform('/admin/plataforma/marcas/marca-03');
     api.tenants[2]!.card = { brand: 'visa', last4: '4242' };
     api.tenants[2]!.billingEvents.unshift({
       type: 'payment_unknown',
       amountCents: 5900,
       status: 'unknown',
-      message: 'Cobro sub-abc-20261008-a1 sin confirmar: se consulta a la pasarela, no se recobra',
+      message: 'Cobro sin confirmar',
       createdAt: new Date(),
     });
+    api.tenants[2]!.openAttempts = [
+      {
+        orderId: 'sub-abc-20261008-a1',
+        kind: 'renewal',
+        status: 'unknown',
+        amountCents: 5900,
+        createdAt: new Date(),
+      },
+    ];
     // Recarga el detalle con el evento nuevo.
     fireEvent.click(await screen.findByRole('link', { name: '← Marcas' }));
     fireEvent.click(await screen.findByRole('link', { name: 'Marca 3' }));
@@ -460,9 +473,10 @@ describe('panel de plataforma (AC3)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Resolver cobro' }));
     const dialog = screen.getByRole('dialog', { name: 'Resolver cobro sin confirmar' });
-    expect((within(dialog).getByLabelText('orderId') as HTMLInputElement).value).toBe(
+    expect((within(dialog).getByLabelText('Cobro abierto') as HTMLSelectElement).value).toBe(
       'sub-abc-20261008-a1',
     );
+    expect(dialog.textContent).toContain('Estas notas son internas, el cliente no las ve.');
     fireEvent.click(within(dialog).getByRole('radio', { name: /Se cobró/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Resolver' }));
     expect((await screen.findByRole('status')).textContent).toBe('Cobro resuelto.');
@@ -477,7 +491,7 @@ describe('panel de plataforma (AC3)', () => {
       before: (api) =>
         api.setOverride((c) => {
           if (c.path !== '/api/platform/tenants/marca-04') return undefined;
-          const tenant = { ...api.tenants[3]!, card: undefined };
+          const tenant = { ...api.tenants[3]!, card: undefined, openAttempts: undefined };
           return json({
             ...tenant,
             billingEvents: [

@@ -28,9 +28,18 @@ function overview(overrides: Record<string, unknown> = {}): Record<string, unkno
     events: [
       {
         type: 'trial_started',
+        description: 'Prueba gratis iniciada',
         amountCents: null,
         status: null,
-        message: 'Prueba de 14 días · plan pro (month)',
+        createdAt: new Date(NOW).toISOString(),
+      },
+      {
+        type: 'payment_succeeded',
+        description: 'Pago registrado',
+        amountCents: 5900,
+        status: 'succeeded',
+        // Una API vieja todavía mandaría `message`: el panel no lo muestra.
+        message: 'Pago manual (TRF-SECRETA) registrado por admin@ventea.tech',
         createdAt: new Date(NOW).toISOString(),
       },
     ],
@@ -118,7 +127,10 @@ describe('Facturación del dueño', () => {
     expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0);
     expect(screen.getByText('Prueba gratis hasta')).toBeTruthy();
     expect(screen.getByText('Sin tarjeta')).toBeTruthy();
-    expect(screen.getByText('Prueba iniciada')).toBeTruthy();
+    expect(screen.getByText('Prueba gratis iniciada')).toBeTruthy();
+    expect(screen.getByText('Pago registrado')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('TRF-SECRETA');
+    expect(document.body.textContent).not.toContain('admin@ventea.tech');
     const note = screen.getByText(/El pago se coordina con el equipo de Ventea/);
     expect(note.querySelector('a')?.getAttribute('href')).toBe('mailto:hola@ventea.tech');
     expect(screen.queryByText(/Pronto vas a poder registrar tu tarjeta/)).toBeNull();
@@ -202,20 +214,20 @@ describe('Facturación del dueño', () => {
     );
   });
 
-  it('un movimiento de tipo desconocido se muestra como «Evento: <tipo>»', async () => {
+  it('un movimiento de tipo nuevo se muestra con la descripción del servidor', async () => {
     renderBilling({
       billing: overview({
         events: [
           {
             type: 'refund_issued',
+            description: 'Reembolso',
             amountCents: 500,
             status: null,
-            message: null,
             createdAt: new Date(NOW).toISOString(),
           },
         ],
       }),
     });
-    expect(await screen.findByText('Evento: refund_issued')).toBeTruthy();
+    expect(await screen.findByText('Reembolso')).toBeTruthy();
   });
 });

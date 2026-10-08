@@ -8,7 +8,7 @@ import {
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import type { PanelBillingEvent, PanelTenantDetail } from '@/lib/billing-schemas';
+import type { PanelOpenAttempt, PanelTenantDetail } from '@/lib/billing-schemas';
 
 import { ConfirmDialog } from './ConfirmDialog';
 import { BASE_DOMAIN } from './host';
@@ -35,24 +35,6 @@ const DONE_MESSAGE: Record<DialogKind, string> = {
   'record-payment': 'Pago registrado: período nuevo abierto.',
   'resolve-payment': 'Cobro resuelto.',
 };
-
-/** El `orderId` de un cobro sin confirmar sale en el mensaje de su evento `payment_unknown`. */
-const UNKNOWN_ORDER_RE = /Cobro (\S+) sin confirmar/;
-
-/** orderId del cobro sin confirmar más reciente, si los eventos lo muestran. */
-export function pendingOrderId(events: PanelBillingEvent[]): string | null {
-  for (const event of events) {
-    if (event.type !== 'payment_unknown') continue;
-    const match = event.message?.match(UNKNOWN_ORDER_RE);
-    if (match?.[1]) return match[1];
-  }
-  return null;
-}
-
-/** ¿Hay algo para resolver a mano? `payment_unknown` o una alerta (`needs_review`). */
-function needsResolution(events: PanelBillingEvent[]): boolean {
-  return events.some((e) => e.type === 'payment_unknown' || e.type === 'billing_alert');
-}
 
 /** Precio del plan e intervalo actuales, para precargar un pago manual. */
 function currentPriceCents(
@@ -170,6 +152,11 @@ export function TenantDetail() {
               </Fact>
               <Fact label="Cancela al terminar">{sub.cancelAtPeriodEnd ? 'Sí' : 'No'}</Fact>
               <Fact label="Tarjeta">{cardLabel(tenant.card)}</Fact>
+              {tenant.openAttempts.length > 0 && (
+                <Fact label="Cobros sin confirmar">
+                  {tenant.openAttempts.length} (bloquean cambios hasta resolverlos)
+                </Fact>
+              )}
             </dl>
           ) : (
             <p className="pf-muted">La marca no tiene suscripción.</p>
@@ -205,7 +192,7 @@ export function TenantDetail() {
                 Registrar pago
               </button>
             )}
-            {sub && needsResolution(tenant.billingEvents) && (
+            {tenant.openAttempts.length > 0 && (
               <button
                 type="button"
                 className="btn btn--warning"
@@ -309,7 +296,7 @@ export function TenantDetail() {
       )}
       {dialog === 'resolve-payment' && (
         <ResolvePaymentDialog
-          suggestedOrderId={pendingOrderId(tenant.billingEvents)}
+          attempts={tenant.openAttempts}
           pending={pending}
           error={error}
           onCancel={() => setDialog(null)}
@@ -365,6 +352,7 @@ function SuspendDialog({
       </p>
       <label className="field">
         <span className="field__label">Motivo (opcional)</span>
+        <span className="field__hint">{INTERNAL_NOTE}</span>
         <textarea
           className="field__input"
           rows={3}
@@ -511,6 +499,9 @@ function RecordPaymentDialog({
       </label>
       <label className="field">
         <span className="field__label">Referencia (transferencia, recibo…)</span>
+        <span className="field__hint">
+          {INTERNAL_NOTE} Una referencia ya registrada en esta marca se rechaza (409).
+        </span>
         <input
           className="field__input"
           maxLength={200}
@@ -525,20 +516,28 @@ function RecordPaymentDialog({
   );
 }
 
+/** Aviso en los campos de texto libre: van al historial interno, no al dueño. */
+const INTERNAL_NOTE = 'Estas notas son internas, el cliente no las ve.';
+
+const ATTEMPT_KIND_LABEL: Record<PanelOpenAttempt['kind'], string> = {
+  establish: 'alta de tarjeta',
+  renewal: 'renovación',
+};
+
 const OUTCOME_LABEL: Record<PaymentResolution, string> = {
   succeeded: 'Se cobró (aprobado en el procesador)',
   failed: 'No se cobró',
 };
 
 function ResolvePaymentDialog({
-  suggestedOrderId,
+  attempts,
   onConfirm,
   ...props
 }: DialogProps & {
-  suggestedOrderId: string | null;
+  attempts: PanelOpenAttempt[];
   onConfirm: (orderId: string, outcome: PaymentResolution, note?: string) => void;
 }) {
-  const [orderId, setOrderId] = useState(suggestedOrderId ?? '');
+  const [orderId, setOrderId] = useState(attempts[0]?.orderId ?? '');
   const [outcome, setOutcome] = useState<PaymentResolution | null>(null);
   const [note, setNote] = useState('');
   const valid = orderId.trim().length > 0 && outcome !== null;
@@ -556,13 +555,19 @@ function ResolvePaymentDialog({
         pagado; «No se cobró» lo cuenta como rechazo.
       </p>
       <label className="field">
-        <span className="field__label">orderId</span>
-        <input
+        <span className="field__label">Cobro abierto</span>
+        <select
           className="field__input"
-          maxLength={64}
           value={orderId}
           onChange={(event) => setOrderId(event.target.value)}
-        />
+        >
+          {attempts.map((attempt) => (
+            <option key={attempt.orderId} value={attempt.orderId}>
+              {attempt.orderId} · {ATTEMPT_KIND_LABEL[attempt.kind]} ·{' '}
+              {formatUsdCents(attempt.amountCents)} · {attempt.status}
+            </option>
+          ))}
+        </select>
       </label>
       <fieldset className="pf-radios">
         <legend className="field__label">Resultado</legend>
@@ -581,6 +586,7 @@ function ResolvePaymentDialog({
       </fieldset>
       <label className="field">
         <span className="field__label">Nota (opcional)</span>
+        <span className="field__hint">{INTERNAL_NOTE}</span>
         <input
           className="field__input"
           maxLength={500}

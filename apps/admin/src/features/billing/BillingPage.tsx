@@ -13,7 +13,6 @@ import { useApi, useSession } from '@/app/services';
 import { ConfirmDialog } from '@/features/platform/ConfirmDialog';
 import {
   cardLabel,
-  eventLabel,
   formatDateTime,
   formatDay,
   formatUsdCents,
@@ -197,18 +196,16 @@ export function BillingPage() {
                   <th scope="col" className="pf-num">
                     Monto
                   </th>
-                  <th scope="col">Detalle</th>
                 </tr>
               </thead>
               <tbody>
                 {data.events.map((event, index) => (
                   <tr key={`${event.createdAt.toISOString()}-${index}`}>
                     <td>{formatDateTime(event.createdAt)}</td>
-                    <td>{eventLabel(event.type)}</td>
+                    <td>{event.description}</td>
                     <td className="pf-num">
                       {event.amountCents === null ? '—' : formatUsdCents(event.amountCents)}
                     </td>
-                    <td>{event.message ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
