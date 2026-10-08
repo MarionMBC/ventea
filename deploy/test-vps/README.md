@@ -139,10 +139,9 @@ grep -q '^IMAGE_WEB=' .env   && sed -i 's/^IMAGE_WEB=.*/IMAGE_WEB=ventea-web:0.1
 cp src/deploy/test-vps/docker-compose.yml src/deploy/test-vps/*.sh .   # si cambiaron
 chmod +x *.sh
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > backup-$(date +%F-%H%M).sql.gz
-docker compose up -d
+docker compose up -d && ./sync-routes.sh   # sync-routes INMEDIATAMENTE después (ver abajo)
 docker compose logs migrate | tail -5     # "All migrations have been successfully applied"
 curl -fsS https://api.ventea.tech/api/health   # REGIONS mal escrito = la API no arranca (todas las marcas)
-./sync-routes.sh
 ./install-cron.sh                          # una vez (idempotente)
 curl https://api.ventea.tech/api/health
 curl -I https://carolina-hot-chicken.ventea.tech/admin/   # 200, el panel
@@ -154,6 +153,14 @@ curl -I https://www.ventea.tech/                 # 301 → https://app.ventea.te
 curl -I https://app.ventea.tech/admin/plataforma # 200, panel de plataforma
 curl -I https://carolina-hot-chicken.ventea.tech/admin/plataforma   # 301 → app.
 ```
+
+**Ventana de `app.` sin certificado (TASK-007).** Apenas sube el web nuevo, el apex y `www`
+responden `301` a `https://app.ventea.tech`; hasta que `sync-routes.sh` publica los routers de
+`app.` y Let's Encrypt emite su certificado (HTTP-01, ~1-2 min la primera vez) la landing y el
+registro no cargan. Por eso `./sync-routes.sh` va en la misma línea que `docker compose up -d`, y
+la primera vez conviene hacerlo en horario de poco tráfico y confirmar `curl -I
+https://app.ventea.tech/` → 200 antes de dar por terminado el deploy. Las marcas no se ven
+afectadas.
 
 La imagen web no lleva `VITE_*`: el panel y la landing usan `/api` relativo y el tenant sale
 del subdominio. La primera vez que se publica `app.`, Traefik pide su certificado (HTTP-01;
