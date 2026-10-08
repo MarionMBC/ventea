@@ -83,6 +83,7 @@ Detalle completo en [docs/multi-tenancy.md](docs/multi-tenancy.md).
 | ---------------------------------------------- | --------------------------------------------------------------------------- |
 | [docs/architecture.md](docs/architecture.md)   | Cómo encajan las tres apps y por dónde va un request                        |
 | [docs/multi-tenancy.md](docs/multi-tenancy.md) | Aislamiento entre marcas, resolución de tenant, camino a RLS                |
+| [docs/api.md](docs/api.md)                     | Endpoints, autenticación, reglas de pedidos y puntos, scripts de operación  |
 | [docs/data-model.md](docs/data-model.md)       | Entidades, por qué hay snapshots y por qué los puntos son un libro contable |
 | [docs/white-label.md](docs/white-label.md)     | Cómo se produce una app con la marca de cada cliente                        |
 | [docs/deployment.md](docs/deployment.md)       | Cómo se instala y se actualiza la instancia de un cliente en su VPS         |
