@@ -45,3 +45,6 @@ npm-debug.log*
 
 # grafo de conocimiento (regenerable)
 graphify-out/
+
+# estado local de herramientas de agentes (regenerable)
+.atl/
