@@ -2,16 +2,21 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
   createOrderSchema,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyKeySchema,
   staffOrdersQuerySchema,
   updateOrderStatusSchema,
   type CreateOrderInput,
@@ -33,6 +38,8 @@ import { ZodValidationPipe } from '@/common/zod-validation.pipe';
 
 import { OrdersService } from './orders.service';
 
+const IDEMPOTENCY_KEY_PIPE = new ZodValidationPipe(idempotencyKeySchema.optional());
+
 /** Pedidos del cliente autenticado. */
 @ApiTags('orders')
 @CustomerAuth()
@@ -40,13 +47,23 @@ import { OrdersService } from './orders.service';
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
+  /**
+   * `201` con el pedido nuevo. Con `Idempotency-Key`, un reintento del mismo pedido
+   * responde `200` con el pedido original; la misma clave con otro cuerpo, `409`.
+   */
   @Post()
-  create(
+  async create(
     @CurrentTenant() tenant: TenantContext,
     @CurrentCustomer() customer: CustomerPrincipal,
     @Body(new ZodValidationPipe(createOrderSchema)) input: CreateOrderInput,
+    @Headers(IDEMPOTENCY_KEY_HEADER) rawIdempotencyKey: string | undefined,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<Order> {
-    return this.orders.create(tenant, customer.customerId, input);
+    // @Headers() no admite pipes en Nest: se valida acá con el mismo pipe y formato de error.
+    const idempotencyKey = IDEMPOTENCY_KEY_PIPE.transform(rawIdempotencyKey, { type: 'custom' });
+    const result = await this.orders.create(tenant, customer.customerId, input, idempotencyKey);
+    if (!result.created) response.status(HttpStatus.OK);
+    return result.order;
   }
 
   @Get()

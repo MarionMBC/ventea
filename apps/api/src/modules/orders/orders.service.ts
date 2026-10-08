@@ -14,6 +14,7 @@ import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { isForeignKeyViolation, isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
+import { assertSameRequest, hashOrderRequest } from './idempotency';
 import { generateOrderCode, orderCodePrefix } from './order-code';
 import { orderInclude, toOrder } from './order.mapper';
 import { canTransition } from './order-status';
@@ -30,6 +31,12 @@ interface OrderState {
   customerId: string | null;
   totalCents: number;
   pointsRedeemed: number;
+}
+
+/** Resultado de crear: `created=false` si fue un reintento con la misma Idempotency-Key. */
+export interface CreateOrderResult {
+  order: Order;
+  created: boolean;
 }
 
 const ORDER_STATE_SELECT = {
@@ -54,9 +61,20 @@ export class OrdersService {
    *
    * Sucursal y catálogo se leen dentro de la transacción. Si aun así un `import-menu`
    * concurrente borra un ítem antes del insert, la FK falla y se responde 409.
+   *
+   * Con `idempotencyKey`: si el cliente ya creó un pedido con esa clave se devuelve
+   * ese pedido (mismo cuerpo) o 409 (otro cuerpo), sin crear ni debitar nada. El
+   * lock de la fila del cliente serializa los reintentos concurrentes; si aun así
+   * dos llegan al insert, el índice único decide y el perdedor lee al ganador.
    */
-  async create(tenant: TenantContext, customerId: string, input: CreateOrderInput): Promise<Order> {
+  async create(
+    tenant: TenantContext,
+    customerId: string,
+    input: CreateOrderInput,
+    idempotencyKey?: string,
+  ): Promise<CreateOrderResult> {
     const { tenantId } = tenant;
+    const requestHash = idempotencyKey ? hashOrderRequest(input) : null;
 
     if (input.fulfillmentType === 'delivery') {
       throw new BadRequestException('delivery no disponible');
@@ -66,7 +84,7 @@ export class OrdersService {
 
     for (let attempt = 1; ; attempt++) {
       try {
-        const orderId = await this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
           // Bloquea la fila del cliente hasta el commit: serializa los pedidos (y canjes)
           // del mismo cliente, y de paso confirma que la cuenta sigue existiendo.
           const locked = await tx.$queryRaw<{ id: string }[]>`
@@ -74,6 +92,21 @@ export class OrdersService {
             WHERE "id" = ${customerId} AND "tenantId" = ${tenantId}
             FOR UPDATE`;
           if (locked.length === 0) throw new UnauthorizedException('Sesión inválida o expirada');
+
+          // Antes de validar contra el catálogo: un reintento devuelve el pedido original
+          // aunque el menú haya cambiado desde entonces.
+          if (idempotencyKey && requestHash) {
+            const existing = await this.findByIdempotencyKey(
+              tx,
+              tenantId,
+              customerId,
+              idempotencyKey,
+            );
+            if (existing) {
+              assertSameRequest(existing.idempotencyRequestHash, requestHash);
+              return { id: existing.id, created: false };
+            }
+          }
 
           const location = await tx.location.findFirst({
             where: { tenantId, id: input.locationId, isActive: true },
@@ -112,6 +145,8 @@ export class OrdersService {
               totalCents: cart.subtotalCents - redemption.discountCents,
               pointsRedeemed: redemption.pointsUsed,
               customerNotes: input.customerNotes ?? null,
+              idempotencyKey: idempotencyKey ?? null,
+              idempotencyRequestHash: requestHash,
               scheduledFor: input.scheduledFor ?? null,
               placedAt: new Date(),
               lines: {
@@ -146,11 +181,27 @@ export class OrdersService {
               redemption.pointsUsed,
             );
           }
-          return order.id;
+          return { id: order.id, created: true };
         });
 
-        return this.getOrThrow(tenantId, { id: orderId });
+        return {
+          order: await this.getOrThrow(tenantId, { id: result.id }),
+          created: result.created,
+        };
       } catch (error) {
+        if (isUniqueViolation(error) && idempotencyKey && requestHash) {
+          // Carrera: otro request con la misma clave ganó el insert. Se devuelve el suyo.
+          const winner = await this.findByIdempotencyKey(
+            this.prisma,
+            tenantId,
+            customerId,
+            idempotencyKey,
+          );
+          if (winner) {
+            assertSameRequest(winner.idempotencyRequestHash, requestHash);
+            return { order: await this.getOrThrow(tenantId, { id: winner.id }), created: false };
+          }
+        }
         // Única violación de unicidad posible: (tenantId, code) por una carrera.
         if (isUniqueViolation(error) && attempt < CREATE_ATTEMPTS) continue;
         if (isForeignKeyViolation(error)) {
@@ -260,6 +311,18 @@ export class OrdersService {
     });
     if (!row) throw new NotFoundException('Pedido no encontrado');
     return toOrder(row);
+  }
+
+  private findByIdempotencyKey(
+    db: PrismaDb,
+    tenantId: string,
+    customerId: string,
+    idempotencyKey: string,
+  ) {
+    return db.order.findFirst({
+      where: { tenantId, customerId, idempotencyKey },
+      select: { id: true, idempotencyRequestHash: true },
+    });
   }
 
   /** Ítems pedidos con sus grupos y opciones, solo del tenant y de categorías activas. */
