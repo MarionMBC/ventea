@@ -51,6 +51,7 @@ model Tenant {
 
   subscription    Subscription?
   billingEvents   BillingEvent[]
+  paymentAttempts PaymentAttempt[]
   branding        TenantBranding?
   rewardProgram   RewardProgram?
   locations       Location[]
@@ -92,7 +93,8 @@ model Plan {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  subscriptions Subscription[]
+  subscriptions        Subscription[]
+  pendingSubscriptions Subscription[] @relation("PendingPlan")
 
   @@map("plans")
 }
@@ -117,12 +119,23 @@ model Subscription {
   cardLast4            String? @db.Char(4)
   /// `networkTransactionId` del primer cobro: ancla los cobros recurrentes sin CVV.
   networkTransactionId String?
+  /// Vencimiento de la tarjeta guardada: el cobro recurrente lo manda junto al token.
+  cardExpMonth         Int?
+  cardExpYear          Int?
+
+  /// Cambio de plan agendado por el dueño: se aplica al abrir el próximo período.
+  pendingPlanId   String?
+  pendingInterval BillingInterval?
+  /// Próximo reintento de cobro tras un rechazo (dunning: días 1, 3 y 7).
+  retryAt         DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan        Plan             @relation(fields: [planId], references: [id], onDelete: Restrict)
+  pendingPlan Plan?            @relation("PendingPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
+  attempts    PaymentAttempt[]
 
   @@index([status])
   @@map("subscriptions")
@@ -169,6 +182,57 @@ enum BillingEventType {
   suspended
   reactivated
   canceled
+  // TASK-005: cobro
+  payment_succeeded
+  payment_failed
+  payment_unknown
+  payment_method_updated
+  plan_change_scheduled
+  cancel_scheduled
+  cancel_resumed
+  past_due
+}
+
+/// Intento de cobro (TASK-005). Se escribe ANTES de llamar a la pasarela (write-ahead): si la
+/// respuesta se pierde, la fila queda `pending`/`unknown` y el ciclo la reconcilia con
+/// `status` en vez de cobrar de nuevo. A diferencia de `BillingEvent`, es mutable.
+model PaymentAttempt {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  subscriptionId        String
+  /// Clave idempotente hacia la pasarela. Renovaciones: determinística por período e intento.
+  orderId               String               @unique
+  kind                  PaymentAttemptKind
+  /// Inicio del período que paga este intento.
+  periodStart           DateTime
+  /// 1..4 en renovaciones (dunning); 1 en altas de tarjeta.
+  attempt               Int
+  amountCents           Int
+  currency              String               @db.Char(3)
+  status                PaymentAttemptStatus @default(pending)
+  providerTransactionId String?
+  message               String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, subscriptionId, periodStart])
+  @@index([status])
+  @@map("payment_attempts")
+}
+
+enum PaymentAttemptKind {
+  establish
+  renewal
+}
+
+enum PaymentAttemptStatus {
+  pending
+  succeeded
+  failed
+  unknown
 }
 
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.

@@ -68,5 +68,18 @@ export const BILLING_EVENT_TYPE = [
   'suspended',
   'reactivated',
   'canceled',
+  // TASK-005: cobro
+  'payment_succeeded',
+  'payment_failed',
+  'payment_unknown', // la pasarela no confirmó: se reconcilia, no se recobra
+  'payment_method_updated',
+  'plan_change_scheduled',
+  'cancel_scheduled',
+  'cancel_resumed',
+  'past_due', // período o prueba vencidos sin pago
 ] as const;
 export type BillingEventType = (typeof BILLING_EVENT_TYPE)[number];
+
+/** Cómo se cobra la suscripción: `ms-payments` (tarjeta, CyberSource) o `manual` (lo registra la plataforma). */
+export const BILLING_MODE = ['ms-payments', 'manual'] as const;
+export type BillingMode = (typeof BILLING_MODE)[number];
