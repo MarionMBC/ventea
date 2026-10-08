@@ -13,6 +13,9 @@ describe('slugs reservados', () => {
     'account',
     'verify',
     'soporte',
+    'plataforma',
+    'panel',
+    'dashboard',
   ])('%s está reservado', (slug) => {
     expect(isReservedTenantSlug(slug)).toBe(true);
   });
