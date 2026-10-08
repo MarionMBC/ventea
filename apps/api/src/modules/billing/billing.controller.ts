@@ -30,15 +30,27 @@ export class BillingController {
     return this.billing.overview(staff.tenantId);
   }
 
-  /** Alta de tarjeta + primer cobro. 5 intentos por marca y hora (anti card-testing). */
+  /**
+   * Alta de tarjeta + primer cobro. Anti card-testing: 5 intentos por marca y hora, 10 por IP
+   * y día (entre todas las marcas: el registro es público) y bloqueo de 24 h tras 3 rechazos
+   * seguidos (en el servicio).
+   */
   @Post('payment-method')
   @HttpCode(HttpStatus.OK)
-  @RateLimit({
-    bucket: 'billing-payment-method',
-    envKey: 'BILLING_RATE_LIMIT_PER_HOUR',
-    defaultPerHour: 5,
-    key: 'tenant',
-  })
+  @RateLimit(
+    {
+      bucket: 'billing-payment-method',
+      envKey: 'BILLING_RATE_LIMIT_PER_HOUR',
+      defaultPerHour: 5,
+      key: 'tenant',
+    },
+    {
+      bucket: 'billing-payment-method-ip',
+      envKey: 'BILLING_IP_RATE_LIMIT_PER_DAY',
+      defaultPerHour: 10,
+      windowHours: 24,
+    },
+  )
   @UseGuards(RateLimitGuard)
   addPaymentMethod(
     @CurrentStaff() staff: StaffPrincipal,

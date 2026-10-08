@@ -95,6 +95,7 @@ model Plan {
 
   subscriptions        Subscription[]
   pendingSubscriptions Subscription[] @relation("PendingPlan")
+  paymentAttempts      PaymentAttempt[]
 
   @@map("plans")
 }
@@ -191,11 +192,17 @@ enum BillingEventType {
   cancel_scheduled
   cancel_resumed
   past_due
+  /// Algo para que una persona revise: posible doble pago, monto aprobado distinto, card-testing.
+  billing_alert
 }
 
 /// Intento de cobro (TASK-005). Se escribe ANTES de llamar a la pasarela (write-ahead): si la
 /// respuesta se pierde, la fila queda `pending`/`unknown` y el ciclo la reconcilia con
 /// `status` en vez de cobrar de nuevo. A diferencia de `BillingEvent`, es mutable.
+///
+/// Lo que se cobra queda CONGELADO acá (plan, intervalo, período, monto): el resultado se
+/// aplica con estos datos, nunca con el estado de la suscripción al momento de conciliar.
+/// Una suscripción tiene como mucho UN intento abierto (pending/unknown) a la vez.
 model PaymentAttempt {
   id                    String               @id @default(uuid())
   tenantId              String
@@ -203,9 +210,12 @@ model PaymentAttempt {
   /// Clave idempotente hacia la pasarela. Renovaciones: determinística por período e intento.
   orderId               String               @unique
   kind                  PaymentAttemptKind
-  /// Inicio del período que paga este intento.
+  /// Período que paga este intento, con el plan y el intervalo cobrados.
   periodStart           DateTime
-  /// 1..4 en renovaciones (dunning); 1 en altas de tarjeta.
+  periodEnd             DateTime
+  planId                String
+  interval              BillingInterval
+  /// Número de intento del período (1, 2…); también entra en el orderId.
   attempt               Int
   amountCents           Int
   currency              String               @db.Char(3)
@@ -217,6 +227,7 @@ model PaymentAttempt {
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, subscriptionId, periodStart])
   @@index([status])
@@ -233,6 +244,8 @@ enum PaymentAttemptStatus {
   succeeded
   failed
   unknown
+  /// No llegó al banco (400 de la pasarela: dato inválido). No cuenta para el dunning.
+  failed_non_bank
 }
 
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.

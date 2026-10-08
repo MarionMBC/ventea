@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
-import { SubscriptionsService } from '@/modules/subscriptions/subscriptions.service';
 import { fitsLocationLimit } from '@/modules/subscriptions/plan-limits';
-import { addDays } from '@/modules/subscriptions/subscription-state';
+import { addDays, periodEnd } from '@/modules/subscriptions/subscription-state';
+import { SubscriptionsService } from '@/modules/subscriptions/subscriptions.service';
 import { isUniqueViolation } from '@/prisma/prisma-errors';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
@@ -13,9 +13,14 @@ import {
   BillingLockService,
   subscriptionLockKey,
 } from './billing-lock.service';
-import { BILLING_NOTIFIER, type BillingNotifier } from './billing-notifier';
-import { BillingOutcomeService } from './billing-outcome.service';
-import { GRACE_DAYS, MAX_RENEWAL_ATTEMPTS, planPriceCents, renewalOrderId } from './billing-rules';
+import { BillingOutcomeService, OPEN_ATTEMPT_STATUSES } from './billing-outcome.service';
+import {
+  checkApproval,
+  GRACE_DAYS,
+  MAX_RENEWAL_ATTEMPTS,
+  planPriceCents,
+  renewalOrderId,
+} from './billing-rules';
 import {
   BILLING_SUBSCRIPTION_SELECT,
   canChargeRecurring,
@@ -38,19 +43,41 @@ export interface BillingCycleSummary {
   canceled: number;
   pastDue: number;
   suspended: number;
-  /** Suscripciones salteadas (lock tomado, intento sin confirmar, pasarela caída…). */
+  /** Suscripciones salteadas (lock tomado, intento abierto, pasarela caída, error…). */
   deferred: number;
 }
 
 type RenewalOutcome = 'approved' | 'declined' | 'unknown' | 'deferred';
 
+/** Cobros desconocidos seguidos que cortan las renovaciones de la corrida (circuit breaker). */
+export const UNKNOWN_BREAKER = 3;
+
 const HAS_CARD = { paymentToken: { not: null }, networkTransactionId: { not: null } };
 const NO_CARD = { OR: [{ paymentToken: null }, { networkTransactionId: null }] };
+/** Una suscripción con un cobro abierto no cambia de estado sola: primero se sabe si pagó. */
+const NO_OPEN_ATTEMPT = { attempts: { none: { status: { in: OPEN_ATTEMPT_STATUSES } } } };
+
+/** Intento abierto, con lo que se cobró congelado. */
+interface FrozenAttempt {
+  tenantId: string;
+  subscriptionId: string;
+  orderId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  interval: BillingSubscription['interval'];
+  amountCents: number;
+  plan: { id: string; code: string };
+}
 
 /**
  * Ciclo de cobro (TASK-005). Lo dispara `BillingScheduler` cada 15 min o el script
  * `run-billing-cycle`. Un lock de Postgres deja correr a una sola réplica; dentro, cada
  * suscripción se cobra con su propio lock (el alta de tarjeta del dueño usa el mismo).
+ *
+ * Invariantes de dinero:
+ * - una suscripción tiene como mucho UN intento abierto (pending/unknown), de cualquier tipo;
+ *   mientras lo tenga no se le cobra nada más ni cambia de estado sola;
+ * - lo cobrado queda congelado en el intento y se aplica desde ahí.
  *
  * Orden: 1) conciliar intentos sin confirmar vía `status`; 2) cancelar las que pidieron
  * cancelar al fin del período; 3) cobrar renovaciones vencidas (solo `ms-payments`);
@@ -63,7 +90,6 @@ export class BillingCycleService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
-    @Inject(BILLING_NOTIFIER) private readonly notifier: BillingNotifier,
     private readonly locks: BillingLockService,
     private readonly outcomes: BillingOutcomeService,
     private readonly subscriptions: SubscriptionsService,
@@ -80,7 +106,7 @@ export class BillingCycleService {
       deferred: 0,
     };
     const lock = await this.locks.withTryLock(BILLING_CYCLE_LOCK, async () => {
-      await this.reconcile(summary);
+      await this.reconcile(now, summary);
       await this.cancelAtPeriodEnd(now, summary);
       if (this.gateway.mode === 'ms-payments') await this.renew(now, summary);
       await this.expire(now, summary);
@@ -97,16 +123,15 @@ export class BillingCycleService {
    * consulta a la pasarela. Los de alta de tarjeta los resuelve el admin (`resolve-payment`):
    * su aprobación tardía no trae el `networkTransactionId` que ancla la serie.
    */
-  private async reconcile(summary: BillingCycleSummary): Promise<void> {
+  private async reconcile(now: Date, summary: BillingCycleSummary): Promise<void> {
     const tenants = await this.prisma.tenant.findMany({
       where: {
-        paymentAttempts: { some: { kind: 'renewal', status: { in: ['pending', 'unknown'] } } },
+        paymentAttempts: { some: { kind: 'renewal', status: { in: OPEN_ATTEMPT_STATUSES } } },
       },
       select: {
         id: true,
         paymentAttempts: {
-          where: { kind: 'renewal', status: { in: ['pending', 'unknown'] } },
-          orderBy: { createdAt: 'asc' },
+          where: { kind: 'renewal', status: { in: OPEN_ATTEMPT_STATUSES } },
           select: { subscriptionId: true },
         },
       },
@@ -117,48 +142,55 @@ export class BillingCycleService {
       for (const subscriptionId of subscriptionIds) {
         try {
           const lock = await this.locks.withTryLock(subscriptionLockKey(subscriptionId), () =>
-            this.reconcileSubscription(tenant.id, subscriptionId),
+            this.reconcileSubscription(tenant.id, subscriptionId, now),
           );
           if (lock.acquired) summary.reconciled += lock.value;
           else summary.deferred += 1;
         } catch (error) {
-          if (!(error instanceof GatewayError)) throw error;
-          this.logger.warn(`Conciliación detenida: ${error.message}`);
           summary.deferred += 1;
-          return;
+          if (error instanceof GatewayError) {
+            this.logger.warn(`Conciliación detenida: ${error.message}`);
+            return;
+          }
+          this.logger.error(`Conciliación de ${tenant.id} falló: ${errorText(error)}`);
         }
       }
     }
   }
 
-  private async reconcileSubscription(tenantId: string, subscriptionId: string): Promise<number> {
+  private async reconcileSubscription(
+    tenantId: string,
+    subscriptionId: string,
+    now: Date,
+  ): Promise<number> {
     const attempts = await this.prisma.paymentAttempt.findMany({
-      where: { tenantId, subscriptionId, kind: 'renewal', status: { in: ['pending', 'unknown'] } },
+      where: {
+        tenantId,
+        subscriptionId,
+        kind: 'renewal',
+        status: { in: OPEN_ATTEMPT_STATUSES },
+      },
       orderBy: { createdAt: 'asc' },
+      include: { plan: { select: { id: true, code: true } } },
     });
     let resolved = 0;
     for (const attempt of attempts) {
-      const result = await this.gateway.status({
-        orderId: attempt.orderId,
-        transactionId: attempt.providerTransactionId,
-      });
+      const result = checkApproval(
+        await this.gateway.status({
+          orderId: attempt.orderId,
+          transactionId: attempt.providerTransactionId,
+        }),
+        { orderId: attempt.orderId, amount: attempt },
+      );
       if (result.status === 'unknown') {
-        // Pending huérfano (el proceso murió con el cobro en vuelo): pasa a unknown y avisa.
-        if (attempt.status === 'pending') {
+        // Pending huérfano (el proceso murió con el cobro en vuelo), o un aprobado distinto
+        // de lo pedido: pasa a unknown (con su alerta) y queda para una persona.
+        if (attempt.status === 'pending' || result.alert) {
           await this.outcomes.markUnknown({ ...attempt, result });
         }
         continue;
       }
-      const subscription = await this.load(tenantId);
-      if (!subscription) continue;
-      await this.applyRenewalResult(subscription, {
-        orderId: attempt.orderId,
-        attempt: attempt.attempt,
-        periodStart: attempt.periodStart,
-        amountCents: attempt.amountCents,
-        result,
-        reconciled: true,
-      });
+      await this.applyRenewalResult(attempt, result, now, true);
       resolved += 1;
     }
     return resolved;
@@ -169,6 +201,7 @@ export class BillingCycleService {
   private async cancelAtPeriodEnd(now: Date, summary: BillingCycleSummary): Promise<void> {
     const due = await this.dueSubscriptions({
       cancelAtPeriodEnd: true,
+      ...NO_OPEN_ATTEMPT,
       OR: [
         { status: 'trialing', trialEndsAt: { lte: now } },
         { status: { in: ['active', 'past_due'] }, currentPeriodEnd: { lte: now } },
@@ -191,9 +224,11 @@ export class BillingCycleService {
       cancelAtPeriodEnd: false,
       currentPeriodEnd: { lte: now },
       ...HAS_CARD,
+      ...NO_OPEN_ATTEMPT,
       OR: [{ retryAt: null }, { retryAt: { lte: now } }],
     });
 
+    let unknownInARow = 0;
     for (const { id, tenantId } of due) {
       let outcome: RenewalOutcome;
       try {
@@ -202,14 +237,28 @@ export class BillingCycleService {
         );
         outcome = lock.acquired ? lock.value : 'deferred';
       } catch (error) {
-        if (!(error instanceof GatewayError) || error.kind !== 'unavailable') throw error;
-        // Pasarela caída: no tiene sentido seguir golpeándola; la próxima corrida reintenta.
-        this.logger.error(`Renovaciones detenidas: ${error.message}`);
+        if (error instanceof GatewayError && error.kind === 'unavailable') {
+          // Pasarela caída: no tiene sentido seguir golpeándola; la próxima corrida reintenta.
+          this.logger.error(`Renovaciones detenidas: ${error.message}`);
+          summary.deferred += 1;
+          return;
+        }
+        // Una suscripción rota no frena a las demás.
+        this.logger.error(`Renovación de ${tenantId} falló: ${errorText(error)}`);
+        outcome = 'deferred';
+      }
+      if (outcome === 'deferred') {
         summary.deferred += 1;
+        continue;
+      }
+      summary.charged[outcome] += 1;
+      unknownInARow = outcome === 'unknown' ? unknownInARow + 1 : 0;
+      if (unknownInARow >= UNKNOWN_BREAKER) {
+        this.logger.error(
+          `Renovaciones cortadas: ${UNKNOWN_BREAKER} cobros sin confirmar seguidos (¿ms-payments o el procesador caídos?)`,
+        );
         return;
       }
-      if (outcome === 'deferred') summary.deferred += 1;
-      else summary.charged[outcome] += 1;
     }
   }
 
@@ -227,30 +276,47 @@ export class BillingCycleService {
       return 'deferred';
     }
 
+    // Un intento abierto de CUALQUIER tipo (también un alta de tarjeta sin confirmar que paga
+    // este mismo período) bloquea el cobro: primero hay que saber si cobró.
+    const open = await this.prisma.paymentAttempt.count({
+      where: { tenantId, subscriptionId: subscription.id, status: { in: OPEN_ATTEMPT_STATUSES } },
+    });
+    if (open > 0) return 'deferred';
+
     const periodStart = subscription.currentPeriodEnd;
     const previous = await this.prisma.paymentAttempt.findMany({
       where: { tenantId, subscriptionId: subscription.id, kind: 'renewal', periodStart },
       select: { status: true },
     });
-    // Un intento sin confirmar bloquea el siguiente: primero hay que saber si cobró.
-    if (previous.some((a) => a.status === 'pending' || a.status === 'unknown')) return 'deferred';
-    const attempt = previous.length + 1;
-    if (attempt > MAX_RENEWAL_ATTEMPTS) return 'deferred';
+    const bankFailures = previous.filter((a) => a.status === 'failed').length;
+    if (bankFailures >= MAX_RENEWAL_ATTEMPTS) return 'deferred';
+    const sequence = previous.length + 1;
 
     const { plan, interval } = await this.renewalPlan(subscription);
-    const amountCents = planPriceCents(plan, interval);
-    const orderId = renewalOrderId(subscription.id, periodStart, attempt);
+    const attempt: FrozenAttempt = {
+      tenantId,
+      subscriptionId: subscription.id,
+      orderId: renewalOrderId(subscription.id, periodStart, sequence),
+      periodStart,
+      periodEnd: periodEnd(periodStart, interval),
+      interval,
+      amountCents: planPriceCents(plan, interval),
+      plan: { id: plan.id, code: plan.code },
+    };
 
     try {
       await this.prisma.paymentAttempt.create({
         data: {
           tenantId,
           subscriptionId: subscription.id,
-          orderId,
+          orderId: attempt.orderId,
           kind: 'renewal',
           periodStart,
-          attempt,
-          amountCents,
+          periodEnd: attempt.periodEnd,
+          planId: plan.id,
+          interval,
+          attempt: sequence,
+          amountCents: attempt.amountCents,
           currency: plan.currency,
         },
       });
@@ -260,6 +326,7 @@ export class BillingCycleService {
       throw error;
     }
 
+    const amount = { amountCents: attempt.amountCents, currency: plan.currency };
     let result: ChargeResult;
     try {
       result = await this.gateway.chargeRecurring({
@@ -267,81 +334,58 @@ export class BillingCycleService {
         initialTransactionId: subscription.networkTransactionId!,
         expMonth: subscription.cardExpMonth,
         expYear: subscription.cardExpYear,
-        amount: { amountCents, currency: plan.currency },
-        orderId,
+        amount,
+        orderId: attempt.orderId,
       });
     } catch (error) {
-      if (error instanceof GatewayError) {
-        // No llegó al procesador: se borra el intento y el mismo orderId sirve la próxima vez.
-        await this.prisma.paymentAttempt.deleteMany({
-          where: { tenantId, orderId, status: 'pending' },
-        });
-        if (error.kind === 'unavailable') throw error;
-        this.logger.error(`Renovación de ${tenantId} rechazada por ms-payments: ${error.message}`);
+      if (!(error instanceof GatewayError)) throw error;
+      if (error.kind === 'invalid') {
+        await this.outcomes.applyNonBankFailure(
+          { ...attempt, result: { status: 'declined', message: error.message } },
+          now,
+        );
         return 'deferred';
       }
+      // No llegó al procesador: se borra el intento y el mismo orderId sirve la próxima vez.
+      await this.prisma.paymentAttempt.deleteMany({
+        where: { tenantId, orderId: attempt.orderId, status: 'pending' },
+      });
       throw error;
     }
 
-    return this.applyRenewalResult(subscription, {
-      orderId,
-      attempt,
-      periodStart,
-      amountCents,
-      result,
-      reconciled: false,
-    });
+    // Lo primero: la referencia del procesador, por si algo falla después.
+    await this.outcomes.rememberTransaction(tenantId, attempt.orderId, result.transactionId);
+    result = checkApproval(result, { orderId: attempt.orderId, amount });
+    return this.applyRenewalResult(attempt, result, now, false);
   }
 
+  /** Aplica el resultado con lo que se cobró (congelado en el intento), nunca con lo actual. */
   private async applyRenewalResult(
-    subscription: BillingSubscription,
-    charge: {
-      orderId: string;
-      attempt: number;
-      periodStart: Date;
-      amountCents: number;
-      result: ChargeResult;
-      reconciled: boolean;
-    },
+    attempt: FrozenAttempt,
+    result: ChargeResult,
+    now: Date,
+    reconciled: boolean,
   ): Promise<RenewalOutcome> {
-    const { tenantId } = subscription;
-    switch (charge.result.status) {
-      case 'approved': {
-        const { plan, interval } = await this.renewalPlan(subscription);
+    switch (result.status) {
+      case 'approved':
         await this.outcomes.applyPaid({
-          tenantId,
-          subscriptionId: subscription.id,
-          expect: { status: ['active', 'past_due'], currentPeriodEnd: charge.periodStart },
-          periodStart: charge.periodStart,
-          plan,
-          interval,
-          previous: { planCode: subscription.plan.code, interval: subscription.interval },
-          amountCents: charge.amountCents,
-          orderId: charge.orderId,
-          providerTransactionId: charge.result.transactionId ?? null,
-          message: `Renovación (intento ${charge.attempt})${charge.reconciled ? ', confirmada al consultar a la pasarela' : ''}`,
+          tenantId: attempt.tenantId,
+          subscriptionId: attempt.subscriptionId,
+          periodStart: attempt.periodStart,
+          periodEnd: attempt.periodEnd,
+          plan: attempt.plan,
+          interval: attempt.interval,
+          amountCents: attempt.amountCents,
+          orderId: attempt.orderId,
+          providerTransactionId: result.transactionId ?? null,
+          message: `Renovación${reconciled ? ', confirmada al consultar a la pasarela' : ''}`,
         });
         return 'approved';
-      }
       case 'declined':
-      case 'error':
-        await this.outcomes.applyRenewalFailure({
-          tenantId,
-          subscriptionId: subscription.id,
-          orderId: charge.orderId,
-          attempt: charge.attempt,
-          periodStart: charge.periodStart,
-          amountCents: charge.amountCents,
-          result: charge.result,
-        });
+        await this.outcomes.applyRenewalFailure({ ...attempt, result }, now);
         return 'declined';
       case 'unknown':
-        await this.outcomes.markUnknown({
-          tenantId,
-          orderId: charge.orderId,
-          amountCents: charge.amountCents,
-          result: charge.result,
-        });
+        await this.outcomes.markUnknown({ ...attempt, result });
         return 'unknown';
     }
   }
@@ -360,11 +404,11 @@ export class BillingCycleService {
     });
     if (fitsLocationLimit(next.plan.maxLocations, active)) return next;
 
-    await this.notifier.notify({
-      tenantId: subscription.tenantId,
-      type: 'plan_change_scheduled',
-      message: `Cambio a ${next.plan.code} no aplicado: ${active} sucursales activas superan su límite`,
-    });
+    await this.outcomes.notify(
+      subscription.tenantId,
+      'plan_change_scheduled',
+      `Cambio a ${next.plan.code} no aplicado: ${active} sucursales activas superan su límite`,
+    );
     return { plan: subscription.plan, interval: subscription.interval };
   }
 
@@ -379,6 +423,7 @@ export class BillingCycleService {
       status: 'trialing',
       cancelAtPeriodEnd: false,
       trialEndsAt: { lte: now },
+      ...NO_OPEN_ATTEMPT,
     });
     for (const subscription of trials) {
       await this.subscriptions.expireTrial(subscription.tenantId, subscription.id, now);
@@ -390,6 +435,7 @@ export class BillingCycleService {
       status: 'active',
       cancelAtPeriodEnd: false,
       currentPeriodEnd: { lte: now },
+      ...NO_OPEN_ATTEMPT,
       ...notCharged,
     });
     for (const subscription of overdue) {
@@ -406,6 +452,7 @@ export class BillingCycleService {
     const graceOver = await this.dueSubscriptions({
       status: 'past_due',
       currentPeriodEnd: { lte: addDays(now, -GRACE_DAYS) },
+      ...NO_OPEN_ATTEMPT,
       ...notCharged,
     });
     for (const subscription of graceOver) {
@@ -451,7 +498,7 @@ export class BillingCycleService {
       await tx.billingEvent.create({ data: { tenantId, ...event } });
       return true;
     });
-    if (changed) await this.notifier.notify({ tenantId, ...event });
+    if (changed) await this.outcomes.notify(tenantId, event.type, event.message);
     return changed;
   }
 
@@ -461,4 +508,8 @@ export class BillingCycleService {
       select: BILLING_SUBSCRIPTION_SELECT,
     });
   }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }

@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   BadRequestException,
   ConflictException,
   GatewayTimeoutException,
@@ -10,6 +9,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
   BillingChangePlanInput,
   BillingOverview,
@@ -18,13 +18,19 @@ import type {
 } from '@ventea/shared';
 
 import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
-import { nextStatus } from '@/modules/subscriptions/subscription-state';
+import { addDays, nextStatus, periodEnd } from '@/modules/subscriptions/subscription-state';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { BillingLockService, subscriptionLockKey } from './billing-lock.service';
-import { BillingOutcomeService } from './billing-outcome.service';
-import { establishOrderId, nextPeriodStart, planPriceCents } from './billing-rules';
+import { BillingOutcomeService, OPEN_ATTEMPT_STATUSES } from './billing-outcome.service';
+import {
+  checkApproval,
+  establishOrderId,
+  nextPeriodStart,
+  planPriceCents,
+  rawCardApiAllowed,
+} from './billing-rules';
 import {
   BILLING_SUBSCRIPTION_SELECT,
   nextPeriodPlan,
@@ -40,6 +46,8 @@ import {
 
 const OVERVIEW_EVENTS = 20;
 const CANCELABLE: SubscriptionStatus[] = ['trialing', 'active', 'past_due'];
+/** Rechazos seguidos de una marca que bloquean el alta de tarjeta 24 h (card-testing). */
+const DECLINE_BLOCK_COUNT = 3;
 
 /**
  * Cobro de la suscripción desde el panel del dueño (`/api/billing/*`). El número de tarjeta y
@@ -56,6 +64,7 @@ export class BillingService {
     private readonly locks: BillingLockService,
     private readonly outcomes: BillingOutcomeService,
     private readonly limits: PlanLimitsService,
+    private readonly config: ConfigService,
   ) {}
 
   async overview(tenantId: string): Promise<BillingOverview> {
@@ -82,18 +91,66 @@ export class BillingService {
         'El cobro con tarjeta no está habilitado: escríbenos y registramos tu pago',
       );
     }
-    const { id } = await this.load(tenantId);
-    const lock = await this.locks.withTryLock(subscriptionLockKey(id), () =>
-      this.establish(tenantId, input),
-    );
-    if (!lock.acquired) {
-      throw new ConflictException('Ya hay un cobro en curso para esta marca; espera un momento');
+    if (
+      !rawCardApiAllowed({
+        nodeEnv: this.config.get<string>('NODE_ENV'),
+        mode: this.gateway.mode,
+        allowRawCard: this.config.get<string>('ALLOW_RAW_CARD_API'),
+      })
+    ) {
+      // PCI: en producción el número de tarjeta no debe tocar la API (docs/deployment.md).
+      throw new ServiceUnavailableException(
+        'El alta de tarjeta todavía no está habilitada; escríbenos y registramos tu pago',
+      );
     }
+    const { id } = await this.load(tenantId);
+    await this.withIdleSubscription(tenantId, id, () => this.establish(tenantId, input));
     return this.overview(tenantId);
   }
 
   /** Cambio de plan para el próximo período, sin prorrateo. */
   async changePlan(tenantId: string, input: BillingChangePlanInput): Promise<BillingOverview> {
+    const { id } = await this.load(tenantId);
+    await this.withIdleSubscription(tenantId, id, () => this.scheduleChange(tenantId, input));
+    return this.overview(tenantId);
+  }
+
+  /** Cancela al fin del período (o de la prueba). Hasta entonces, todo sigue igual. */
+  async cancel(tenantId: string): Promise<BillingOverview> {
+    return this.setCancelAtPeriodEnd(tenantId, true);
+  }
+
+  async resume(tenantId: string): Promise<BillingOverview> {
+    return this.setCancelAtPeriodEnd(tenantId, false);
+  }
+
+  /**
+   * Corre `fn` con el lock de la suscripción y sin cobros abiertos. Con un cobro en vuelo o
+   * sin confirmar, nada que cambie lo que se cobra (plan, cancelación, tarjeta) puede pasar:
+   * `409`. Primero se aplica el resultado de ese cobro.
+   */
+  private async withIdleSubscription(
+    tenantId: string,
+    subscriptionId: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    const lock = await this.locks.withTryLock(subscriptionLockKey(subscriptionId), async () => {
+      const open = await this.prisma.paymentAttempt.count({
+        where: { tenantId, subscriptionId, status: { in: OPEN_ATTEMPT_STATUSES } },
+      });
+      if (open > 0) {
+        throw new ConflictException(
+          'Hay un cobro sin confirmar con el banco; lo estamos revisando. Espera a que se resuelva.',
+        );
+      }
+      await fn();
+    });
+    if (!lock.acquired) {
+      throw new ConflictException('Hay un cobro en curso para esta marca; espera un momento');
+    }
+  }
+
+  private async scheduleChange(tenantId: string, input: BillingChangePlanInput): Promise<void> {
     const subscription = await this.load(tenantId);
     if (nextStatus(subscription.status, 'change_plan') === null) {
       throw new ConflictException(
@@ -109,7 +166,7 @@ export class BillingService {
     const interval = input.interval ?? subscription.interval;
     const sameAsCurrent = plan.id === subscription.plan.id && interval === subscription.interval;
     const hadPending = subscription.pendingPlan !== null || subscription.pendingInterval !== null;
-    if (sameAsCurrent && !hadPending) return this.overview(tenantId);
+    if (sameAsCurrent && !hadPending) return;
     if (!sameAsCurrent) await this.limits.assertFitsPlan(tenantId, plan);
 
     await this.prisma.$transaction(async (tx) => {
@@ -130,62 +187,70 @@ export class BillingService {
         },
       });
     });
-    return this.overview(tenantId);
-  }
-
-  /** Cancela al fin del período (o de la prueba). Hasta entonces, todo sigue igual. */
-  async cancel(tenantId: string): Promise<BillingOverview> {
-    return this.setCancelAtPeriodEnd(tenantId, true);
-  }
-
-  async resume(tenantId: string): Promise<BillingOverview> {
-    return this.setCancelAtPeriodEnd(tenantId, false);
   }
 
   private async setCancelAtPeriodEnd(tenantId: string, cancel: boolean): Promise<BillingOverview> {
-    const subscription = await this.load(tenantId);
-    if (!CANCELABLE.includes(subscription.status)) {
-      throw new ConflictException(
-        subscription.status === 'canceled'
-          ? 'La suscripción ya terminó: registra una tarjeta para reactivarla'
-          : `No se puede ${cancel ? 'cancelar' : 'reanudar'} una suscripción ${subscription.status}`,
-      );
-    }
-    if (subscription.cancelAtPeriodEnd === cancel) return this.overview(tenantId);
+    const { id } = await this.load(tenantId);
+    await this.withIdleSubscription(tenantId, id, async () => {
+      const subscription = await this.load(tenantId);
+      if (!CANCELABLE.includes(subscription.status)) {
+        throw new ConflictException(
+          subscription.status === 'canceled'
+            ? 'La suscripción ya terminó: registra una tarjeta para reactivarla'
+            : `No se puede ${cancel ? 'cancelar' : 'reanudar'} una suscripción ${subscription.status}`,
+        );
+      }
+      if (subscription.cancelAtPeriodEnd === cancel) return;
 
-    await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.subscription.updateMany({
-        where: {
-          tenantId,
-          id: subscription.id,
-          status: subscription.status,
-          cancelAtPeriodEnd: !cancel,
-        },
-        data: { cancelAtPeriodEnd: cancel },
-      });
-      if (count === 0) throw changedMeanwhile();
-      await tx.billingEvent.create({
-        data: {
-          tenantId,
-          type: cancel ? 'cancel_scheduled' : 'cancel_resumed',
-          message: cancel
-            ? 'Se cancela al terminar el período actual'
-            : 'Cancelación anulada: sigue renovándose',
-        },
+      await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.subscription.updateMany({
+          where: {
+            tenantId,
+            id: subscription.id,
+            status: subscription.status,
+            cancelAtPeriodEnd: !cancel,
+          },
+          data: { cancelAtPeriodEnd: cancel },
+        });
+        if (count === 0) throw changedMeanwhile();
+        await tx.billingEvent.create({
+          data: {
+            tenantId,
+            type: cancel ? 'cancel_scheduled' : 'cancel_resumed',
+            message: cancel
+              ? 'Se cancela al terminar el período actual'
+              : 'Cancelación anulada: sigue renovándose',
+          },
+        });
       });
     });
     return this.overview(tenantId);
+  }
+
+  /** Rechazos bancarios seguidos de altas de tarjeta de la marca en las últimas 24 h. */
+  private async declineStreak(tenantId: string, now: Date): Promise<number> {
+    const recent = await this.prisma.paymentAttempt.findMany({
+      where: { tenantId, kind: 'establish', createdAt: { gte: addDays(now, -1) } },
+      orderBy: { createdAt: 'desc' },
+      take: DECLINE_BLOCK_COUNT,
+      select: { status: true },
+    });
+    let streak = 0;
+    for (const attempt of recent) {
+      if (attempt.status !== 'failed') break;
+      streak += 1;
+    }
+    return streak;
   }
 
   private async establish(tenantId: string, input: PaymentMethodInput): Promise<void> {
     const now = new Date();
     const subscription = await this.load(tenantId);
-    const open = await this.prisma.paymentAttempt.count({
-      where: { tenantId, subscriptionId: subscription.id, status: { in: ['pending', 'unknown'] } },
-    });
-    if (open > 0) {
-      throw new ConflictException(
-        'Hay un cobro sin confirmar con el banco; lo estamos revisando. No hace falta reintentar.',
+    // Anti card-testing: 3 rechazos seguidos → 24 h sin poder probar otra tarjeta.
+    if ((await this.declineStreak(tenantId, now)) >= DECLINE_BLOCK_COUNT) {
+      throw new HttpException(
+        'Demasiadas tarjetas rechazadas: el alta queda bloqueada 24 h. Si es un error, escríbenos.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
@@ -194,8 +259,19 @@ export class BillingService {
     const periodStart = nextPeriodStart(subscription, now);
     const amount = { amountCents: planPriceCents(plan, interval), currency: plan.currency };
     const orderId = establishOrderId(subscription.id, now);
+    const frozen = {
+      tenantId,
+      subscriptionId: subscription.id,
+      orderId,
+      periodStart,
+      periodEnd: periodEnd(periodStart, interval),
+      plan: { id: plan.id, code: plan.code },
+      interval,
+      amountCents: amount.amountCents,
+    };
 
-    // Write-ahead: si la respuesta se pierde, el intento queda y nadie cobra de nuevo a ciegas.
+    // Write-ahead, con lo que se cobra congelado: si la respuesta se pierde, el intento queda,
+    // nadie cobra de nuevo a ciegas y al confirmarlo se aplica exactamente esto.
     await this.prisma.paymentAttempt.create({
       data: {
         tenantId,
@@ -203,6 +279,9 @@ export class BillingService {
         orderId,
         kind: 'establish',
         periodStart,
+        periodEnd: frozen.periodEnd,
+        planId: plan.id,
+        interval,
         attempt: 1,
         amountCents: amount.amountCents,
         currency: amount.currency,
@@ -219,29 +298,17 @@ export class BillingService {
       });
       throw gatewayErrorToHttp(error);
     }
+    await this.outcomes.rememberTransaction(tenantId, orderId, result.transactionId);
+    const checked = checkApproval(result, { orderId, amount });
+    const failed = { ...frozen, result: checked };
 
-    const failed = {
-      tenantId,
-      subscriptionId: subscription.id,
-      orderId,
-      amountCents: amount.amountCents,
-      result,
-    };
-    switch (result.status) {
+    switch (checked.status) {
       case 'approved':
         await this.outcomes.applyPaid({
-          tenantId,
-          subscriptionId: subscription.id,
-          // El dueño pagó: el período se abre aunque el estado haya cambiado en el medio
-          // (p. ej. la prueba venció mientras cargaba la tarjeta).
-          expect: {},
-          periodStart,
-          plan,
-          interval,
-          previous: { planCode: subscription.plan.code, interval: subscription.interval },
-          amountCents: amount.amountCents,
-          orderId,
+          ...frozen,
           providerTransactionId: result.transactionId ?? null,
+          // El dueño paga con él presente: pagar es pedir seguir.
+          resetCancel: true,
           card: {
             provider: this.gateway.provider,
             token: result.token!,
@@ -266,14 +333,15 @@ export class BillingService {
         );
       case 'declined':
         await this.outcomes.applyEstablishFailure(failed);
+        if ((await this.declineStreak(tenantId, now)) === DECLINE_BLOCK_COUNT) {
+          await this.outcomes.alert(
+            tenantId,
+            `${DECLINE_BLOCK_COUNT} tarjetas rechazadas seguidas: alta de tarjeta bloqueada 24 h (posible card-testing)`,
+          );
+        }
         throw new HttpException(
-          `La tarjeta fue rechazada${result.message ? `: ${result.message}` : ''}`,
+          `La tarjeta fue rechazada${checked.message ? `: ${checked.message}` : ''}`,
           HttpStatus.PAYMENT_REQUIRED,
-        );
-      case 'error':
-        await this.outcomes.applyEstablishFailure(failed);
-        throw new BadGatewayException(
-          'La pasarela de pagos falló; intenta de nuevo en unos minutos',
         );
     }
   }

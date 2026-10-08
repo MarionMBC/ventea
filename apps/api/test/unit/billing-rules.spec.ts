@@ -3,14 +3,17 @@ import { paymentMethodInputSchema } from '@ventea/shared';
 import { redactSensitive } from '@/common/logging/redact';
 import {
   afterRenewalFailure,
+  checkApproval,
   dueAt,
   establishOrderId,
   graceExpired,
   MAX_RENEWAL_ATTEMPTS,
+  MIN_RETRY_GAP_HOURS,
   monthlyValueCents,
   nextPeriodStart,
   ORDER_ID_MAX_LENGTH,
   planPriceCents,
+  rawCardApiAllowed,
   renewalOrderId,
 } from '@/modules/billing/billing-rules';
 import { addDays, periodEnd } from '@/modules/subscriptions/subscription-state';
@@ -22,15 +25,80 @@ const PLAN = { priceMonthlyCents: 2500, priceYearlyCents: 25000 };
 describe('dunning: afterRenewalFailure', () => {
   const due = new Date('2026-11-08T12:00:00.000Z');
 
+  const onTime = (days: number) => new Date(addDays(due, days).getTime() + 60_000);
+
   it('rechazos 1, 2 y 3 → past_due con reintento a los días 1, 3 y 7 del vencimiento', () => {
-    expect(afterRenewalFailure(1, due)).toEqual({ status: 'past_due', retryAt: addDays(due, 1) });
-    expect(afterRenewalFailure(2, due)).toEqual({ status: 'past_due', retryAt: addDays(due, 3) });
-    expect(afterRenewalFailure(3, due)).toEqual({ status: 'past_due', retryAt: addDays(due, 7) });
+    expect(afterRenewalFailure(1, due, onTime(0))).toEqual({
+      status: 'past_due',
+      retryAt: addDays(due, 1),
+    });
+    expect(afterRenewalFailure(2, due, onTime(1))).toEqual({
+      status: 'past_due',
+      retryAt: addDays(due, 3),
+    });
+    expect(afterRenewalFailure(3, due, onTime(3))).toEqual({
+      status: 'past_due',
+      retryAt: addDays(due, 7),
+    });
   });
 
   it('el 4.º rechazo suspende', () => {
     expect(MAX_RENEWAL_ATTEMPTS).toBe(4);
-    expect(afterRenewalFailure(4, due)).toEqual({ status: 'suspended', retryAt: null });
+    expect(afterRenewalFailure(4, due, onTime(7))).toEqual({ status: 'suspended', retryAt: null });
+  });
+
+  it('catch-up (ciclo parado 10 días): el reintento se espacia desde ahora, sin ráfaga', () => {
+    const late = addDays(due, 10);
+    const decision = afterRenewalFailure(1, due, late);
+    expect(decision.retryAt!.getTime() - late.getTime()).toBe(MIN_RETRY_GAP_HOURS * 3600_000);
+  });
+});
+
+describe('checkApproval', () => {
+  const expected = { orderId: 'sub-x-a1', amount: { amountCents: 5900, currency: 'USD' } };
+
+  it('aprobado con mismo monto y orderId (o sin eco) → aprobado', () => {
+    const ok = {
+      status: 'approved' as const,
+      orderId: 'sub-x-a1',
+      approvedAmount: { amountCents: 5900, currency: 'usd' },
+    };
+    expect(checkApproval(ok, expected)).toBe(ok);
+    expect(checkApproval({ status: 'approved' }, expected).status).toBe('approved');
+  });
+
+  it.each([
+    ['monto distinto', { approvedAmount: { amountCents: 100, currency: 'USD' } }],
+    ['otra moneda', { approvedAmount: { amountCents: 5900, currency: 'HNL' } }],
+    ['otro orderId', { orderId: 'sub-y-a1' }],
+    ['autorización parcial', { partial: true }],
+  ])('%s → unknown con alerta (no se da por pagado)', (_name, extra) => {
+    const result = checkApproval({ status: 'approved', ...extra }, expected);
+    expect(result.status).toBe('unknown');
+    expect(result.alert).toMatch(/sub-x-a1/);
+  });
+
+  it('un rechazo o un desconocido pasan tal cual', () => {
+    expect(checkApproval({ status: 'declined' }, expected).status).toBe('declined');
+    expect(checkApproval({ status: 'unknown' }, expected).status).toBe('unknown');
+  });
+});
+
+describe('rawCardApiAllowed (PCI)', () => {
+  it('en producción con cobro real exige ALLOW_RAW_CARD_API=true', () => {
+    const prod = { nodeEnv: 'production', mode: 'ms-payments' as const };
+    expect(rawCardApiAllowed({ ...prod, allowRawCard: undefined })).toBe(false);
+    expect(rawCardApiAllowed({ ...prod, allowRawCard: '1' })).toBe(false);
+    expect(rawCardApiAllowed({ ...prod, allowRawCard: 'true' })).toBe(true);
+  });
+
+  it('fuera de producción, o en modo manual, no aplica', () => {
+    expect(
+      rawCardApiAllowed({ nodeEnv: 'test', mode: 'ms-payments', allowRawCard: undefined }),
+    ).toBe(true);
+    expect(
+      rawCardApiAllowed({ nodeEnv: 'production', mode: 'manual', allowRawCard: undefined }),
+    ).toBe(true);
   });
 });
 
@@ -49,8 +117,18 @@ describe('nextPeriodStart', () => {
     );
   });
 
-  it.each(['past_due', 'suspended', 'canceled'] as const)('%s: desde ahora', (status) => {
-    expect(nextPeriodStart({ ...base, status }, NOW)).toEqual(NOW);
+  it.each(['past_due', 'suspended', 'canceled'] as const)(
+    '%s con el período vencido: desde ahora',
+    (status) => {
+      expect(nextPeriodStart({ ...base, status }, NOW)).toEqual(NOW);
+    },
+  );
+
+  it('suspendida a mano a mitad de período: desde el fin del período (nunca solapa)', () => {
+    const currentPeriodEnd = addDays(NOW, 12);
+    expect(nextPeriodStart({ ...base, status: 'suspended', currentPeriodEnd }, NOW)).toEqual(
+      currentPeriodEnd,
+    );
   });
 
   it('prueba ya vencida: desde ahora (no se cobran días pasados)', () => {
@@ -166,6 +244,28 @@ describe('redactSensitive (logger)', () => {
     expect(out).not.toContain('"123"');
     expect(out).toContain('[REDACTED]');
     expect(redactSensitive('cvv=987 securityCode: 4321')).not.toMatch(/987|4321/);
+  });
+
+  it('PAN con puntos', () => {
+    expect(redactSensitive('pan 4111.1111.1111.1111 fin')).toBe('pan [PAN] fin');
+  });
+
+  it('claves csc, cvc, card_cvc, cvc2, securityCode y cardNumber', () => {
+    const out = redactSensitive(
+      '{"csc":"111","cvc":"222","card_cvc":"333","cvc2":"444","securityCode":"555","cardNumber":"x9"}',
+    );
+    expect(out).not.toMatch(/111|222|333|444|555|x9/);
+  });
+
+  it('JSON escapado una y dos veces (body dentro de otro string)', () => {
+    const once = JSON.stringify(JSON.stringify({ card: { cvv: '737', number: 'abc' } }));
+    const twice = JSON.stringify(once);
+    for (const text of [once, twice]) {
+      const out = redactSensitive(`body ${text}`);
+      expect(out).not.toContain('737');
+      expect(out).not.toContain('abc');
+      expect(out).toContain('[REDACTED]');
+    }
   });
 
   it('no toca ids largos que no pasan Luhn ni texto común', () => {

@@ -77,6 +77,7 @@ export const BILLING_EVENT_TYPE = [
   'cancel_scheduled',
   'cancel_resumed',
   'past_due', // período o prueba vencidos sin pago
+  'billing_alert', // para revisar: posible doble pago, monto distinto, card-testing
 ] as const;
 export type BillingEventType = (typeof BILLING_EVENT_TYPE)[number];
 

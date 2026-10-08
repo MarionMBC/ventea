@@ -156,8 +156,13 @@ export const billingSummarySchema = z.object({
   mrrCents: z.number().int().nonnegative(),
   byStatus: z.record(z.enum(SUBSCRIPTION_STATUS), z.number().int().nonnegative()),
   failuresLast7Days: z.number().int().nonnegative(),
-  /** Intentos de cobro sin confirmar: alguien tiene que mirarlos. */
+  /**
+   * Cobros que alguien tiene que mirar: sin confirmar (pending/unknown) y los que la pasarela
+   * rechazó antes del banco (`failed_non_bank`) en los últimos 7 días.
+   */
   unresolvedPayments: z.number().int().nonnegative(),
+  /** Alertas (`billing_alert`) de los últimos 7 días: posible doble pago, monto distinto… */
+  alertsLast7Days: z.number().int().nonnegative(),
 });
 
 export type PaymentCard = z.infer<typeof paymentCardSchema>;

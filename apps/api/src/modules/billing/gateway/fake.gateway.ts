@@ -3,7 +3,6 @@ import type { BillingAddress, PaymentCard } from '@ventea/shared';
 import {
   GatewayError,
   type ChargeResult,
-  type ChargeStatus,
   type EstablishResult,
   type GatewayAmount,
   type PaymentGateway,
@@ -13,24 +12,27 @@ import {
 
 /**
  * Qué hace el próximo cobro del `FakeGateway`:
- * - `approve` / `decline` / `error`: respuesta inmediata.
- * - `timeout`: la respuesta se pierde (`unknown`), pero el cobro queda en `final`; `status`
+ * - `approve` / `decline`: respuesta inmediata.
+ * - `timeout`: la respuesta se pierde (`unknown`), pero el cobro queda en `timeout`; `status`
  *   lo devuelve. `withTransactionId: false` simula un timeout antes de tener id.
+ * - `approveAmountCents`: el banco aprueba OTRO monto (autorización parcial).
+ * - `invalid`: la pasarela rechaza el request antes del banco (400).
  * - `unavailable`: la pasarela no atiende (no cobra).
  */
 export type FakeBehavior =
   | 'approve'
   | 'decline'
-  | 'error'
+  | 'invalid'
   | 'unavailable'
-  | { timeout: Exclude<ChargeStatus, 'unknown'>; withTransactionId?: boolean };
+  | { timeout: 'approved' | 'declined'; withTransactionId?: boolean }
+  | { approveAmountCents: number };
 
 export interface FakeCharge {
   orderId: string;
   kind: 'establish' | 'recurring';
   amount: GatewayAmount;
   /** Lo que de verdad pasó en el "banco" (`approved` = se movió dinero). */
-  outcome: Exclude<ChargeStatus, 'unknown'>;
+  outcome: 'approved' | 'declined';
   initialTransactionId?: string;
 }
 
@@ -101,26 +103,33 @@ export class FakeGateway implements PaymentGateway {
     const behavior = this.script.shift() ?? 'approve';
     if (this.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.delayMs));
     if (behavior === 'unavailable') throw new GatewayError('unavailable', 'fake: no disponible');
+    if (behavior === 'invalid') throw new GatewayError('invalid', 'fake: request inválido');
 
     this.sequence += 1;
     const transactionId = `fake-tx-${this.sequence}`;
     const networkTransactionId = `fake-ntid-${this.sequence}`;
+    const echo = { transactionId, orderId: input.orderId };
 
-    if (typeof behavior === 'object') {
+    if (typeof behavior === 'object' && 'timeout' in behavior) {
       this.charges.push({ ...input, outcome: behavior.timeout });
       return behavior.withTransactionId === false
         ? { status: 'unknown', message: 'fake: timeout' }
         : { status: 'unknown', transactionId, message: 'fake: timeout' };
     }
-
-    const outcome =
-      behavior === 'approve' ? 'approved' : behavior === 'decline' ? 'declined' : 'error';
-    this.charges.push({ ...input, outcome });
-    return {
-      status: outcome,
-      transactionId,
-      ...(outcome === 'approved' ? { networkTransactionId } : {}),
-      message: outcome === 'approved' ? undefined : `fake: ${outcome}`,
-    };
+    if (typeof behavior === 'object') {
+      this.charges.push({ ...input, outcome: 'approved' });
+      return {
+        status: 'approved',
+        ...echo,
+        networkTransactionId,
+        approvedAmount: { ...input.amount, amountCents: behavior.approveAmountCents },
+      };
+    }
+    if (behavior === 'decline') {
+      this.charges.push({ ...input, outcome: 'declined' });
+      return { status: 'declined', ...echo, message: 'fake: declined' };
+    }
+    this.charges.push({ ...input, outcome: 'approved' });
+    return { status: 'approved', ...echo, networkTransactionId, approvedAmount: input.amount };
   }
 }

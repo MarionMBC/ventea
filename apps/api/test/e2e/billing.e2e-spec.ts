@@ -236,10 +236,10 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       expect(await eventsOf(target, 'payment_succeeded')).toHaveLength(0);
     });
 
-    it('error de la pasarela → 502; pasarela caída → 503 sin dejar intento abierto', async () => {
+    it('pasarela caída → 503 y 400 de la pasarela → 400, sin dejar intento abierto', async () => {
       const target = await brand('alta-caida');
-      fake.next('error');
-      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(502);
+      fake.next('invalid');
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(400);
       fake.next('unavailable');
       await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(503);
 
@@ -526,6 +526,210 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       expect(await eventsOf(target, 'cancel_scheduled')).toHaveLength(2);
       expect(await eventsOf(target, 'cancel_resumed')).toHaveLength(1);
       await asOwner(http().post('/api/billing/resume'), target).expect(409);
+    });
+  });
+
+  describe('review TASK-005: bloqueantes de dinero', () => {
+    it('R1 · alta sin confirmar sobre el período siguiente → la renovación NO cobra ese período', async () => {
+      const target = await brand('r1-doble');
+      await addCard(target);
+      const paidThrough = (await subscriptionOf(target)).currentPeriodEnd;
+
+      // Cambio de tarjeta con período vigente: cobra [paidThrough, +1 mes]; se pierde la respuesta.
+      fake.next({ timeout: 'approved', withTransactionId: false });
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(504);
+
+      await cycle.run(later(paidThrough));
+      expect(recurringCharges()).toHaveLength(0); // un intento abierto bloquea todo cobro nuevo
+
+      const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+        where: { tenantId: target.tenant.id, status: 'unknown' },
+      });
+      await asPlatform(http().post(`/api/platform/tenants/${target.tenant.slug}/resolve-payment`))
+        .send({ orderId: attempt.orderId, outcome: 'succeeded' })
+        .expect(200);
+      const sub = await subscriptionOf(target);
+      expect(sub.currentPeriodStart).toEqual(paidThrough);
+      expect(sub.currentPeriodEnd).toEqual(periodEnd(paidThrough, 'month'));
+    });
+
+    it('R1 · confirmar un cobro cuyo período ya quedó cubierto → alerta de posible doble pago, sin mover el período', async () => {
+      const target = await brand('r1-alerta');
+      await addCard(target);
+      fake.next({ timeout: 'approved', withTransactionId: false });
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(504);
+      // Algo cubrió ese período mientras tanto (dato corrido a mano).
+      const covered = addDays(new Date(), 400);
+      await prisma.subscription.update({
+        where: { tenantId: target.tenant.id },
+        data: { currentPeriodEnd: covered },
+      });
+      const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+        where: { tenantId: target.tenant.id, status: 'unknown' },
+      });
+      await asPlatform(http().post(`/api/platform/tenants/${target.tenant.slug}/resolve-payment`))
+        .send({ orderId: attempt.orderId, outcome: 'succeeded' })
+        .expect(200);
+
+      expect((await subscriptionOf(target)).currentPeriodEnd).toEqual(covered);
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+      const summary = billingSummarySchema.parse(
+        (await asPlatform(http().get('/api/platform/billing/summary')).expect(200)).body,
+      );
+      expect(summary.alertsLast7Days).toBeGreaterThanOrEqual(1);
+    });
+
+    it('R2 · se aplica lo que se cobró: plan e intervalo congelados en el intento; change-plan 409 con cobro abierto', async () => {
+      const target = await brand('r2-plan');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next({ timeout: 'approved' });
+      await cycle.run(later(due));
+
+      await asOwner(http().post('/api/billing/change-plan'), target)
+        .send({ planCode: 'pro', interval: 'year' })
+        .expect(409);
+      // Aunque el agendado cambiara en el medio (dato corrido a mano), manda el intento.
+      const chain = await prisma.plan.findUniqueOrThrow({ where: { code: 'chain' } });
+      await prisma.subscription.update({
+        where: { tenantId: target.tenant.id },
+        data: { pendingPlanId: chain.id, pendingInterval: 'year' },
+      });
+
+      await cycle.run(later(due, 2 * MINUTE));
+      const sub = await subscriptionOf(target);
+      expect(sub).toMatchObject({ interval: 'month', currentPeriodStart: due });
+      expect(sub.currentPeriodEnd).toEqual(periodEnd(due, 'month'));
+      expect(sub.pendingPlanId).toBe(chain.id); // el agendado sigue para el próximo período
+      const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+        where: { tenantId: target.tenant.id, kind: 'renewal' },
+      });
+      expect(attempt).toMatchObject({
+        interval: 'month',
+        amountCents: 5900,
+        periodStart: due,
+        periodEnd: periodEnd(due, 'month'),
+      });
+    });
+
+    it('R3 · confirmar una renovación no pisa la cancelación del dueño; cancel/resume/record-payment 409 con cobro abierto', async () => {
+      const target = await brand('r3-cancel');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next({ timeout: 'approved' });
+      await cycle.run(later(due));
+
+      await asOwner(http().post('/api/billing/cancel'), target).expect(409);
+      await asOwner(http().post('/api/billing/resume'), target).expect(409);
+      await asPlatform(http().post(`/api/platform/tenants/${target.tenant.slug}/record-payment`))
+        .send({ amountCents: 5900, reference: 'TRF-R3' })
+        .expect(409);
+
+      await prisma.subscription.update({
+        where: { tenantId: target.tenant.id },
+        data: { cancelAtPeriodEnd: true }, // el dueño canceló justo antes
+      });
+      await cycle.run(later(due, 2 * MINUTE)); // concilia: aprobado
+      const sub = await subscriptionOf(target);
+      expect(sub).toMatchObject({ status: 'active', cancelAtPeriodEnd: true });
+
+      await cycle.run(later(sub.currentPeriodEnd));
+      expect((await subscriptionOf(target)).status).toBe('canceled');
+      expect(recurringCharges()).toHaveLength(1);
+    });
+  });
+
+  describe('review TASK-005: importantes', () => {
+    it('monto aprobado distinto del pedido → no se da por pagado, alerta', async () => {
+      const target = await brand('rv-monto');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next({ approveAmountCents: 100 });
+      const summary = await cycle.run(later(due));
+      expect(summary.charged.unknown).toBe(1);
+      expect((await subscriptionOf(target)).currentPeriodEnd).toEqual(due);
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+    });
+
+    it('400 de la pasarela → intento failed_non_bank visible, sin dunning ni ráfaga', async () => {
+      const target = await brand('rv-invalid');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next('invalid');
+      await cycle.run(later(due));
+      await cycle.run(later(due, 30 * MINUTE));
+
+      const attempts = await prisma.paymentAttempt.findMany({
+        where: { tenantId: target.tenant.id, kind: 'renewal' },
+      });
+      expect(attempts).toEqual([expect.objectContaining({ status: 'failed_non_bank' })]);
+      const sub = await subscriptionOf(target);
+      expect(sub.status).toBe('active');
+      expect(sub.retryAt!.getTime()).toBeGreaterThan(later(due, 30 * MINUTE).getTime());
+      const summary = billingSummarySchema.parse(
+        (await asPlatform(http().get('/api/platform/billing/summary')).expect(200)).body,
+      );
+      expect(summary.unresolvedPayments).toBeGreaterThanOrEqual(1);
+    });
+
+    it('circuit breaker: 3 cobros desconocidos seguidos cortan las renovaciones de la corrida', async () => {
+      const targets: Brand[] = [];
+      for (let i = 0; i < 4; i++) {
+        const target = await brand(`rv-breaker-${i}`);
+        await addCard(target);
+        targets.push(target);
+      }
+      const due = (await subscriptionOf(targets[0]!)).currentPeriodEnd;
+      for (const target of targets) {
+        await prisma.subscription.update({
+          where: { tenantId: target.tenant.id },
+          data: { currentPeriodEnd: due },
+        });
+      }
+      const unknown = { timeout: 'declined', withTransactionId: false } as const;
+      fake.next(unknown, unknown, unknown, 'approve');
+      const summary = await cycle.run(later(due));
+      expect(summary.charged.unknown).toBe(3);
+      expect(recurringCharges()).toHaveLength(3);
+    });
+
+    it('3 rechazos seguidos de la marca → alta de tarjeta bloqueada 24 h y alerta', async () => {
+      const target = await brand('rv-cardtesting');
+      fake.next('decline', 'decline', 'decline');
+      for (let i = 0; i < 3; i++) {
+        await asOwner(http().post('/api/billing/payment-method'), target)
+          .send(CARD_BODY)
+          .expect(402);
+      }
+      const blocked = await asOwner(http().post('/api/billing/payment-method'), target)
+        .send(CARD_BODY)
+        .expect(429);
+      expect(blocked.body.message).toMatch(/24 h/);
+      expect(fake.charges).toHaveLength(3);
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+    });
+
+    it('alta sin confirmar en prueba → no se vence ni se suspende mientras se resuelve', async () => {
+      const target = await brand('rv-no-suspender');
+      fake.next({ timeout: 'approved', withTransactionId: false });
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(504);
+      const { trialEndsAt } = await subscriptionOf(target);
+      await cycle.run(addDays(trialEndsAt!, 9));
+      expect((await subscriptionOf(target)).status).toBe('trialing');
+    });
+
+    it('límite por IP en el alta de tarjeta (card-testing entre marcas)', async () => {
+      const previous = process.env.BILLING_IP_RATE_LIMIT_PER_DAY;
+      process.env.BILLING_IP_RATE_LIMIT_PER_DAY = '1';
+      try {
+        const target = await brand('rv-ip');
+        const response = await asOwner(http().post('/api/billing/payment-method'), target)
+          .send(CARD_BODY)
+          .expect(429);
+        expect(response.body.message).toMatch(/conexión/);
+      } finally {
+        process.env.BILLING_IP_RATE_LIMIT_PER_DAY = previous;
+      }
     });
   });
 

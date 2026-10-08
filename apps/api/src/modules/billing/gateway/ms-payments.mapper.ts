@@ -156,13 +156,9 @@ export function mapSaleReply(reply: HttpReply): ChargeResult {
   const env = envelope(reply.body);
 
   if (reply.status >= 200 && reply.status < 300 && env?.success) {
-    const { data } = env;
     return {
-      status: classifyPaymentStatus(data.status),
-      transactionId: text(data.transactionId),
-      networkTransactionId: text(data.networkTransactionId),
-      providerCode: text(data.providerCode),
-      message: text(data.message),
+      ...successFields(env.data),
+      networkTransactionId: text(env.data.networkTransactionId),
     };
   }
 
@@ -173,11 +169,11 @@ export function mapSaleReply(reply: HttpReply): ChargeResult {
   switch (env?.code) {
     case 'declined':
       return { status: 'declined', ...failure };
-    case 'provider_error':
-      return { status: 'error', ...failure };
     default:
-      // provider_timeout, not_found, internal_error, un 5xx de un proxy sin JSON…: no se
-      // sabe si el procesador cobró.
+      // provider_timeout, provider_error (todo 5xx de CyberSource sin motivo conocido, que
+      // incluye SERVER_TIMEOUT / PROCESSOR_TIMEOUT), not_found, internal_error, un 5xx de un
+      // proxy sin JSON…: no se sabe si el procesador cobró. Solo un decline explícito o un
+      // 4xx de validación previo al banco significan "no cobró".
       return { status: 'unknown', ...failure };
   }
 }
@@ -186,16 +182,37 @@ export function mapSaleReply(reply: HttpReply): ChargeResult {
 export function mapStatusReply(reply: HttpReply): ChargeResult {
   const env = envelope(reply.body);
   if (reply.status >= 200 && reply.status < 300 && env?.success) {
-    return {
-      status: classifyPaymentStatus(env.data.status),
-      transactionId: text(env.data.transactionId),
-      providerCode: text(env.data.providerCode),
-      message: text(env.data.message),
-    };
+    return successFields(env.data);
   }
   const blocked = notSent(reply, env);
   if (blocked) throw blocked;
   return { status: 'unknown', providerCode: env?.providerCode, message: env?.message };
+}
+
+/**
+ * Campos de un `data` exitoso, incluido lo que permite verificar un aprobado (`checkApproval`):
+ * el monto y el orderId que devolvió la pasarela, y si fue autorización parcial (ms-payments
+ * mapea `PARTIAL_AUTHORIZED` a `authorized` y deja el código en `providerCode`).
+ */
+function successFields(data: Record<string, unknown>): ChargeResult {
+  const amount = data.amount as { amountMinor?: unknown; currency?: unknown } | undefined;
+  const providerCode = text(data.providerCode);
+  return {
+    status: classifyPaymentStatus(data.status),
+    transactionId: text(data.transactionId),
+    orderId: text(data.orderId),
+    ...(amount && Number.isInteger(amount.amountMinor) && typeof amount.currency === 'string'
+      ? {
+          approvedAmount: {
+            amountCents: amount.amountMinor as number,
+            currency: amount.currency,
+          },
+        }
+      : {}),
+    ...(providerCode === 'PARTIAL_AUTHORIZED' ? { partial: true } : {}),
+    providerCode,
+    message: text(data.message),
+  };
 }
 
 export interface TokenizeOutcome {

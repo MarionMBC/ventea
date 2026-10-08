@@ -116,9 +116,36 @@ describe('mapSaleReply', () => {
     });
   });
 
-  it('provider_error (502) → error de la pasarela (no cobró, reintentable)', () => {
-    const body = { success: false, code: 'provider_error', message: 'Falla del procesador' };
-    expect(mapSaleReply({ status: 502, body }).status).toBe('error');
+  it.each(['SERVER_TIMEOUT', 'SERVICE_TIMEOUT', 'PROCESSOR_TIMEOUT', undefined])(
+    'provider_error (502) con motivo %s → desconocido (pudo cobrar: consultar, no recobrar)',
+    (providerCode) => {
+      const body = { success: false, code: 'provider_error', message: 'Falla', providerCode };
+      expect(mapSaleReply({ status: 502, body }).status).toBe('unknown');
+    },
+  );
+
+  it('502/504 de un proxy sin JSON → desconocido', () => {
+    expect(mapSaleReply({ status: 502, body: null }).status).toBe('unknown');
+    expect(mapSaleReply({ status: 504, body: '<html>' }).status).toBe('unknown');
+  });
+
+  it('aprobado: devuelve monto, orderId y marca la autorización parcial para verificarlos', () => {
+    const body = {
+      success: true,
+      data: {
+        status: 'authorized',
+        transactionId: 't-9',
+        orderId: 'sub-x-a1',
+        amount: { amountMinor: 3000, currency: 'USD' },
+        providerCode: 'PARTIAL_AUTHORIZED',
+      },
+    };
+    expect(mapSaleReply({ status: 200, body })).toMatchObject({
+      status: 'approved',
+      orderId: 'sub-x-a1',
+      approvedAmount: { amountCents: 3000, currency: 'USD' },
+      partial: true,
+    });
   });
 
   it('500 sin JSON de un proxy → desconocido (pudo haber cobrado)', () => {

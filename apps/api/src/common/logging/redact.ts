@@ -10,9 +10,12 @@
  *   JSON o `clave=valor` → `[REDACTED]`, sea cual sea el valor.
  */
 
-const PAN_CANDIDATE = /\d(?:[ -]?\d){12,18}/g;
+// Dígitos separados por espacio, guion o punto (`4111.1111.1111.1111`).
+const PAN_CANDIDATE = /\d(?:[ .-]?\d){12,18}/g;
+// Clave sensible y su valor, también en JSON escapado una o más veces (`{\"cvv\":\"737\"}`,
+// típico de un body serializado dentro de otro string).
 const SENSITIVE_KEY =
-  /(["']?\b(?:cvv2?|cvc|cvn|security_?code|securityCode|card_?number|cardNumber|pan|number)\b["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,}\]&]+)/gi;
+  /(\\*["']?\b(?:cvv2?|cvc2?|csc|cvn|card_?cvc|card_?cvv|card_?csc|security_?code|card_?number|pan|number)\b\\*["']?\s*[:=]\s*)(\\*"(?:[^"\\]|\\(?!"))*\\*"|'[^']*'|[^\s,}\]&\\]+)/gi;
 
 function passesLuhn(digits: string): boolean {
   let sum = 0;
@@ -33,7 +36,7 @@ export function redactSensitive(text: string): string {
   return text
     .replace(SENSITIVE_KEY, (_match, key: string) => `${key}"[REDACTED]"`)
     .replace(PAN_CANDIDATE, (candidate) => {
-      const digits = candidate.replace(/[ -]/g, '');
+      const digits = candidate.replace(/[ .-]/g, '');
       return digits.length >= 13 && passesLuhn(digits) ? '[PAN]' : candidate;
     });
 }

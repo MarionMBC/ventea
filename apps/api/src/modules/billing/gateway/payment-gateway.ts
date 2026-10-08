@@ -14,12 +14,13 @@ export interface GatewayAmount {
 
 /**
  * Resultado de un cobro, ya clasificado:
- * - `approved`: el dinero se movió.
- * - `declined`: el banco lo rechazó (fondos, tarjeta vencida…). No se movió nada.
- * - `error`: el procesador respondió con un error suyo. No se movió nada; reintentable.
- * - `unknown`: no se sabe (timeout, `pending`). NUNCA se recobra: se consulta `status`.
+ * - `approved`: el dinero se movió (y hay que verificar que fue el monto y el orderId pedidos:
+ *   `checkApproval`).
+ * - `declined`: el banco lo rechazó explícitamente. No se movió nada.
+ * - `unknown`: no se sabe (timeout, `pending`, 5xx de la pasarela o del procesador). NUNCA se
+ *   recobra: se consulta `status` o lo resuelve una persona.
  */
-export type ChargeStatus = 'approved' | 'declined' | 'error' | 'unknown';
+export type ChargeStatus = 'approved' | 'declined' | 'unknown';
 
 export interface ChargeResult {
   status: ChargeStatus;
@@ -27,9 +28,17 @@ export interface ChargeResult {
   transactionId?: string;
   /** Id de RED del cobro: el del `establish` ancla todos los recurrentes. */
   networkTransactionId?: string;
+  /** `orderId` que devolvió la pasarela, si lo devuelve. */
+  orderId?: string;
+  /** Monto que aprobó el banco, si la pasarela lo devuelve. */
+  approvedAmount?: GatewayAmount;
+  /** Autorización parcial (`PARTIAL_AUTHORIZED`): no cubre el cobro completo. */
+  partial?: boolean;
   providerCode?: string;
   /** Mensaje para mostrar o auditar. Nunca trae datos de tarjeta. */
   message?: string;
+  /** Motivo para que una persona lo revise (lo pone `checkApproval`). */
+  alert?: string;
 }
 
 export interface EstablishResult extends ChargeResult {

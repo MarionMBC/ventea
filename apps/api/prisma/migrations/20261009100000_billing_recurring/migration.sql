@@ -4,7 +4,7 @@
 CREATE TYPE "PaymentAttemptKind" AS ENUM ('establish', 'renewal');
 
 -- CreateEnum
-CREATE TYPE "PaymentAttemptStatus" AS ENUM ('pending', 'succeeded', 'failed', 'unknown');
+CREATE TYPE "PaymentAttemptStatus" AS ENUM ('pending', 'succeeded', 'failed', 'unknown', 'failed_non_bank');
 
 -- AlterEnum
 
@@ -17,6 +17,7 @@ ALTER TYPE "BillingEventType" ADD VALUE 'plan_change_scheduled';
 ALTER TYPE "BillingEventType" ADD VALUE 'cancel_scheduled';
 ALTER TYPE "BillingEventType" ADD VALUE 'cancel_resumed';
 ALTER TYPE "BillingEventType" ADD VALUE 'past_due';
+ALTER TYPE "BillingEventType" ADD VALUE 'billing_alert';
 
 -- AlterTable
 ALTER TABLE "subscriptions" ADD COLUMN     "cardExpMonth" INTEGER,
@@ -33,6 +34,9 @@ CREATE TABLE "payment_attempts" (
     "orderId" TEXT NOT NULL,
     "kind" "PaymentAttemptKind" NOT NULL,
     "periodStart" TIMESTAMP(3) NOT NULL,
+    "periodEnd" TIMESTAMP(3) NOT NULL,
+    "planId" TEXT NOT NULL,
+    "interval" "BillingInterval" NOT NULL,
     "attempt" INTEGER NOT NULL,
     "amountCents" INTEGER NOT NULL,
     "currency" CHAR(3) NOT NULL,
@@ -62,4 +66,7 @@ ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_tenantId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_planId_fkey" FOREIGN KEY ("planId") REFERENCES "plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
