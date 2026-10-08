@@ -73,6 +73,18 @@ describe('fechas de la suscripción', () => {
     expect(periodEnd(NOW, 'year').toISOString()).toBe('2027-10-08T12:00:00.000Z');
   });
 
+  it.each([
+    ['2026-01-31T10:00:00.000Z', 'month', '2026-02-28T10:00:00.000Z'],
+    ['2028-01-31T10:00:00.000Z', 'month', '2028-02-29T10:00:00.000Z'], // bisiesto
+    ['2026-03-31T00:00:00.000Z', 'month', '2026-04-30T00:00:00.000Z'],
+    ['2026-12-31T23:59:59.000Z', 'month', '2027-01-31T23:59:59.000Z'], // cruza el año
+    ['2026-02-28T00:00:00.000Z', 'month', '2026-03-28T00:00:00.000Z'],
+    ['2028-02-29T12:00:00.000Z', 'year', '2029-02-28T12:00:00.000Z'],
+    ['2027-02-28T12:00:00.000Z', 'year', '2028-02-28T12:00:00.000Z'],
+  ] as const)('periodEnd recorta al último día del mes: %s + %s → %s', (start, interval, end) => {
+    expect(periodEnd(new Date(start), interval).toISOString()).toBe(end);
+  });
+
   it('extender una prueba vigente suma desde su fin', () => {
     const end = addDays(NOW, 3);
     expect(extendedTrialEnd(end, NOW, 7)).toEqual(addDays(NOW, 10));

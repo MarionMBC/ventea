@@ -5,7 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import {
   platformAuthResponseSchema,
   platformTenantDetailSchema,
-  platformTenantSchema,
+  platformTenantPageSchema,
 } from '@ventea/shared';
 import argon2 from 'argon2';
 import request from 'supertest';
@@ -15,6 +15,7 @@ import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
 import {
   createApp,
   createRawPrisma,
+  CUSTOMER_PASSWORD,
   loginStaff,
   registerCustomer,
   seedTenant,
@@ -125,6 +126,19 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
       await prisma.platformAdmin.delete({ where: { email } });
       await asPlatform(http().get('/api/platform/tenants'), token).expect(401);
     });
+
+    it('subir tokenVersion (reset de clave) invalida los tokens vivos; el login nuevo sirve', async () => {
+      const email = await createAdmin();
+      const token = await platformLogin(email);
+      await asPlatform(http().get('/api/platform/tenants'), token).expect(200);
+      await prisma.platformAdmin.update({
+        where: { email },
+        data: { tokenVersion: { increment: 1 } },
+      });
+      await asPlatform(http().get('/api/platform/tenants'), token).expect(401);
+      const fresh = await platformLogin(email);
+      await asPlatform(http().get('/api/platform/tenants'), fresh).expect(200);
+    });
   });
 
   describe('listado y detalle', () => {
@@ -150,8 +164,10 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
         },
       });
 
-      const response = await asPlatform(http().get('/api/platform/tenants')).expect(200);
-      const tenants = platformTenantSchema.array().parse(response.body);
+      const response = await asPlatform(
+        http().get('/api/platform/tenants').query({ pageSize: 100 }),
+      ).expect(200);
+      const tenants = platformTenantPageSchema.parse(response.body).items;
       expect(tenants.find((t) => t.slug === tenant.slug)).toMatchObject({
         region: 'hn-1',
         createdVia: 'script',
@@ -159,6 +175,37 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
         subscription: { status: 'active', planCode: 'chain', interval: 'year' },
         ordersLast30Days: 1,
       });
+    });
+
+    it('pagina con total: page y pageSize (máx 100), sin repetir marcas entre páginas', async () => {
+      await seedTenant(prisma, 'pagina-a');
+      await seedTenant(prisma, 'pagina-b');
+      const total = await prisma.tenant.count();
+
+      const first = platformTenantPageSchema.parse(
+        (await asPlatform(http().get('/api/platform/tenants').query({ pageSize: 2 })).expect(200))
+          .body,
+      );
+      const second = platformTenantPageSchema.parse(
+        (
+          await asPlatform(
+            http().get('/api/platform/tenants').query({ page: 2, pageSize: 2 }),
+          ).expect(200)
+        ).body,
+      );
+      expect(first).toMatchObject({ total, page: 1, pageSize: 2 });
+      expect(first.items).toHaveLength(2);
+      expect(second.items).toHaveLength(Math.min(2, total - 2));
+      const ids = [...first.items, ...second.items].map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
+
+      const defaults = platformTenantPageSchema.parse(
+        (await asPlatform(http().get('/api/platform/tenants')).expect(200)).body,
+      );
+      expect(defaults).toMatchObject({ page: 1, pageSize: 50 });
+
+      await asPlatform(http().get('/api/platform/tenants').query({ pageSize: 101 })).expect(400);
+      await asPlatform(http().get('/api/platform/tenants').query({ page: 0 })).expect(400);
     });
 
     it('detalle con sucursales activas y eventos; 404 si no existe', async () => {
@@ -175,6 +222,18 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
     it('suspendida: la API pública da 402, el staff entra; reactivar la restaura', async () => {
       const slug = tenant.slug;
       const customer = await registerCustomer(app, slug);
+      // Un pedido en curso del cliente, hecho antes de la suspensión.
+      const inFlight = await prisma.order.create({
+        data: {
+          tenantId: tenant.id,
+          locationId: tenant.locationId,
+          customerId: customer.customer.id,
+          code: `E-${randomUUID().slice(0, 4)}`,
+          fulfillmentType: 'pickup',
+          status: 'preparing',
+          placedAt: new Date(),
+        },
+      });
 
       const suspended = await asPlatform(
         http().post(`/api/platform/tenants/${slug}/suspend`).send({ reason: 'sin pago' }),
@@ -207,6 +266,31 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
         .set('Authorization', `Bearer ${customer.accessToken}`)
         .send({ locationId: tenant.locationId, fulfillmentType: 'pickup', lines: [] })
         .expect(402);
+      await http()
+        .post('/api/auth/login')
+        .set('X-Tenant-Slug', slug)
+        .send({ email: customer.customer.email, password: CUSTOMER_PASSWORD })
+        .expect(402);
+      await http()
+        .patch('/api/me')
+        .set('X-Tenant-Slug', slug)
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .send({ firstName: 'X' })
+        .expect(402);
+      await http()
+        .post(`/api/orders/${inFlight.id}/cancel`)
+        .set('X-Tenant-Slug', slug)
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .expect(402);
+
+      // El cliente final sigue viendo su cuenta y sus pedidos en curso.
+      const asCustomer = (req: request.Test) =>
+        req.set('X-Tenant-Slug', slug).set('Authorization', `Bearer ${customer.accessToken}`);
+      await asCustomer(http().get('/api/me')).expect(200);
+      const mine = await asCustomer(http().get('/api/orders')).expect(200);
+      expect((mine.body as { id: string }[]).map((o) => o.id)).toContain(inFlight.id);
+      const one = await asCustomer(http().get(`/api/orders/${inFlight.id}`)).expect(200);
+      expect(one.body).toMatchObject({ id: inFlight.id, status: 'preparing' });
 
       // El dueño puede entrar al panel (a pagar): login, branding y tablero.
       const staff = await loginStaff(app, tenant);
@@ -244,6 +328,23 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
 
       await http().get('/api/menu').set('X-Tenant-Slug', slug).expect(200);
       await asPlatform(http().post(`/api/platform/tenants/${slug}/reactivate`)).expect(409);
+    });
+
+    it('prueba vencida con solo tráfico de staff: igual pasa a past_due (el staff entra)', async () => {
+      const trial = await seedTenant(prisma, 'solo-staff');
+      await prisma.subscription.update({
+        where: { tenantId: trial.id },
+        data: { status: 'trialing', trialEndsAt: new Date(Date.now() - 1000) },
+      });
+
+      await loginStaff(app, trial);
+      await http().get('/api/tenant').set('X-Tenant-Slug', trial.slug).expect(200);
+
+      const sub = await prisma.subscription.findUniqueOrThrow({ where: { tenantId: trial.id } });
+      expect(sub.status).toBe('past_due');
+      expect(
+        await prisma.billingEvent.count({ where: { tenantId: trial.id, type: 'trial_expired' } }),
+      ).toBe(1);
     });
 
     it('prueba vencida: pasa a past_due y 402; extender la prueba la restaura', async () => {

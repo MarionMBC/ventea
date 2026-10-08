@@ -88,11 +88,17 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * DAY_MS);
 }
 
-/** Fin del período que empieza en `start`: un mes o un año calendario (UTC). */
+/**
+ * Fin del período que empieza en `start`: un mes o un año calendario (UTC), con el día
+ * recortado al último del mes destino. `setUTCMonth` solo desbordaría (31 ene + 1 mes =
+ * 3 mar); acá 31 ene → 28/29 feb y, anual, 29 feb → 28 feb. La hora se conserva.
+ */
 export function periodEnd(start: Date, interval: BillingInterval): Date {
+  const year = start.getUTCFullYear() + (interval === 'year' ? 1 : 0);
+  const month = start.getUTCMonth() + (interval === 'month' ? 1 : 0); // 12 = enero siguiente
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const end = new Date(start.getTime());
-  if (interval === 'month') end.setUTCMonth(end.getUTCMonth() + 1);
-  else end.setUTCFullYear(end.getUTCFullYear() + 1);
+  end.setUTCFullYear(year, month, Math.min(start.getUTCDate(), lastDay));
   return end;
 }
 

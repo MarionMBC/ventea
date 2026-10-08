@@ -40,9 +40,9 @@
    (`single`), de la configuración. Sin tenant, 404 — no llega a ningún controlador.
    En la misma consulta trae el estado de la suscripción.
 2. **SubscriptionMiddleware** corta con `402 Servicio suspendido` las rutas públicas de
-   una marca suspendida, cancelada o con la prueba vencida. Las rutas de staff
-   (`/api/staff/*`), `/api/tenant` y `/api/auth/refresh` siguen abiertas: el dueño tiene
-   que poder entrar a pagar.
+   una marca suspendida, cancelada o con la prueba vencida. Siguen abiertas las rutas de
+   staff (`/api/staff/*`), `/api/tenant` y `/api/auth/refresh` (el dueño entra a pagar), y
+   `GET /api/orders[/:id]` y `GET /api/me` (el cliente ve sus pedidos en curso).
 3. **Guard de autenticación** valida el JWT. El token incluye el `tenantId`: si no
    coincide con el tenant resuelto, se rechaza. Un token robado de otra marca no sirve.
 4. **Guard de rol** para rutas de staff (`owner` / `manager` / `staff`).

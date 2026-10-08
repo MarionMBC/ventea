@@ -5,9 +5,14 @@ Todas las rutas van bajo `/api` y pasan por `TenantMiddleware`: la marca sale de
 Las excepciones son `/api/health` y `/api/platform/*` (ver [Plataforma](#plataforma-saas)).
 
 **Marca suspendida → `402 {statusCode: 402, message: "Servicio suspendido", error: "Payment Required"}`**
-en toda ruta de la marca salvo `/api/staff/*`, `/api/tenant` y `/api/auth/refresh`: el dueño
-sigue entrando al panel para pagar. Pasa con la suscripción `suspended`, `canceled`,
-`past_due` o en prueba vencida (que en ese request pasa a `past_due`). Los schemas de entrada y salida son los de `@ventea/shared`
+en toda ruta de la marca salvo:
+
+- `/api/staff/*`, `/api/tenant` y `/api/auth/refresh`: el dueño sigue entrando al panel a pagar;
+- `GET /api/orders`, `GET /api/orders/:id` y `GET /api/me`: el cliente sigue viendo su cuenta y
+  sus pedidos en curso. Crear o cancelar pedidos, el menú, registro y login dan 402.
+
+Pasa con la suscripción `suspended`, `canceled`, `past_due` o en prueba vencida. Una prueba
+vencida pasa a `past_due` con el primer request de la marca, también en las rutas abiertas. Los schemas de entrada y salida son los de `@ventea/shared`
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
 ## Autenticación
@@ -116,7 +121,7 @@ Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 | GET    | `/api/platform/slug-available?slug=`       | público · `{available, reason?: invalid·reserved·taken}`   |
 | POST   | `/api/platform/signup`                     | público · 5 intentos por IP y hora (`429` + `Retry-After`) |
 | POST   | `/api/platform/auth/login`                 | público · `PlatformAdmin`; 20 intentos por IP y hora       |
-| GET    | `/api/platform/tenants`                    | plataforma · plan, estado, región, alta, pedidos 30 días   |
+| GET    | `/api/platform/tenants?page=&pageSize=`    | plataforma · `{items, total, page, pageSize}` (máx 100)    |
 | GET    | `/api/platform/tenants/:slug`              | plataforma · + sucursales activas y últimos 20 eventos     |
 | POST   | `/api/platform/tenants/:slug/suspend`      | plataforma · `{reason?}`                                   |
 | POST   | `/api/platform/tenants/:slug/reactivate`   | plataforma · abre un período nuevo desde hoy               |
@@ -128,7 +133,12 @@ interval, country?, currency?}`. Crea en una transacción la marca, su branding,
   de puntos por defecto, «Sucursal principal», el dueño con esa contraseña y la suscripción en
   prueba de 14 días. Responde `201 {tenant: {slug, url, adminUrl, region}, trialEndsAt}`. Slug
   tomado → `409`; reservado o inválido → `400`. El campo oculto `website` (honeypot) tiene que
-  venir vacío.
+  venir vacío. Cupo global contado en la base: `SIGNUP_DAILY_LIMIT` (10) y
+  `SIGNUP_WEEKLY_LIMIT` (25) altas por registro; lleno → `429 "Registro temporalmente
+cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login`, `pagos`…),
+  todo lo que empiece con `admin` y todo lo que contenga `ventea`.
+- **Token de plataforma:** lleva `ver` (`PlatformAdmin.tokenVersion`); resetear la clave lo sube
+  y todos los tokens vivos dejan de valer.
 - **Región:** la asigna `REGIONS` por país: el del body, si no `CF-IPCountry` / `X-Country`.
 - **Transiciones:** suspender desde `trialing`/`active`/`past_due`; reactivar desde
   `suspended`/`past_due`/`canceled`; extender la prueba desde `trialing`/`past_due`; cambiar de
