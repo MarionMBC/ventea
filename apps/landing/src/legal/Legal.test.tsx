@@ -71,3 +71,35 @@ describe('Política de privacidad (TASK-007 AC1)', () => {
     expect(body).not.toMatch(/borrador/i);
   });
 });
+
+describe('Legales: solo lo que el producto hace hoy (review TASK-007)', () => {
+  it.each([
+    ['Términos', TermsPage],
+    ['Privacidad', PrivacyPage],
+  ])('%s no promete correos automáticos, facturas ni borrados por plazo', (_name, Page) => {
+    const { container } = render(<Page />);
+    const body = text(container).toLowerCase();
+    expect(body).not.toMatch(/por correo|te avisamos|envío de correos|notificaciones por correo/);
+    expect(body).not.toMatch(/\bfacturas?\b/);
+    expect(body).not.toMatch(/\d+\s*días?\s*(por si vuelves|después los borramos)/);
+    expect(body).not.toMatch(/90 días|15 días hábiles/);
+    // Los avisos viven en el panel.
+    expect(body).toContain('panel');
+  });
+
+  it('cambios de precio y de términos se anuncian en la página y en el panel con anticipación', () => {
+    const { container } = render(<TermsPage />);
+    const body = text(container);
+    expect(body).toContain(
+      'Un cambio de precio se anuncia en esta página y en tu panel con al menos 30 días de anticipación',
+    );
+    expect(body).toContain('lo anunciamos en esta página y en tu panel con al menos 15 días');
+    expect(body).toContain('comprobante de pago');
+  });
+
+  it('borrado de datos a pedido por escrito, en un plazo razonable', () => {
+    const { container } = render(<PrivacyPage />);
+    expect(text(container)).toContain('pídelo por escrito');
+    expect(text(container)).toContain('en un plazo razonable');
+  });
+});

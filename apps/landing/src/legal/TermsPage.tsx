@@ -6,6 +6,11 @@
  * comercio electrónico, protección al consumidor y datos personales). Al cambiar el fondo,
  * publicar una versión nueva: agregarla a `TERMS_VERSIONS` en @ventea/shared y actualizar
  * `TERMS_VERSION` y `LEGAL_UPDATED_LABEL` en `src/site.ts`.
+ *
+ * Regla (review TASK-007): describir SOLO lo que el producto hace hoy. No hay correos
+ * automáticos (BillingNotifier solo registra), ni facturación electrónica, ni purga
+ * automática de datos, y el pago se coordina con el equipo (BILLING_MODE=manual). Los avisos
+ * al dueño se ven en la sección Facturación de su panel.
  */
 import {
   CONTACT_EMAIL,
@@ -66,9 +71,9 @@ const SECTIONS: LegalSection[] = [
     body: (
       <p>
         Al registrarte empiezas una prueba gratis de {TRIAL_DAYS} días del plan que elegiste, sin
-        tarjeta. Durante la prueba puedes usar el servicio completo. Antes de que termine te
-        avisamos cómo activar tu plan; si no lo activas, tu página deja de recibir pedidos al vencer
-        la prueba y no se te cobra nada.
+        tarjeta. Durante la prueba puedes usar el servicio completo. En la sección Facturación de tu
+        panel ves en todo momento hasta cuándo dura tu prueba y cómo activar tu plan. Si no lo
+        activas, al vencer la prueba tu página deja de recibir pedidos y no se te cobra nada.
       </p>
     ),
   },
@@ -82,16 +87,22 @@ const SECTIONS: LegalSection[] = [
           por año, según el intervalo que elijas.
         </li>
         <li>
-          Los impuestos que correspondan según la ley se suman al precio cuando apliquen y se
-          indican en la factura.
+          Hoy el pago se coordina con el equipo de Ventea (por ejemplo, por transferencia):
+          escríbenos a {mail} y te indicamos cómo pagar. Cuando registramos tu pago, lo ves en la
+          sección Facturación de tu panel.
         </li>
         <li>
-          Si pagas con tarjeta, el cobro lo procesa un proveedor de pagos. Nosotros no guardamos el
-          número de tu tarjeta: solo una referencia (token), la marca y los últimos cuatro dígitos.
+          Los impuestos que correspondan según la ley se suman al precio cuando apliquen. Si
+          necesitas un comprobante de pago, pídelo por escrito a {mail}.
         </li>
         <li>
-          Podemos cambiar los precios. Un cambio de precio se aplica desde tu siguiente renovación y
-          te lo avisamos con al menos 30 días de anticipación.
+          Cuando habilitemos el pago con tarjeta, el cobro lo procesará un proveedor de pagos y
+          nosotros no guardaremos el número de tu tarjeta: solo una referencia (token), la marca y
+          los últimos cuatro dígitos.
+        </li>
+        <li>
+          Podemos cambiar los precios. Un cambio de precio se anuncia en esta página y en tu panel
+          con al menos 30 días de anticipación y se aplica desde tu siguiente renovación.
         </li>
       </ul>
     ),
@@ -101,9 +112,9 @@ const SECTIONS: LegalSection[] = [
     title: 'Renovación automática',
     body: (
       <p>
-        Tu suscripción se renueva sola al final de cada período (mes o año) por el mismo plan e
-        intervalo, salvo que la canceles antes. Si tienes una tarjeta guardada, el cobro de la
-        renovación se hace a esa tarjeta en la fecha de renovación.
+        Tu suscripción se renueva al final de cada período (mes o año) por el mismo plan e
+        intervalo, salvo que la canceles antes. La fecha de renovación y el monto se ven en la
+        sección Facturación de tu panel.
       </p>
     ),
   },
@@ -130,14 +141,14 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          Si un cobro de renovación es rechazado, lo reintentamos durante los días siguientes y te
-          avisamos para que actualices tu forma de pago. Si después de los reintentos el pago no se
+          Si el pago de una renovación no llega, tu suscripción queda con un pago pendiente: lo ves
+          como aviso en la sección Facturación de tu panel. Si después de unos días el pago no se
           completa, suspendemos el servicio.
         </p>
         <p>
           Con el servicio suspendido tu página y tu app dejan de recibir pedidos, pero tú sigues
-          pudiendo entrar a tu panel para ponerte al día. Al pagar, el servicio se reactiva. Tus
-          datos se conservan como se explica en la{' '}
+          pudiendo entrar a tu panel. Para reactivarlo, escríbenos a {mail}: al registrar tu pago el
+          servicio vuelve a funcionar. Tus datos se conservan como se explica en la{' '}
           <a href="/privacidad#retencion">política de privacidad</a>.
         </p>
       </>
@@ -195,9 +206,9 @@ const SECTIONS: LegalSection[] = [
     body: (
       <p>
         Trabajamos para que Ventea esté disponible todo el tiempo, pero puede haber interrupciones
-        por mantenimiento, fallas de proveedores o causas fuera de nuestro control. Avisamos con
-        anticipación los mantenimientos programados cuando es posible. Podemos mejorar o cambiar
-        funciones; si quitamos algo importante de tu plan, te avisamos con anticipación.
+        por mantenimiento, fallas de proveedores o causas fuera de nuestro control. Podemos mejorar
+        o cambiar funciones; si quitamos algo importante de tu plan, lo anunciamos en esta página y
+        en tu panel con anticipación.
       </p>
     ),
   },
@@ -234,9 +245,9 @@ const SECTIONS: LegalSection[] = [
     title: 'Cambios a estos términos',
     body: (
       <p>
-        Si cambiamos estos términos de forma importante, te avisamos por correo con al menos 15 días
-        de anticipación. Si no estás de acuerdo, puedes cancelar antes de que entren en vigor.
-        Versión vigente: {TERMS_VERSION}.
+        Si cambiamos estos términos de forma importante, lo anunciamos en esta página y en tu panel
+        con al menos 15 días de anticipación. Si no estás de acuerdo, puedes cancelar antes de que
+        entren en vigor. Versión vigente: {TERMS_VERSION}.
       </p>
     ),
   },

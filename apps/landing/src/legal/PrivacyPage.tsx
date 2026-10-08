@@ -5,6 +5,9 @@
  * apps/api/prisma/schema.prisma): si cambia qué datos se guardan o con quién se comparten,
  * actualizar este texto y publicar una versión nueva (`TERMS_VERSIONS` en @ventea/shared,
  * `TERMS_VERSION` y `LEGAL_UPDATED_LABEL` en `src/site.ts`).
+ *
+ * Regla (review TASK-007): solo lo que existe hoy. Sin correos automáticos, sin facturas, sin
+ * borrado automático por plazo: el borrado se hace a pedido, a mano.
  */
 import { CONTACT_EMAIL, LEGAL_NAME } from '@/config';
 
@@ -45,9 +48,10 @@ const SECTIONS: LegalSection[] = [
           colores y logo.
         </li>
         <li>
-          <strong>Suscripción y pagos:</strong> plan, fechas, pagos y facturas. Si pagas con
-          tarjeta, solo una referencia del procesador de pagos (token), la marca y los últimos
-          cuatro dígitos; nunca el número completo ni el código de seguridad.
+          <strong>Suscripción y pagos:</strong> plan, fechas y pagos registrados (monto y
+          referencia). Cuando habilitemos el pago con tarjeta, solo guardaremos una referencia del
+          procesador de pagos (token), la marca y los últimos cuatro dígitos; nunca el número
+          completo ni el código de seguridad.
         </li>
         <li>
           <strong>Aceptación de estos textos:</strong> la versión de los términos y de esta política
@@ -71,7 +75,9 @@ const SECTIONS: LegalSection[] = [
           <li>pedidos (productos, montos, notas y estado);</li>
           <li>puntos de lealtad ganados y canjeados;</li>
           <li>
-            el identificador del dispositivo para avisarle del estado de su pedido, si lo autoriza.
+            si usa la app y lo autoriza, el identificador de su teléfono y, si activa el ingreso con
+            huella o rostro, una referencia a esa credencial (el dato biométrico nunca sale del
+            teléfono).
           </li>
         </ul>
         <p>
@@ -107,8 +113,8 @@ const SECTIONS: LegalSection[] = [
       <ul>
         <li>prestar el servicio: mostrar el menú, recibir pedidos y gestionar puntos;</li>
         <li>crear y administrar tu cuenta, tu suscripción y tus pagos;</li>
-        <li>avisarte de cosas importantes de tu cuenta (prueba, cobros, cambios del servicio);</li>
-        <li>dar soporte cuando nos escribes;</li>
+        <li>mostrarte en tu panel avisos de tu cuenta (prueba, pagos, cambios del servicio);</li>
+        <li>responderte cuando nos escribes;</li>
         <li>proteger la plataforma contra fraudes y abusos, y cumplir obligaciones legales.</li>
       </ul>
     ),
@@ -120,13 +126,10 @@ const SECTIONS: LegalSection[] = [
       <>
         <p>
           No vendemos datos personales. Solo los compartimos con proveedores que necesitamos para
-          funcionar, que los tratan por cuenta nuestra y con obligación de confidencialidad:
+          funcionar, que los tratan por cuenta nuestra y con obligación de confidencialidad: hoy, el
+          alojamiento de servidores y bases de datos en la nube. Cuando habilitemos el pago con
+          tarjeta, también el procesador de pagos.
         </p>
-        <ul>
-          <li>alojamiento y bases de datos en la nube;</li>
-          <li>procesador de pagos, para cobrar la suscripción;</li>
-          <li>envío de correos y notificaciones.</li>
-        </ul>
         <p>
           También podemos entregarlos cuando una autoridad competente lo exija conforme a la ley.
           Algunos proveedores pueden guardar datos en servidores fuera de Honduras; en ese caso
@@ -140,13 +143,13 @@ const SECTIONS: LegalSection[] = [
     title: 'Cuánto tiempo los guardamos',
     body: (
       <ul>
-        <li>Mientras tu cuenta esté activa, guardamos los datos necesarios para el servicio.</li>
+        <li>Mientras tu cuenta exista, guardamos los datos necesarios para el servicio.</li>
         <li>
-          Si cancelas o tu cuenta queda suspendida, conservamos los datos hasta 90 días por si
-          vuelves; después los borramos o los dejamos anónimos, salvo lo que debamos guardar por ley
-          (por ejemplo, registros de pagos y facturas).
+          Si cancelas o tu cuenta queda suspendida, los datos se conservan para que puedas volver.
+          Si quieres que los borremos, pídelo por escrito a {mail} desde el correo de tu cuenta: lo
+          hacemos en un plazo razonable y te confirmamos por escrito, salvo lo que debamos guardar
+          por ley (por ejemplo, los registros de pagos).
         </li>
-        <li>Puedes pedirnos que borremos tu cuenta antes: escríbenos a {mail}.</li>
       </ul>
     ),
   },
@@ -157,7 +160,7 @@ const SECTIONS: LegalSection[] = [
       <p>
         Usamos conexiones cifradas (HTTPS), contraseñas cifradas, accesos separados por restaurante
         y copias de seguridad. Ningún sistema es infalible: si ocurriera un incidente que afecte tus
-        datos, te avisaremos sin demora y te diremos qué hacer.
+        datos, te lo comunicaremos por escrito y te diremos qué hacer.
       </p>
     ),
   },
@@ -165,13 +168,11 @@ const SECTIONS: LegalSection[] = [
     id: 'derechos',
     title: 'Tus derechos',
     body: (
-      <>
-        <p>
-          Puedes pedirnos acceso a tus datos, corregirlos, borrarlos, oponerte a un uso o recibirlos
-          en un formato que puedas llevarte. Escríbenos a {mail} desde el correo de tu cuenta; te
-          respondemos en un plazo máximo de 15 días hábiles.
-        </p>
-      </>
+      <p>
+        Puedes pedirnos acceso a tus datos, corregirlos, borrarlos, oponerte a un uso o recibirlos
+        en un formato que puedas llevarte. Escríbenos a {mail} desde el correo de tu cuenta; te
+        respondemos por escrito en un plazo razonable.
+      </p>
     ),
   },
   {
@@ -189,8 +190,8 @@ const SECTIONS: LegalSection[] = [
     title: 'Cambios a esta política',
     body: (
       <p>
-        Si cambiamos esta política de forma importante, te avisamos por correo antes de que el
-        cambio entre en vigor y actualizamos la fecha de arriba.
+        Si cambiamos esta política de forma importante, lo anunciamos en esta página y en tu panel
+        antes de que el cambio entre en vigor, y actualizamos la fecha de arriba.
       </p>
     ),
   },
