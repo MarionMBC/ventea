@@ -37,10 +37,17 @@ model Tenant {
   name      String
   currency  String   @db.Char(3)
   timezone  String   @default("America/Santiago")
+  /// `false` = la marca no existe para nadie (404). La suspensión por falta de pago NO
+  /// usa esto: es un estado de `Subscription` (402, el staff sigue entrando).
   isActive  Boolean  @default(true)
+  /// Región donde vive la marca. La asigna la plataforma al registrarla (RegionService).
+  region     String           @default("hn-1")
+  createdVia TenantCreatedVia @default(script)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  subscription    Subscription?
+  billingEvents   BillingEvent[]
   branding        TenantBranding?
   rewardProgram   RewardProgram?
   locations       Location[]
@@ -55,6 +62,110 @@ model Tenant {
   devices         Device[]
 
   @@map("tenants")
+}
+
+enum TenantCreatedVia {
+  signup
+  script
+}
+
+// ─── Suscripción (SaaS, ADR 0007) ────────────────────────────────────────────
+
+/// Plan comercial. Catálogo GLOBAL: no lleva tenantId (exento del guard de tenant).
+/// Lo siembra una migración SQL idempotente; cambiar un precio es otra migración.
+model Plan {
+  id                String   @id @default(uuid())
+  /// `basic` | `pro` | `chain` (PLAN_CODE en @ventea/shared).
+  code              String   @unique
+  name              String
+  priceMonthlyCents Int
+  priceYearlyCents  Int
+  currency          String   @default("USD") @db.Char(3)
+  /// Sucursales activas permitidas. Null = ilimitadas.
+  maxLocations      Int?
+  /// `{ brandedApp, customDomain, reports, prioritySupport }` (booleanos).
+  features          Json
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// Suscripción de una marca (1:1). El estado decide si su API pública atiende (402 si no).
+model Subscription {
+  id                 String             @id @default(uuid())
+  tenantId           String             @unique
+  planId             String
+  interval           BillingInterval
+  status             SubscriptionStatus
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+
+  // Datos de cobro (TASK-005, ms-payments). Todos opcionales; hoy quedan en null.
+  paymentProvider      String?
+  /// Token de la tarjeta en la pasarela. Nunca el número de tarjeta.
+  paymentToken         String?
+  cardBrand            String?
+  cardLast4            String? @db.Char(4)
+  /// `networkTransactionId` del primer cobro: ancla los cobros recurrentes sin CVV.
+  networkTransactionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  suspended
+  canceled
+}
+
+enum BillingInterval {
+  month
+  year
+}
+
+/// Auditoría append-only de la suscripción: cambios de estado, de plan y (TASK-005) cobros.
+model BillingEvent {
+  id                    String           @id @default(uuid())
+  tenantId              String
+  type                  BillingEventType
+  amountCents           Int?
+  /// Resultado del cobro (`succeeded`, `failed`, `pending`…). Null en eventos sin cobro.
+  status                String?
+  providerTransactionId String?
+  /// Clave idempotente hacia ms-payments (un orderId por intento de cobro).
+  orderId               String?          @unique
+  message               String?
+  createdAt             DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("billing_events")
+}
+
+enum BillingEventType {
+  trial_started
+  trial_extended
+  trial_expired
+  plan_changed
+  suspended
+  reactivated
+  canceled
 }
 
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.
