@@ -297,15 +297,17 @@ describe('sesión de plataforma', () => {
 });
 
 describe('host del panel de plataforma', () => {
-  it('solo el apex y localhost', () => {
-    expect(isPlatformHost('ventea.tech')).toBe(true);
-    expect(isPlatformHost('VENTEA.TECH.')).toBe(true);
+  it('solo app.<dominio> y localhost (el apex ya no: redirige a app.)', () => {
+    expect(isPlatformHost('app.ventea.tech')).toBe(true);
+    expect(isPlatformHost('APP.VENTEA.TECH.')).toBe(true);
     expect(isPlatformHost('localhost')).toBe(true);
+    expect(isPlatformHost('ventea.tech')).toBe(false);
+    expect(isPlatformHost('www.ventea.tech')).toBe(false);
     expect(isPlatformHost('pollos-juan.ventea.tech')).toBe(false);
-    expect(isPlatformHost('ventea.tech.evil.com')).toBe(false);
+    expect(isPlatformHost('app.ventea.tech.evil.com')).toBe(false);
   });
 
-  it('en el subdominio de una marca no monta el login: manda al apex', async () => {
+  it('en el subdominio de una marca no monta el login: manda a app.', async () => {
     const { api } = renderPlatform('/admin/plataforma', {
       loggedIn: false,
       hostname: 'pollos-juan.ventea.tech',
@@ -313,7 +315,7 @@ describe('host del panel de plataforma', () => {
     expect(await screen.findByRole('heading', { name: /no está acá/ })).toBeTruthy();
     expect(screen.queryByLabelText('Contraseña')).toBeNull();
     expect(screen.getByRole('link').getAttribute('href')).toBe(
-      'https://ventea.tech/admin/plataforma',
+      'https://app.ventea.tech/admin/plataforma',
     );
     expect(api.calls).toHaveLength(0);
   });

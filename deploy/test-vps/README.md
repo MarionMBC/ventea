@@ -21,25 +21,29 @@ API responde `402` al resto):
 | `api.ventea.tech`, host sslip | todo             | `api` (`ventea-test-api-1:3000`)            |
 | `<slug>.ventea.tech`          | `/api`, `/api/*` | `api` (priority 100)                        |
 | `<slug>.ventea.tech`          | el resto         | `web` (`ventea-test-web-1:80`, priority 10) |
-| `ventea.tech` (apex)          | `/api`, `/api/*` | `api` (priority 100)                        |
-| `ventea.tech` (apex)          | el resto         | `web` (priority 50): landing y registro     |
-| `www.ventea.tech`             | todo             | `web` (priority 50): nginx `301` al apex    |
+| `app.ventea.tech`             | `/api`, `/api/*` | `api` (priority 100)                        |
+| `app.ventea.tech`             | el resto         | `web` (priority 50): landing y registro     |
+| `ventea.tech` (apex)          | todo             | `web` (priority 50): nginx `301` a `app.`   |
+| `www.ventea.tech`             | todo             | `web` (priority 50): nginx `301` a `app.`   |
 
 En `web` (nginx, `deploy/Dockerfile.web`) el panel de staff vive en `/admin` y llama a `/api`
 del mismo origen, así que no hay CORS de por medio. En `/` queda el build web de `apps/mobile`.
 El panel: `https://<slug>.ventea.tech/admin`.
 
-En el apex, el mismo nginx (otro `server` por `Host`, ver `deploy/nginx.conf`) sirve la landing
-(`apps/landing`) en `/` y `/registro`, y el panel en `/admin/` — el de plataforma en
-`https://ventea.tech/admin/plataforma` (`/plataforma` redirige). La landing y el panel llaman a
-`ventea.tech/api` (mismo origen). Las rutas del apex y de `www` son fijas: las publica
-`sync-routes.sh` en cada corrida, cada una con su certificado. Priority explícita 50 (no 10)
-en el web del apex y de `www`: sin ella Traefik usa el largo de la regla, y cualquier otro
-router del Traefik compartido que declare `Host(ventea.tech)` ganaría en silencio. Antes del
-primer deploy: `grep -rn "ventea.tech" /etc/traefik/dynamic` (solo debe aparecer
-`ventea-test.yml`). El panel de plataforma existe **solo** en el apex: en
-`<slug>.ventea.tech/admin/plataforma` nginx responde `301` al apex (y la app no monta su login
-fuera del apex).
+En `app.ventea.tech` (TASK-007; antes en el apex), el mismo nginx (otro `server` por `Host`,
+ver `deploy/nginx.conf`) sirve la landing (`apps/landing`) en `/`, `/registro`, `/terminos` y
+`/privacidad` (cada una con su `index.html` del build), y el panel en `/admin/` — el de
+plataforma en `https://app.ventea.tech/admin/plataforma` (`/plataforma` redirige). La landing y
+el panel llaman a `app.ventea.tech/api` (mismo origen). El apex y `www` responden `301` a
+`https://app.ventea.tech` conservando ruta y query (`ventea.tech/registro?plan=pro` →
+`app.ventea.tech/registro?plan=pro`). Las rutas de `app.`, del apex y de `www` son fijas: las
+publica `sync-routes.sh` en cada corrida, cada una con su certificado. Priority explícita 50
+(no 10) en sus routers web: sin ella Traefik usa el largo de la regla, y cualquier otro router
+del Traefik compartido que declare `Host(ventea.tech)` ganaría en silencio. Antes del primer
+deploy: `grep -rn "ventea.tech" /etc/traefik/dynamic` (solo debe aparecer `ventea-test.yml`).
+El panel de plataforma existe **solo** en `app.`: en `<slug>.ventea.tech/admin/plataforma`
+nginx responde `301` a `app.` (y la app no monta su login fuera de `app.`). `app` es un slug
+reservado: ninguna marca puede registrarlo.
 
 nginx agrega en todas las respuestas (`deploy/nginx-security-headers.conf`) HSTS (30 días,
 `includeSubDomains`; subir a 1 año —`max-age=31536000`— cuando se haya verificado que todo
@@ -47,7 +51,7 @@ nginx agrega en todas las respuestas (`deploy/nginx-security-headers.conf`) HSTS
 `Referrer-Policy: strict-origin-when-cross-origin` y una CSP del mismo origen
 (`frame-ancestors 'none'`; `connect-src 'self'`; `style-src 'unsafe-inline'` por Ionic;
 `img-src https:` por los logos de cada marca). Verificar después del deploy:
-`curl -sI https://ventea.tech/ | grep -iE "strict-transport|content-security|x-frame"`.
+`curl -sI https://app.ventea.tech/ | grep -iE "strict-transport|content-security|x-frame"`.
 
 ### Rutas automáticas (cron)
 
@@ -96,7 +100,7 @@ cd ~/ventea-test
 
 ## Plataforma (admin del SaaS)
 
-Panel web: `https://ventea.tech/admin/plataforma` (login propio; el token dura 1 h y al vencer
+Panel web: `https://app.ventea.tech/admin/plataforma` (login propio; el token dura 1 h y al vencer
 vuelve al login). Lista de marcas con filtro y búsqueda, detalle con eventos y acciones
 (suspender, reactivar, cambiar plan, extender prueba; «Registrar pago» aparece solo cuando la
 API tiene `record-payment`, TASK-005). Lo mismo por `curl`:
@@ -142,16 +146,19 @@ curl -fsS https://api.ventea.tech/api/health   # REGIONS mal escrito = la API no
 ./install-cron.sh                          # una vez (idempotente)
 curl https://api.ventea.tech/api/health
 curl -I https://carolina-hot-chicken.ventea.tech/admin/   # 200, el panel
-curl -I https://ventea.tech/                  # 200, la landing
-curl -I https://ventea.tech/registro          # 200 (mismo index.html)
-curl -s https://ventea.tech/api/platform/plans | head -c 200   # precios por el apex
-curl -I https://www.ventea.tech/              # 301 → https://ventea.tech/
-curl -I https://ventea.tech/admin/plataforma  # 200, panel de plataforma
+curl -I https://app.ventea.tech/                  # 200, la landing
+curl -I https://app.ventea.tech/terminos         # 200 (su index.html, con su <title>)
+curl -s https://app.ventea.tech/api/platform/plans | head -c 200   # precios por app.
+curl -I https://ventea.tech/registro?plan=pro    # 301 → https://app.ventea.tech/registro?plan=pro
+curl -I https://www.ventea.tech/                 # 301 → https://app.ventea.tech/
+curl -I https://app.ventea.tech/admin/plataforma # 200, panel de plataforma
+curl -I https://carolina-hot-chicken.ventea.tech/admin/plataforma   # 301 → app.
 ```
 
 La imagen web no lleva `VITE_*`: el panel y la landing usan `/api` relativo y el tenant sale
-del subdominio. La primera vez que se publica el apex, Traefik pide los certificados de
-`ventea.tech` y `www.ventea.tech` (HTTP-01; el DNS ya apunta a la VPS): pueden tardar ~1 min.
+del subdominio. La primera vez que se publica `app.`, Traefik pide su certificado (HTTP-01;
+`app.ventea.tech` tiene que resolver a la VPS: lo cubre el comodín `*.ventea.tech` del DNS):
+puede tardar ~1 min. Los del apex y `www` ya existen.
 Si otro router del Traefik compartido ya atendía `Host(ventea.tech)`, hay que quitarlo antes.
 
 ## Quitarlo

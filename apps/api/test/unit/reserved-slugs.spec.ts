@@ -16,6 +16,8 @@ describe('slugs reservados', () => {
     'plataforma',
     'panel',
     'dashboard',
+    // TASK-007: app.ventea.tech es la landing y el panel de plataforma.
+    'app',
   ])('%s está reservado', (slug) => {
     expect(isReservedTenantSlug(slug)).toBe(true);
   });

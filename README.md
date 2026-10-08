@@ -27,7 +27,7 @@ apps/
   mobile/    Ionic React + Capacitor — app de cliente (iOS, Android, web)
   admin/     React + Vite — panel de gestión del tenant (desktop; /admin/facturacion para el
              dueño) y, en /admin/plataforma, el panel de la plataforma (marcas, cobros)
-  landing/   React + Vite — ventea.tech: landing con precios y registro self-service
+  landing/   React + Vite — app.ventea.tech (el apex redirige): landing, registro y legales
 packages/
   shared/         contratos zod + vocabulario de dominio, compartidos por los tres
   tsconfig/       configuraciones base de TypeScript

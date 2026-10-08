@@ -3,8 +3,9 @@ import type { ConfigService } from '@nestjs/config';
 /**
  * Orígenes que pueden llamar a la API en producción.
  *
- * - El dominio base (`https://<TENANT_BASE_DOMAIN>`, la landing con el registro) y sus
- *   subdominios (modo multi): cada tenant nuevo queda habilitado sin redeploy.
+ * - El dominio base (`https://<TENANT_BASE_DOMAIN>`, que redirige a `app.`) y sus
+ *   subdominios (modo multi): `app.` (landing, registro y panel de plataforma, TASK-007) y
+ *   cada tenant nuevo quedan habilitados sin redeploy.
  * - `PUBLIC_ORIGIN` (modo single): el dominio propio del cliente.
  * - El WebView de Capacitor: `https://localhost` en Android y `capacitor://localhost`
  *   en iOS. Sin esto la app nativa no puede llamar a su propia API.

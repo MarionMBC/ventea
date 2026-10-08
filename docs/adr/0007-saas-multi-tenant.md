@@ -93,6 +93,15 @@ cerrado, escríbenos"`. Vale entre reinicios y réplicas, a diferencia del rate 
   (SAQ A). Hasta entonces el endpoint se niega en producción salvo `ALLOW_RAW_CARD_API=true`
   explícito (ver [deployment.md](../deployment.md#cobro-de-suscripciones)).
 
+## Nota (TASK-007, 2026-10-08): la landing pasa a `app.ventea.tech`
+
+La landing, el registro, las páginas legales y el panel de plataforma se sirven en
+`https://app.ventea.tech`. El apex `ventea.tech` y `www.ventea.tech` responden `301` a
+`app.` conservando ruta y query; en los hosts de marca `/admin/plataforma` responde `301` a
+`app.`. `app` ya era un slug reservado, así que ninguna marca puede ocupar ese host. El
+apex queda libre para un sitio institucional futuro sin mover el producto. Detalle en
+`deploy/nginx.conf` y `deploy/test-vps/README.md`.
+
 ## Alternativas descartadas
 
 - **Seguir con una instancia por cliente (0006)**: no cierra con precios de $25–$129 al

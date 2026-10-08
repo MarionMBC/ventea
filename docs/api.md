@@ -235,12 +235,14 @@ interval, acceptedTermsVersion, country?, currency?}`. `acceptedTermsVersion` (T
   `SIGNUP_WEEKLY_LIMIT` (25) altas por registro; lleno → `429 "Registro temporalmente
 cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login`, `pagos`…),
   todo lo que empiece con `admin` y todo lo que contenga `ventea`.
-- **Clientes:** la landing (`apps/landing`, `https://ventea.tech`) usa `plans`,
-  `slug-available` y `signup`; el panel de plataforma (`apps/admin`,
-  `https://ventea.tech/admin/plataforma`) el login y `tenants/*`. Los dos llaman a `/api` del
-  mismo origen (Traefik manda `ventea.tech/api/*` a la API). En producción el CORS acepta
-  además el apex `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio
-  (`src/cors-origins.ts`), por si la landing se sirve aparte y llama a `api.ventea.tech`.
+- **Clientes:** la landing (`apps/landing`, `https://app.ventea.tech`; el apex y `www`
+  redirigen ahí desde TASK-007) usa `plans`, `slug-available`, `signup`, `tenant-ready` y
+  `analytics/event`; el panel de plataforma (`apps/admin`,
+  `https://app.ventea.tech/admin/plataforma`) el login, `tenants/*`, `billing/summary` y
+  `analytics/funnel`. Los dos llaman a `/api` del mismo origen (Traefik manda
+  `app.ventea.tech/api/*` a la API). En producción el CORS acepta además el apex
+  `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio (`src/cors-origins.ts`), que incluye
+  `app.`.
 - **Dirección lista (`tenant-ready`):** tras el alta, la dirección tarda 1-2 min (ruta en
   Traefik + certificado de Let's Encrypt; mientras tanto el navegador da
   `ERR_CERT_AUTHORITY_INVALID` y, con HSTS, no deja seguir). La API hace un GET a

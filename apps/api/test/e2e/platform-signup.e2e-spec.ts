@@ -194,7 +194,8 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
       .expect(400);
     expect(reserved.body.message).toContain('reservado');
     // Suplantación: login/pagos y cualquier slug con "ventea" o que empiece con "admin".
-    for (const slug of ['login', 'pagos', 'secure', 'soporte-ventea', 'administracion']) {
+    // `app` (TASK-007): app.ventea.tech es la landing y el panel de plataforma.
+    for (const slug of ['app', 'login', 'pagos', 'secure', 'soporte-ventea', 'administracion']) {
       await http().post('/api/platform/signup').send(signupBody({ slug })).expect(400);
     }
 

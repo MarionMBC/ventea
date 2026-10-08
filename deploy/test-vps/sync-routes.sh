@@ -14,9 +14,10 @@
 # Así el panel llama a /api del mismo origen, sin CORS. `api.` y el host sslip
 # siguen yendo enteros a la API.
 #
-# El apex `ventea.tech` (TASK-006: landing, registro y panel de plataforma) lleva los
-# mismos dos routers; `www.ventea.tech` va al web, que responde 301 al apex. nginx
-# elige el sitio por el header Host (deploy/nginx.conf).
+# `app.ventea.tech` (TASK-007: landing, registro y panel de plataforma; antes en el apex)
+# lleva los mismos dos routers que una marca. El apex `ventea.tech` y `www.ventea.tech`
+# van solo al web, que responde 301 a app. conservando ruta y query. nginx elige el sitio
+# por el header Host (deploy/nginx.conf). `app` es un slug reservado: ninguna marca lo pisa.
 #
 # Corre por cron cada minuto (install-cron.sh, TASK-004): una marca registrada sola
 # queda publicada con certificado en <= 2 min. Por eso SOLO reescribe el archivo de
@@ -71,6 +72,7 @@ slugs=$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_D
   "select slug from tenants where \"isActive\" order by slug")
 
 api_hosts="$SSLIP_HOST api.$TENANT_BASE_DOMAIN"
+app_host="app.$TENANT_BASE_DOMAIN"
 apex_host="$TENANT_BASE_DOMAIN"
 www_host="www.$TENANT_BASE_DOMAIN"
 tenant_hosts=""
@@ -100,20 +102,23 @@ trap 'rm -f "$NEW"' EXIT
   for h in $api_hosts; do
     router "ventea-test-$(echo "$h" | tr '.' '-')" "Host(\`$h\`)" ventea-test
   done
-  # El apex (landing + registro + panel de plataforma en /admin/plataforma) lleva los
-  # mismos dos routers que una marca: su /api va a la API (mismo origen, sin CORS).
-  # Priority web 50 (no 10) en apex y www: Traefik usa por defecto el largo de la regla
-  # (Host de ventea.tech ≈ 19), así que con 10 cualquier otro router del Traefik
-  # compartido que declare ese host ganaría en silencio. /api del apex sigue en 100 > 50.
-  for h in $apex_host $tenant_hosts; do
+  # app. (landing + registro + panel de plataforma en /admin/plataforma) lleva los mismos
+  # dos routers que una marca: su /api va a la API (mismo origen, sin CORS).
+  # Priority web 50 (no 10) en app., apex y www: Traefik usa por defecto el largo de la
+  # regla (Host de ventea.tech ≈ 19), así que con 10 cualquier otro router del Traefik
+  # compartido que declare ese host ganaría en silencio. /api de app. sigue en 100 > 50.
+  for h in $app_host $tenant_hosts; do
     name="ventea-test-$(echo "$h" | tr '.' '-')"
     web_priority=10
-    [ "$h" = "$apex_host" ] && web_priority=50
+    [ "$h" = "$app_host" ] && web_priority=50
     router "$name-api" "Host(\`$h\`) && (PathPrefix(\`/api/\`) || Path(\`/api\`))" ventea-test 100
     router "$name-web" "Host(\`$h\`)" ventea-test-web "$web_priority"
   done
-  # www: nginx responde 301 al apex (necesita su propio certificado para el https://www).
-  router "ventea-test-$(echo "$www_host" | tr '.' '-')-web" "Host(\`$www_host\`)" ventea-test-web 50
+  # Apex y www: solo web; nginx responde 301 a app. (cada uno necesita su certificado para
+  # que el https:// del redirect funcione).
+  for h in $apex_host $www_host; do
+    router "ventea-test-$(echo "$h" | tr '.' '-')-web" "Host(\`$h\`)" ventea-test-web 50
+  done
   echo "  services:"
   echo "    ventea-test:"
   echo "      loadBalancer:"
@@ -149,6 +154,7 @@ docker run --rm -v "$DYNAMIC_DIR":/d -v "$PWD":/s:ro alpine \
 # En modo cron queda en sync-routes.log una entrada con fecha por cada cambio publicado.
 echo "$(date -u +%FT%TZ) ✓ rutas publicadas:"
 for h in $api_hosts; do echo "  https://$h (API)"; done
-echo "  https://$apex_host (landing + registro; panel de plataforma en /admin/plataforma; /api → API)"
-echo "  https://$www_host (301 → https://$apex_host)"
+echo "  https://$app_host (landing + registro; panel de plataforma en /admin/plataforma; /api → API)"
+echo "  https://$apex_host (301 → https://$app_host)"
+echo "  https://$www_host (301 → https://$app_host)"
 for h in $tenant_hosts; do echo "  https://$h (web + panel /admin, /api → API)"; done
