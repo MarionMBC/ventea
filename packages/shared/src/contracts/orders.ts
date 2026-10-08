@@ -24,12 +24,19 @@ export const createOrderSchema = z.object({
 
 export const orderLineSchema = z.object({
   id: z.string().uuid(),
-  menuItemId: z.string().uuid(),
+  // null si el producto se borró del menú después del pedido (la FK queda en SetNull)
+  menuItemId: z.string().uuid().nullable(),
   nameSnapshot: z.string(), // nombre al momento de la compra: el menú cambia, el pedido no
   quantity: z.number().int().positive(),
   unitPriceCents: moneySchema,
   totalCents: moneySchema,
-  selectedOptions: z.array(z.object({ id: z.string().uuid(), nameSnapshot: z.string() })),
+  selectedOptions: z.array(
+    z.object({
+      id: z.string().uuid().nullable(), // null si la opción se borró del menú
+      nameSnapshot: z.string(),
+      priceDeltaCents: z.number().int(),
+    }),
+  ),
   notes: z.string().nullable(),
 });
 
@@ -51,7 +58,19 @@ export const orderSchema = z.object({
   scheduledFor: z.coerce.date().nullable(),
 });
 
+/** Cambio de estado desde el panel de staff. Las transiciones válidas las decide la API. */
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(ORDER_STATUS),
+});
+
+/** Filtro del listado de staff. */
+export const staffOrdersQuerySchema = z.object({
+  status: z.enum(ORDER_STATUS).optional(),
+});
+
 export type CartLine = z.infer<typeof cartLineSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type OrderLine = z.infer<typeof orderLineSchema>;
 export type Order = z.infer<typeof orderSchema>;
+export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type StaffOrdersQuery = z.infer<typeof staffOrdersQuerySchema>;

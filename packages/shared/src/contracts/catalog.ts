@@ -29,6 +29,10 @@ export const menuItemSchema = z.object({
   description: z.string().nullable(),
   imageUrl: z.string().url().nullable(),
   basePriceCents: moneySchema,
+  /** Precio anterior, tachado en la app. `null` si el ítem no está rebajado. */
+  compareAtPriceCents: moneySchema.nullable(),
+  /** Badges de la app: `popular`, `new`, `hot`, `combo`… */
+  tags: z.array(z.string()),
   isAvailable: z.boolean(),
   sortOrder: z.number().int(),
   modifierGroups: z.array(modifierGroupSchema),
@@ -48,8 +52,14 @@ export const publicMenuSchema = z.object({
   categories: z.array(menuCategorySchema),
 });
 
+/** Query de `GET /api/menu`. Sin `locationId` se usa la primera sucursal activa. */
+export const menuQuerySchema = z.object({
+  locationId: z.string().uuid().optional(),
+});
+
 export type ModifierOption = z.infer<typeof modifierOptionSchema>;
 export type ModifierGroup = z.infer<typeof modifierGroupSchema>;
 export type MenuItem = z.infer<typeof menuItemSchema>;
 export type MenuCategory = z.infer<typeof menuCategorySchema>;
 export type PublicMenu = z.infer<typeof publicMenuSchema>;
+export type MenuQuery = z.infer<typeof menuQuerySchema>;
