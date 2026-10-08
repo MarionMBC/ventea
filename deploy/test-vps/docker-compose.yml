@@ -43,6 +43,12 @@ services:
       SIGNUP_RATE_LIMIT_PER_HOUR: ${SIGNUP_RATE_LIMIT_PER_HOUR:-}
       SIGNUP_DAILY_LIMIT: ${SIGNUP_DAILY_LIMIT:-}
       SIGNUP_WEEKLY_LIMIT: ${SIGNUP_WEEKLY_LIMIT:-}
+      # Cobro (TASK-005). Sin credenciales de CyberSource en esta VPS: manual.
+      BILLING_MODE: ${BILLING_MODE:-manual}
+      MS_PAYMENTS_URL: ${MS_PAYMENTS_URL:-}
+      MS_PAYMENTS_KEY: ${MS_PAYMENTS_KEY:-}
+      MS_PAYMENTS_PROVIDER: ${MS_PAYMENTS_PROVIDER:-}
+      BILLING_CYCLE_INTERVAL_MINUTES: ${BILLING_CYCLE_INTERVAL_MINUTES:-}
     networks: [internal, dokploy-network]
     depends_on:
       postgres: { condition: service_healthy }

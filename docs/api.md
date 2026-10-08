@@ -7,7 +7,8 @@ Las excepciones son `/api/health` y `/api/platform/*` (ver [Plataforma](#platafo
 **Marca suspendida → `402 {statusCode: 402, message: "Servicio suspendido", error: "Payment Required"}`**
 en toda ruta de la marca salvo:
 
-- `/api/staff/*`, `/api/tenant` y `/api/auth/refresh`: el dueño sigue entrando al panel a pagar;
+- `/api/staff/*`, `/api/tenant`, `/api/auth/refresh` y `/api/billing/*`: el dueño sigue
+  entrando al panel a pagar;
 - `GET /api/orders`, `GET /api/orders/:id` y `GET /api/me`: el cliente sigue viendo su cuenta y
   sus pedidos en curso. Crear o cancelar pedidos, el menú, registro y login dan 402.
 
@@ -110,23 +111,80 @@ Valores por defecto del programa (`DEFAULT_REWARD_PROGRAM`), en unidades menores
 - canje desde 100 puntos;
 - bono de bienvenida de 50 puntos.
 
+## Cobro de la suscripción (`/api/billing`)
+
+Solo staff con rol `owner` (manager y staff → `403`). Abiertas aunque la marca esté suspendida.
+Contratos en `packages/shared/src/contracts/billing.ts`. Montos en centavos USD.
+
+| Método | Ruta                          | Qué hace                                                                           |
+| ------ | ----------------------------- | ---------------------------------------------------------------------------------- |
+| GET    | `/api/billing`                | plan, precio, estado, fechas, tarjeta (marca, últimos 4), modo, últimos 20 eventos |
+| POST   | `/api/billing/payment-method` | alta o cambio de tarjeta + primer cobro (`establish`)                              |
+| POST   | `/api/billing/change-plan`    | `{planCode, interval?}`: se aplica al **próximo período**, sin prorrateo           |
+| POST   | `/api/billing/cancel`         | cancela al terminar el período (o la prueba)                                       |
+| POST   | `/api/billing/resume`         | anula la cancelación agendada                                                      |
+
+- **Alta de tarjeta:** `{card: {number, expiryMonth, expiryYear, cvv, holder}, billing: {country,
+city?, line1?, state?, zip?, phone?, email?}}`. Tokeniza y cobra el próximo período con CVV
+  (`storedCredential.usage = "establish"`). El período pagado empieza al terminar la prueba (en
+  `trialing`), al terminar el actual (`active` vigente: pago adelantado) o ahora (vencida,
+  `past_due`, `suspended`, `canceled`), y aplica el cambio de plan agendado. Respuestas: `200`
+  con el estado nuevo · `402` tarjeta rechazada (la suscripción no cambia) · `400` datos
+  inválidos (Luhn, vencida) · `502` error de la pasarela · `503` pasarela no disponible · `504`
+  el banco no confirmó: **no reintentar**, lo revisa la plataforma (mientras tanto, `409`) ·
+  `409` en modo `manual` · `429` más de 5 intentos por marca y hora
+  (`BILLING_RATE_LIMIT_PER_HOUR`).
+- **El número y el CVV nunca se guardan, ni se loguean, ni vuelven en una respuesta.** Se
+  guarda el token de la pasarela, el `networkTransactionId` del primer cobro, marca, últimos 4
+  y vencimiento. El logger de la API tacha PAN y CVV como red de seguridad.
+- **change-plan:** `409` si la marca tiene más sucursales activas de las que permite el plan
+  destino. Pedir el plan actual anula el cambio agendado.
+
+## Cobro recurrente
+
+`BillingCycleService` corre cada 15 min (`BILLING_CYCLE_INTERVAL_MINUTES`) con un
+`pg_try_advisory_lock`: aunque haya varias réplicas, cobra una sola. También a mano con
+`node apps/api/dist/scripts/run-billing-cycle.js`.
+
+1. **Conciliación:** los intentos de renovación sin confirmar (`unknown`, o `pending` de un
+   proceso que murió) se consultan con `status`; nunca se recobran a ciegas. Uno sin
+   `transactionId` (timeout antes de la respuesta) no se puede consultar en ms-payments: queda
+   para `resolve-payment`.
+2. **Cancelación:** las que pidieron cancelar pasan a `canceled` al vencer.
+3. **Renovación** (`BILLING_MODE=ms-payments`): `active`/`past_due` vencidas, con tarjeta y sin
+   cancelar. Cobro sin CVV (`usage = "recurring"`, `initialTransactionId` = el del primer
+   cobro, siempre). `orderId` = `sub-<subId>-<AAAAMMDD del inicio del período>-a<n>`, escrito en
+   `payment_attempts` **antes** de llamar a la pasarela. Aprobado → período siguiente (fin de
+   mes con clamp) con el cambio de plan agendado. Rechazado → `past_due` y reintentos a los días
+   1, 3 y 7 del vencimiento; el 4.º rechazo → `suspended`.
+4. **Vencimientos sin cobro:** prueba vencida → `past_due`; `active` vencida sin tarjeta (o en
+   modo `manual`) → `past_due`; `past_due` sin tarjeta (o manual) 7 días después del
+   vencimiento → `suspended`.
+
+Cada paso deja su `BillingEvent` (`payment_succeeded`, `payment_failed`, `payment_unknown`,
+`past_due`, `suspended`, `canceled`…) y avisa por `BillingNotifier` (hoy, log; el email se
+enchufa ahí).
+
 ## Plataforma (SaaS)
 
 Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 `packages/shared/src/contracts/platform.ts`.
 
-| Método | Ruta                                       | Quién                                                      |
-| ------ | ------------------------------------------ | ---------------------------------------------------------- |
-| GET    | `/api/platform/plans`                      | público · planes activos (precios en centavos USD)         |
-| GET    | `/api/platform/slug-available?slug=`       | público · `{available, reason?: invalid·reserved·taken}`   |
-| POST   | `/api/platform/signup`                     | público · 5 intentos por IP y hora (`429` + `Retry-After`) |
-| POST   | `/api/platform/auth/login`                 | público · `PlatformAdmin`; 20 intentos por IP y hora       |
-| GET    | `/api/platform/tenants?page=&pageSize=`    | plataforma · `{items, total, page, pageSize}` (máx 100)    |
-| GET    | `/api/platform/tenants/:slug`              | plataforma · + sucursales activas y últimos 20 eventos     |
-| POST   | `/api/platform/tenants/:slug/suspend`      | plataforma · `{reason?}`                                   |
-| POST   | `/api/platform/tenants/:slug/reactivate`   | plataforma · abre un período nuevo desde hoy               |
-| POST   | `/api/platform/tenants/:slug/change-plan`  | plataforma · `{planCode, interval?}`                       |
-| POST   | `/api/platform/tenants/:slug/extend-trial` | plataforma · `{days}` (1–90)                               |
+| Método | Ruta                                          | Quién                                                                                     |
+| ------ | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| GET    | `/api/platform/plans`                         | público · planes activos (precios en centavos USD)                                        |
+| GET    | `/api/platform/slug-available?slug=`          | público · `{available, reason?: invalid·reserved·taken}`                                  |
+| POST   | `/api/platform/signup`                        | público · 5 intentos por IP y hora (`429` + `Retry-After`)                                |
+| POST   | `/api/platform/auth/login`                    | público · `PlatformAdmin`; 20 intentos por IP y hora                                      |
+| GET    | `/api/platform/tenants?page=&pageSize=`       | plataforma · `{items, total, page, pageSize}` (máx 100)                                   |
+| GET    | `/api/platform/tenants/:slug`                 | plataforma · + sucursales activas y últimos 20 eventos                                    |
+| POST   | `/api/platform/tenants/:slug/suspend`         | plataforma · `{reason?}`                                                                  |
+| POST   | `/api/platform/tenants/:slug/reactivate`      | plataforma · abre un período nuevo desde hoy                                              |
+| POST   | `/api/platform/tenants/:slug/change-plan`     | plataforma · `{planCode, interval?}`                                                      |
+| POST   | `/api/platform/tenants/:slug/extend-trial`    | plataforma · `{days}` (1–90)                                                              |
+| POST   | `/api/platform/tenants/:slug/record-payment`  | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período         |
+| POST   | `/api/platform/tenants/:slug/resolve-payment` | plataforma · `{orderId, outcome: succeeded·failed, note?}`: cierra un cobro sin confirmar |
+| GET    | `/api/platform/billing/summary`               | plataforma · `{currency, mrrCents, byStatus, failuresLast7Days, unresolvedPayments}`      |
 
 - **Registro:** `{restaurantName, slug, ownerName, ownerEmail, ownerPassword (≥ 10), planCode,
 interval, country?, currency?}`. Crea en una transacción la marca, su branding, el programa
@@ -154,6 +212,9 @@ node apps/api/dist/scripts/create-tenant.js --slug <slug> --name "<nombre>" --ow
 
 # Admin de la plataforma (contraseña aleatoria, se muestra una vez; --reset-password genera otra)
 node apps/api/dist/scripts/create-platform-admin.js --email <email> --name "<nombre>"
+
+# Una corrida del ciclo de cobro (mismo lock que el scheduler de la API)
+node apps/api/dist/scripts/run-billing-cycle.js
 
 # Reemplazar el menú de una marca desde un JSON. Corre en una transacción; los
 # pedidos existentes no se tocan. Cambiar la moneda de una marca que ya tiene
