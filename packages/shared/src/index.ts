@@ -1,6 +1,7 @@
 export * from './domain/enums.js';
 export * from './domain/tenant.js';
 export * from './contracts/auth.js';
+export * from './contracts/billing.js';
 export * from './contracts/catalog.js';
 export * from './contracts/orders.js';
 export * from './contracts/platform.js';

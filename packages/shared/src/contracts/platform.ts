@@ -140,6 +140,8 @@ export const billingEventSchema = z.object({
 export const platformTenantDetailSchema = platformTenantSchema.extend({
   activeLocations: z.number().int().nonnegative(),
   billingEvents: z.array(billingEventSchema),
+  /** Tarjeta guardada (marca y últimos 4), o `null`. Nunca el token. */
+  card: z.object({ brand: z.string().nullable(), last4: z.string().nullable() }).nullable(),
 });
 
 /** Body opcional: sin body (Express 5 deja `req.body` undefined) vale como `{}`. */

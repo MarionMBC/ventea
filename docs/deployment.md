@@ -23,6 +23,84 @@ instancia y una base por región.
   `[{"code":"hn-1","countries":["*"]}]`) y `SIGNUP_RATE_LIMIT_PER_HOUR` (default 5 por IP).
 - **Respaldos**: centralizados y copiados fuera de la VPS; ahora un disco perdido es el de
   todos los clientes.
+- **Cobro de suscripciones** (TASK-005): ver [abajo](#cobro-de-suscripciones).
+
+## Cobro de suscripciones
+
+La API cobra las renovaciones sola: `BillingScheduler` corre el ciclo cada 15 minutos en cada
+réplica y un `pg_try_advisory_lock` deja cobrar a una sola. No hace falta cron.
+
+| Variable                         | Default       | Qué es                                                                                          |
+| -------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| `BILLING_MODE`                   | `manual`      | `manual`: sin pasarela, el admin registra los pagos. `ms-payments`: tarjeta vía ms-payments     |
+| `MS_PAYMENTS_URL`                | —             | Base de ms-payments sin `/api`, por red interna. Obligatoria con `ms-payments`                  |
+| `MS_PAYMENTS_KEY`                | —             | `INTERNAL_SERVICE_KEY` de ms-payments (`X-Internal-Service-Key`). Obligatoria con `ms-payments` |
+| `MS_PAYMENTS_PROVIDER`           | `cybersource` | `X-Payment-Provider`. Solo CyberSource cobra recurrente sin CVV                                 |
+| `MS_PAYMENTS_TIMEOUT_MS`         | `30000`       | Timeout por llamada; vencido = cobro desconocido (se concilia, no se recobra)                   |
+| `BILLING_CYCLE_INTERVAL_MINUTES` | `15`          | Cada cuánto corre el ciclo                                                                      |
+| `BILLING_SCHEDULER_ENABLED`      | `true`        | `false` apaga el scheduler (el script `run-billing-cycle.js` sigue funcionando)                 |
+| `BILLING_RATE_LIMIT_PER_HOUR`    | `5`           | Altas de tarjeta por marca y hora                                                               |
+| `BILLING_IP_RATE_LIMIT_PER_DAY`  | `10`          | Altas de tarjeta por IP y día, entre todas las marcas (card-testing con el registro público)    |
+| `ALLOW_RAW_CARD_API`             | —             | `true` permite el alta con número crudo en producción con `ms-payments` (ver PCI, abajo)        |
+
+Con `BILLING_MODE=ms-payments` y sin URL o clave, **la API no arranca**: falla al desplegar, no
+en la primera renovación.
+
+### Modo manual (hoy, en la VPS)
+
+El ciclo no cobra: pasa a `past_due` las pruebas y los períodos vencidos, y a `suspended` tras 7
+días de gracia. Cuando el cliente paga (transferencia), el admin de plataforma lo registra:
+
+```bash
+curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \
+  -H "Authorization: Bearer $PLATFORM_TOKEN" -H "Content-Type: application/json" \
+  -d '{"amountCents": 5900, "reference": "TRF-0001"}'
+```
+
+Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) y deja la marca
+`active`. No toca una cancelación agendada por el dueño. El servicio `api` de los compose
+lleva `stop_grace_period: 40s`: el apagado espera la corrida de cobro en curso (hasta 35 s). Con un cobro con tarjeta sin
+confirmar responde `409`: primero `resolve-payment`.
+
+### Alertas
+
+`GET /api/platform/billing/summary` trae `unresolvedPayments` (cobros sin confirmar y
+rechazados por la pasarela antes del banco) y `alertsLast7Days` (`billing_alert`: posible
+doble pago, monto aprobado distinto del pedido, card-testing). Los dos tienen que estar en 0;
+si no, revisar el detalle de la marca y EBC.
+
+### Puesta en marcha con CyberSource (no verificada: faltan credenciales)
+
+1. **ms-payments con CyberSource**, en la red interna de la API y sin exponerlo a internet:
+   `INTERNAL_SERVICE_KEY` larga y aleatoria, `CYBERSOURCE_MERCHANT_ID`, `CYBERSOURCE_KEY_ID` y
+   `CYBERSOURCE_SHARED_SECRET` (portal EBC → Gestión de claves → API REST, secreto compartido).
+   Producción exige `NODE_ENV=production` **y** `CYBERSOURCE_ENV=production` en ms-payments;
+   verificarlo en su `/health` (`environments.cybersource.environment`).
+2. **Sandbox primero.** Con ms-payments contra `apitest.cybersource.com`, en la API:
+   `BILLING_MODE=ms-payments`, `MS_PAYMENTS_URL=http://ms-payments:3000`,
+   `MS_PAYMENTS_KEY=<INTERNAL_SERVICE_KEY>`, `MS_PAYMENTS_PROVIDER=cybersource`. Desplegar y
+   verificar que la API arranca.
+3. **Alta de prueba:** con una marca de prueba en `trialing`, `POST /api/billing/payment-method`
+   con la tarjeta de sandbox `4111 1111 1111 1111`. Verificar que `subscriptions.paymentToken`
+   y `networkTransactionId` quedaron, y que no hay PAN en `billing_events`, `payment_attempts`
+   ni en `docker logs`.
+4. **Renovación de prueba:** poner en el pasado el `currentPeriodEnd` de esa marca y correr
+   `node apps/api/dist/scripts/run-billing-cycle.js`: debe salir `charged.approved = 1` y, en
+   EBC, un cobro recurrente sin CVV que referencia el `networkTransactionId` del alta.
+5. **Producción:** BAC tiene certificado el stack con el plugin de PixelPay; cobrar directo por
+   CyberSource **exige re-certificar** y confirmar que el MID `bac_hn_oncorp` admite conexión
+   directa (README de ms-payments). Recién entonces, ms-payments a producción.
+6. **Rollback:** `BILLING_MODE=manual` y redeploy de la API. Los intentos en vuelo quedan en
+   `payment_attempts`; los `unknown` se cierran con `resolve-payment` tras mirarlos en EBC.
+
+**PCI — requisito antes de cobrar en producción:** hoy `POST /api/billing/payment-method`
+recibe el número de tarjeta: pasa por la memoria de la API y de ms-payments (alcance SAQ D),
+aunque no se guarda ni se loguea. **Antes de activar `BILLING_MODE=ms-payments` en
+producción hay que migrar a `capture-context` (Microform de CyberSource)**: el navegador
+tokeniza contra el procesador y la API recibe solo el token (SAQ A). Mientras tanto, con
+`NODE_ENV=production` y `BILLING_MODE=ms-payments`, el endpoint responde `503` salvo
+`ALLOW_RAW_CARD_API=true`, que es una decisión explícita (y documentada en el cambio de
+configuración) de aceptar SAQ D. En sandbox y en desarrollo no aplica.
 
 ## Instalación dedicada (modo single, excepcional)
 

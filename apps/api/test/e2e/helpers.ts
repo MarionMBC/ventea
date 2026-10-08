@@ -6,19 +6,32 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import type { CustomerAuthResponse, StaffAuthResponse } from '@ventea/shared';
+import type {
+  CustomerAuthResponse,
+  PlatformAuthResponse,
+  StaffAuthResponse,
+  TenantRole,
+} from '@ventea/shared';
 import argon2 from 'argon2';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
+import { PAYMENT_GATEWAY, type PaymentGateway } from '@/modules/billing/gateway/payment-gateway';
 import { importMenu, type MenuImportOptions } from '@/modules/catalog/menu-import';
 
 export const STAFF_PASSWORD = 'staff-password-123';
 export const CUSTOMER_PASSWORD = 'customer-password-123';
 
-/** La app completa, configurada como en main.ts (prefijo `api`). */
-export async function createApp(): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+/**
+ * La app completa, configurada como en main.ts (prefijo `api`). `gateway` reemplaza la
+ * pasarela de cobro (FakeGateway); sin él rige `BILLING_MODE` (manual en env.cjs).
+ */
+export async function createApp(
+  options: { gateway?: PaymentGateway } = {},
+): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  if (options.gateway) builder.overrideProvider(PAYMENT_GATEWAY).useValue(options.gateway);
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
   await app.init();
@@ -173,4 +186,53 @@ export async function loginStaff(
     .send({ email: tenant.staffEmail, password: STAFF_PASSWORD })
     .expect(200);
   return response.body as StaffAuthResponse;
+}
+
+/** Otro miembro del staff de la marca, con la contraseña de prueba. Devuelve su email. */
+export async function createStaffMember(
+  prisma: PrismaClient,
+  tenant: TestTenant,
+  role: TenantRole,
+): Promise<string> {
+  const email = `${role}-${randomUUID().slice(0, 8)}@${tenant.slug}.test`;
+  await prisma.staffMember.create({
+    data: {
+      tenantId: tenant.id,
+      email,
+      name: role,
+      role,
+      passwordHash: await argon2.hash(STAFF_PASSWORD),
+    },
+  });
+  return email;
+}
+
+export async function loginStaffAs(
+  app: INestApplication,
+  tenant: TestTenant,
+  email: string,
+): Promise<string> {
+  const response = await request(app.getHttpServer())
+    .post('/api/staff/auth/login')
+    .set('X-Tenant-Slug', tenant.slug)
+    .send({ email, password: STAFF_PASSWORD })
+    .expect(200);
+  return (response.body as StaffAuthResponse).accessToken;
+}
+
+/** Crea un admin de plataforma y devuelve su access token. */
+export async function platformAdminToken(
+  app: INestApplication,
+  prisma: PrismaClient,
+): Promise<string> {
+  const email = `admin-${randomUUID().slice(0, 8)}@ventea.tech`;
+  const password = 'platform-password-123';
+  await prisma.platformAdmin.create({
+    data: { email, name: 'Admin', passwordHash: await argon2.hash(password) },
+  });
+  const response = await request(app.getHttpServer())
+    .post('/api/platform/auth/login')
+    .send({ email, password })
+    .expect(200);
+  return (response.body as PlatformAuthResponse).accessToken;
 }

@@ -87,6 +87,11 @@ cerrado, escríbenos"`. Vale entre reinicios y réplicas, a diferencia del rate 
   a otra región o a una base propia; `region` ya está en el modelo.
 - Los tenants existentes (`carolina-hot-chicken`, `demo-burgers`, `pollos-prueba`,
   `taqueria-demo`) pasan a plan Cadena anual `active` en la migración: nada se suspende.
+- **Cobro con tarjeta y PCI (TASK-005).** El alta de tarjeta de esta fase recibe el número en
+  la API (alcance PCI DSS SAQ D). Antes de activar `BILLING_MODE=ms-payments` en producción se
+  migra a `capture-context` (Microform de CyberSource) para que el PAN no toque la API
+  (SAQ A). Hasta entonces el endpoint se niega en producción salvo `ALLOW_RAW_CARD_API=true`
+  explícito (ver [deployment.md](../deployment.md#cobro-de-suscripciones)).
 
 ## Alternativas descartadas
 

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 
 import { PlatformAuthGuard } from '@/common/guards/platform-auth.guard';
+import { BillingModule } from '@/modules/billing/billing.module';
 import { SubscriptionsModule } from '@/modules/subscriptions/subscriptions.module';
 
 import {
   PlatformAuthController,
+  PlatformBillingController,
   PlatformPublicController,
   PlatformTenantsController,
 } from './platform.controller';
@@ -19,8 +21,13 @@ import { SignupService } from './signup.service';
  * marcas. Sus rutas (`/api/platform/*`) quedan fuera del TenantMiddleware.
  */
 @Module({
-  imports: [SubscriptionsModule],
-  controllers: [PlatformPublicController, PlatformAuthController, PlatformTenantsController],
+  imports: [SubscriptionsModule, BillingModule],
+  controllers: [
+    PlatformPublicController,
+    PlatformAuthController,
+    PlatformTenantsController,
+    PlatformBillingController,
+  ],
   providers: [
     RegionService,
     SignupService,
