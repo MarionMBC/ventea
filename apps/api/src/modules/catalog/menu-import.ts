@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { rewardProgramSchema } from '@ventea/shared';
 import { z } from 'zod';
 
 /**
@@ -42,6 +43,8 @@ export const menuFileSchema = z
       .string()
       .regex(/^[A-Z]{3}$/, 'currency: código ISO 4217 de 3 letras')
       .optional(),
+    /** Programa de puntos del tenant, en unidades menores de `currency`. Se aplica con el menú. */
+    rewardProgram: rewardProgramSchema.optional(),
     modifierGroups: z.array(groupFileSchema).default([]),
     categories: z
       .array(
@@ -77,7 +80,21 @@ export const menuFileSchema = z
 
 export type MenuFile = z.infer<typeof menuFileSchema>;
 
+export interface MenuImportOptions {
+  /**
+   * Permite cambiar la moneda de un tenant que ya tiene pedidos. Sin esto se rechaza:
+   * los montos históricos están en centavos de la moneda anterior y pasarían a
+   * mostrarse en la nueva.
+   */
+  forceCurrency?: boolean;
+}
+
+/** Error de regla de operación (no de formato): el script lo reporta y sale con 1. */
+export class MenuImportError extends Error {}
+
 export interface MenuImportResult {
+  currencyChanged: boolean;
+  rewardProgramUpdated: boolean;
   categories: number;
   items: number;
   modifierGroups: number;
@@ -91,6 +108,10 @@ export interface MenuImportResult {
  * Los pedidos no se tocan: las líneas y opciones de pedido apuntan al catálogo con
  * `onDelete: SetNull` y guardan snapshot de nombre y precio.
  *
+ * Si el archivo trae `currency` distinta a la del tenant y el tenant ya tiene pedidos,
+ * se rechaza salvo `forceCurrency`. Si trae `rewardProgram`, se aplica en la misma
+ * transacción: el programa está en unidades menores y tiene que ir con la moneda.
+ *
  * Usa el cliente crudo (sin guard de tenant) como los demás scripts de operación,
  * pero filtra igual por `tenantId` en cada borrado.
  */
@@ -98,15 +119,17 @@ export async function importMenu(
   prisma: PrismaClient,
   tenantSlug: string,
   input: unknown,
+  options: MenuImportOptions = {},
 ): Promise<MenuImportResult> {
   const menu = menuFileSchema.parse(input);
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true },
+    select: { id: true, currency: true },
   });
-  if (!tenant) throw new Error(`No existe el tenant "${tenantSlug}"`);
+  if (!tenant) throw new MenuImportError(`No existe el tenant "${tenantSlug}"`);
   const tenantId = tenant.id;
+  const currencyChanged = !!menu.currency && menu.currency !== tenant.currency;
 
   return prisma.$transaction(
     async (tx) => {
@@ -116,8 +139,26 @@ export async function importMenu(
       await tx.modifierOption.deleteMany({ where: { tenantId } });
       await tx.modifierGroup.deleteMany({ where: { tenantId } });
 
-      if (menu.currency) {
+      if (currencyChanged && !options.forceCurrency) {
+        // Dentro de la tx: un pedido creado entre la lectura y el cambio también cuenta.
+        const orders = await tx.order.count({ where: { tenantId } });
+        if (orders > 0) {
+          throw new MenuImportError(
+            `"${tenantSlug}" tiene ${orders} pedidos en ${tenant.currency}: cambiar a ` +
+              `${menu.currency} reinterpreta sus montos. Usar --force-currency si es intencional.`,
+          );
+        }
+      }
+      if (currencyChanged) {
         await tx.tenant.update({ where: { id: tenantId }, data: { currency: menu.currency } });
+      }
+
+      if (menu.rewardProgram) {
+        await tx.rewardProgram.upsert({
+          where: { tenantId },
+          update: menu.rewardProgram,
+          create: { tenantId, ...menu.rewardProgram },
+        });
       }
 
       const groupIds = new Map<string, string>();
@@ -182,6 +223,8 @@ export async function importMenu(
       }
 
       return {
+        currencyChanged,
+        rewardProgramUpdated: !!menu.rewardProgram,
         categories: menu.categories.length,
         items: itemCount,
         modifierGroups: menu.modifierGroups.length,

@@ -23,6 +23,7 @@ interface MenuFileItem {
 }
 interface MenuFile {
   currency: string;
+  rewardProgram: Record<string, unknown>;
   categories: { name: string; items: MenuFileItem[] }[];
 }
 
@@ -113,6 +114,45 @@ describe('Catálogo público (AC3)', () => {
       .get('/api/menu?locationId=no-uuid')
       .set('X-Tenant-Slug', carolina.slug)
       .expect(400);
+  });
+
+  it('el import aplica el programa de puntos del archivo (unidades menores de USD)', async () => {
+    const response = await http()
+      .get('/api/tenant')
+      .set('X-Tenant-Slug', carolina.slug)
+      .expect(200);
+    expect(publicTenantSchema.parse(response.body).rewardProgram).toEqual(file.rewardProgram);
+    expect(file.rewardProgram).toMatchObject({
+      pointsPerCurrencyUnit: 1,
+      redemptionValueCents: 1,
+      minPointsToRedeem: 100,
+      signupBonusPoints: 50,
+    });
+  });
+
+  it('cambiar la moneda de un tenant con pedidos se rechaza salvo forceCurrency', async () => {
+    const withOrders = await seedTenant(prisma, 'con-pedidos'); // CLP
+    await prisma.order.create({
+      data: {
+        tenantId: withOrders.id,
+        locationId: withOrders.locationId,
+        code: 'CP-0001',
+        status: 'completed',
+        fulfillmentType: 'pickup',
+        totalCents: 890000,
+      },
+    });
+
+    await expect(importCarolinaMenu(prisma, withOrders.slug)).rejects.toThrow(/--force-currency/);
+    // Nada cambió: la transacción se revirtió entera.
+    const before = await prisma.tenant.findUniqueOrThrow({ where: { id: withOrders.id } });
+    expect(before.currency).toBe('CLP');
+    expect(await prisma.menuItem.count({ where: { tenantId: withOrders.id } })).toBe(0);
+
+    await importCarolinaMenu(prisma, withOrders.slug, { forceCurrency: true });
+    const after = await prisma.tenant.findUniqueOrThrow({ where: { id: withOrders.id } });
+    expect(after.currency).toBe('USD');
+    expect(await prisma.menuItem.count({ where: { tenantId: withOrders.id } })).toBeGreaterThan(0);
   });
 
   it('reimportar reemplaza el menú sin duplicar', async () => {

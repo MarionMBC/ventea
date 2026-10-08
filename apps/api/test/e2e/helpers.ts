@@ -11,7 +11,7 @@ import argon2 from 'argon2';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
-import { importMenu } from '@/modules/catalog/menu-import';
+import { importMenu, type MenuImportOptions } from '@/modules/catalog/menu-import';
 
 export const STAFF_PASSWORD = 'staff-password-123';
 export const CUSTOMER_PASSWORD = 'customer-password-123';
@@ -117,9 +117,20 @@ export const CAROLINA_MENU_FILE = fileURLToPath(
   new URL('../../prisma/data/carolina-menu.json', import.meta.url),
 );
 
-export async function importCarolinaMenu(prisma: PrismaClient, slug: string): Promise<void> {
-  const data: unknown = JSON.parse(await readFile(CAROLINA_MENU_FILE, 'utf8'));
-  await importMenu(prisma, slug, data);
+/**
+ * Importa el menú real de Carolina. `keepRewardProgram` quita el bloque
+ * `rewardProgram` del archivo para conservar el programa con que se sembró el tenant
+ * (las suites de pedidos usan valores chicos para que las cuentas se lean fácil).
+ */
+export async function importCarolinaMenu(
+  prisma: PrismaClient,
+  slug: string,
+  options: MenuImportOptions & { keepRewardProgram?: boolean } = {},
+): Promise<void> {
+  const { keepRewardProgram, ...importOptions } = options;
+  const data = JSON.parse(await readFile(CAROLINA_MENU_FILE, 'utf8')) as Record<string, unknown>;
+  if (keepRewardProgram) delete data.rewardProgram;
+  await importMenu(prisma, slug, data, importOptions);
 }
 
 export async function registerCustomer(

@@ -1,5 +1,12 @@
 {
   "currency": "USD",
+  "rewardProgram": {
+    "isEnabled": true,
+    "pointsPerCurrencyUnit": 1,
+    "redemptionValueCents": 1,
+    "minPointsToRedeem": 100,
+    "signupBonusPoints": 50
+  },
   "modifierGroups": [
     {
       "key": "heat-mild",

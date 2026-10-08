@@ -30,6 +30,20 @@ export const rewardProgramSchema = z.object({
   signupBonusPoints: z.number().int().nonnegative(),
 });
 
+/**
+ * Programa por defecto de un tenant nuevo, en unidades menores para que valga en
+ * cualquier moneda: 1 punto por unidad monetaria gastada, 1 punto = 1 centavo al
+ * canjear (1 % de vuelta), canje desde 100 puntos y 50 de bono de registro (50
+ * centavos: no alcanza para comer gratis creando cuentas).
+ */
+export const DEFAULT_REWARD_PROGRAM = {
+  isEnabled: true,
+  pointsPerCurrencyUnit: 1,
+  redemptionValueCents: 1,
+  minPointsToRedeem: 100,
+  signupBonusPoints: 50,
+} as const satisfies RewardProgram;
+
 export type RewardLedgerEntry = z.infer<typeof rewardLedgerEntrySchema>;
 export type RewardBalance = z.infer<typeof rewardBalanceSchema>;
 export type RewardProgram = z.infer<typeof rewardProgramSchema>;

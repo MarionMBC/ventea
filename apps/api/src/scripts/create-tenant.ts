@@ -19,7 +19,7 @@ import { parseArgs } from 'node:util';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { tenantSlugSchema } from '@ventea/shared';
+import { DEFAULT_REWARD_PROGRAM, tenantSlugSchema } from '@ventea/shared';
 import argon2 from 'argon2';
 
 /** Subdominios que el proxy o la plataforma usan para otra cosa. */
@@ -75,13 +75,7 @@ async function main(): Promise<void> {
           currency: values.currency,
           branding: { create: { primaryColor: values.color, appDisplayName: values.name! } },
           rewardProgram: {
-            create: {
-              isEnabled: true,
-              pointsPerCurrencyUnit: 0.01,
-              redemptionValueCents: 100,
-              minPointsToRedeem: 10,
-              signupBonusPoints: 20,
-            },
+            create: { ...DEFAULT_REWARD_PROGRAM },
           },
         },
       });
