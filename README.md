@@ -25,7 +25,9 @@ deploy/    Dockerfiles, compose de producción, Caddy y scripts de operación
 apps/
   api/       NestJS + Prisma + PostgreSQL — API multi-tenant
   mobile/    Ionic React + Capacitor — app de cliente (iOS, Android, web)
-  admin/     React + Vite — panel de gestión del tenant (desktop)
+  admin/     React + Vite — panel de gestión del tenant (desktop; /admin/facturacion para el
+             dueño) y, en /admin/plataforma, el panel de la plataforma (marcas, cobros)
+  landing/   React + Vite — ventea.tech: landing con precios y registro self-service
 packages/
   shared/         contratos zod + vocabulario de dominio, compartidos por los tres
   tsconfig/       configuraciones base de TypeScript
@@ -43,8 +45,13 @@ npm install
 npm run db:up                 # PostgreSQL en Docker
 npm run db:migrate            # crea el esquema
 npm run db:seed               # 2 tenants de prueba (ver nota abajo)
-npm run dev                   # api :3000 · mobile :5173 · admin :5174
+npm run dev                   # api :3000 · mobile :5173 · admin :5174 · landing :5175
 ```
+
+Landing y registro: `http://localhost:5175` (y `/registro`); el panel de plataforma:
+`http://localhost:5174/admin/plataforma` (admin creado con `create-platform-admin`, ver
+`docs/api.md`). Ambos llaman a `/api` del mismo origen y Vite lo manda a
+`API_PROXY_TARGET` (por defecto `http://localhost:3000`).
 
 La semilla crea **dos** tenants a propósito: `carolina-hot-chicken` y `demo-burgers`.
 Con un solo tenant en la base, un bug de aislamiento es invisible.

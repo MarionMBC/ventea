@@ -1,0 +1,66 @@
+/*
+ * Tokens de la landing. Paleta cálida (carbón, papel, achiote y maíz) pensada para
+ * restaurantes. Todos los pares texto/fondo usados cumplen AA (≥ 4.5:1; los títulos
+ * grandes ≥ 3:1). Sin fuentes web: la pila del sistema carga al instante.
+ */
+:root {
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-display:
+    ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: clamp(1.625rem, 1.2rem + 1.8vw, 2.375rem);
+  --fs-hero: clamp(2.125rem, 1.4rem + 3.6vw, 3.75rem);
+  --lh: 1.55;
+
+  /* Superficies */
+  --ink: #1d1a16; /* carbón: hero, footer y texto */
+  --ink-2: #2b2621;
+  --paper: #fbf8f3;
+  --surface: #ffffff;
+  --tint: #f4eee4;
+  --line: #e2d9cb;
+  --line-strong: #c9bca8;
+
+  /* Texto */
+  --text: #1d1a16; /* 16.6:1 sobre --paper */
+  --text-muted: #5b5248; /* 7.4:1 sobre --paper, 6.7:1 sobre --tint */
+  --on-ink: #fbf8f3;
+  --on-ink-muted: #d6ccbd; /* 11:1 sobre --ink */
+
+  /* Acentos */
+  --brand: #b23f0e; /* achiote: botones primarios, 5.9:1 con blanco */
+  --brand-hover: #94330a;
+  --brand-soft: #fbe7da;
+  --sun: #f6b54a; /* maíz: CTA sobre carbón, 9.6:1 con --ink */
+  --sun-hover: #f8c56d;
+  --leaf: #12643e; /* el 0 % y lo positivo, 7:1 sobre blanco */
+  --leaf-soft: #e1f2e7;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn-text: #6b4300;
+  --warn-soft: #fff3cd;
+
+  --focus: #1d4ed8;
+  --focus-ring: 0 0 0 3px #ffffff, 0 0 0 6px var(--focus);
+
+  /* Medidas */
+  --tap: 48px;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --gutter: 16px;
+  --container: 1160px;
+  --shadow: 0 1px 2px rgb(29 26 22 / 0.06), 0 4px 16px rgb(29 26 22 / 0.06);
+  --shadow-lg: 0 18px 48px rgb(29 26 22 / 0.18);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+  }
+}

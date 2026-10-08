@@ -6,6 +6,8 @@ interface ImportMetaEnv {
    * `localhost` no hay subdominio. En producción va vacío y manda el subdominio.
    */
   readonly VITE_TENANT_SLUG?: string;
+  /** Dominio de la plataforma (apex del panel de plataforma). Vacío = `ventea.tech`. */
+  readonly VITE_BASE_DOMAIN?: string;
 }
 
 interface ImportMeta {

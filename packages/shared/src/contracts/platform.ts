@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   BILLING_EVENT_TYPE,
+  OPEN_PAYMENT_ATTEMPT_STATUS,
+  PAYMENT_ATTEMPT_KIND,
   BILLING_INTERVAL,
   PLAN_CODE,
   SUBSCRIPTION_STATUS,
@@ -142,6 +144,19 @@ export const platformTenantDetailSchema = platformTenantSchema.extend({
   billingEvents: z.array(billingEventSchema),
   /** Tarjeta guardada (marca y últimos 4), o `null`. Nunca el token. */
   card: z.object({ brand: z.string().nullable(), last4: z.string().nullable() }).nullable(),
+  /**
+   * Cobros abiertos (`pending`, `unknown`, `needs_review`): los que bloquean cambios y se
+   * cierran con `resolve-payment`. Solo para la plataforma; el dueño nunca ve orderIds.
+   */
+  openAttempts: z.array(
+    z.object({
+      orderId: z.string(),
+      kind: z.enum(PAYMENT_ATTEMPT_KIND),
+      status: z.enum(OPEN_PAYMENT_ATTEMPT_STATUS),
+      amountCents: z.number().int(),
+      createdAt: z.coerce.date(),
+    }),
+  ),
 });
 
 /** Body opcional: sin body (Express 5 deja `req.body` undefined) vale como `{}`. */

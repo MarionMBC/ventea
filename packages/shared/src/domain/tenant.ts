@@ -26,6 +26,11 @@ export const RESERVED_TENANT_SLUGS: readonly string[] = [
   'status',
   'docs',
   'platform',
+  // el panel de plataforma vive en el apex: un subdominio con estos nombres
+  // serviría para phishing de su login (TASK-006)
+  'plataforma',
+  'panel',
+  'dashboard',
   'billing',
   'help',
   'support',

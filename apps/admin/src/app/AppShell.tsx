@@ -13,6 +13,9 @@ const NAV = [
   { to: '/reports', label: 'Reportes' },
 ] as const;
 
+/** Solo el dueño ve la facturación (la API responde 403 al resto). */
+const OWNER_NAV = [{ to: '/facturacion', label: 'Facturación' }] as const;
+
 const ROLE_LABEL = { owner: 'Dueño', manager: 'Encargado', staff: 'Staff' } as const;
 
 /** Marco del panel: marca, navegación y sesión. */
@@ -38,7 +41,7 @@ export function AppShell() {
           <span>{tenant?.branding.appDisplayName ?? tenant?.name ?? 'Ventea'}</span>
         </div>
         <nav className="shell__nav" aria-label="Secciones del panel">
-          {NAV.map((item) => (
+          {[...NAV, ...(current?.staff.role === 'owner' ? OWNER_NAV : [])].map((item) => (
             <NavLink key={item.to} to={item.to} className="shell__link">
               {item.label}
             </NavLink>

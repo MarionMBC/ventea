@@ -83,6 +83,11 @@ export class PlatformTenantsService {
       include: {
         ...PLATFORM_TENANT_INCLUDE,
         billingEvents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: DETAIL_EVENTS },
+        paymentAttempts: {
+          where: { status: { in: OPEN_ATTEMPT_STATUSES } },
+          orderBy: { createdAt: 'desc' },
+          select: { orderId: true, kind: true, status: true, amountCents: true, createdAt: true },
+        },
       },
     });
     if (!tenant) throw new NotFoundException('Tenant no encontrado');
@@ -105,6 +110,13 @@ export class PlatformTenantsService {
       card: tenant.subscription?.paymentToken
         ? { brand: tenant.subscription.cardBrand, last4: tenant.subscription.cardLast4 }
         : null,
+      openAttempts: tenant.paymentAttempts.map((attempt) => ({
+        orderId: attempt.orderId,
+        kind: attempt.kind,
+        status: attempt.status as (typeof OPEN_ATTEMPT_STATUSES)[number],
+        amountCents: attempt.amountCents,
+        createdAt: attempt.createdAt,
+      })),
     };
   }
 

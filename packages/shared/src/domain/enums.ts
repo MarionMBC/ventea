@@ -81,6 +81,33 @@ export const BILLING_EVENT_TYPE = [
 ] as const;
 export type BillingEventType = (typeof BILLING_EVENT_TYPE)[number];
 
+/**
+ * Eventos que ve el DUEÑO de la marca (`GET /api/billing`): lista blanca. Las alertas, los
+ * cobros sin confirmar y cualquier tipo nuevo quedan solo para la plataforma hasta que se
+ * agreguen acá a propósito.
+ */
+export const OWNER_BILLING_EVENT_TYPE = [
+  'trial_started',
+  'trial_extended',
+  'trial_expired',
+  'plan_changed',
+  'suspended',
+  'reactivated',
+  'canceled',
+  'payment_succeeded',
+  'payment_failed',
+  'payment_method_updated',
+  'plan_change_scheduled',
+  'cancel_scheduled',
+  'cancel_resumed',
+  'past_due',
+] as const satisfies readonly BillingEventType[];
+export type OwnerBillingEventType = (typeof OWNER_BILLING_EVENT_TYPE)[number];
+
+/** Tipo e intentos abiertos de un cobro (`payment_attempts`), como los ve la plataforma. */
+export const PAYMENT_ATTEMPT_KIND = ['establish', 'renewal'] as const;
+export const OPEN_PAYMENT_ATTEMPT_STATUS = ['pending', 'unknown', 'needs_review'] as const;
+
 /** Cómo se cobra la suscripción: `ms-payments` (tarjeta, CyberSource) o `manual` (lo registra la plataforma). */
 export const BILLING_MODE = ['ms-payments', 'manual'] as const;
 export type BillingMode = (typeof BILLING_MODE)[number];

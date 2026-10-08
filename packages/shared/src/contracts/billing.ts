@@ -1,6 +1,12 @@
 import { z } from 'zod';
-import { BILLING_INTERVAL, BILLING_MODE, PLAN_CODE, SUBSCRIPTION_STATUS } from '../domain/enums.js';
-import { billingEventSchema, changePlanSchema, countryCodeSchema } from './platform.js';
+import {
+  BILLING_INTERVAL,
+  BILLING_MODE,
+  OWNER_BILLING_EVENT_TYPE,
+  PLAN_CODE,
+  SUBSCRIPTION_STATUS,
+} from '../domain/enums.js';
+import { changePlanSchema, countryCodeSchema } from './platform.js';
 
 /**
  * Contratos del cobro de la suscripción (TASK-005): `/api/billing/*` (dueño de la marca) y
@@ -100,6 +106,19 @@ export const savedCardSchema = z.object({
   expYear: z.number().int().nullable(),
 });
 
+/**
+ * Evento de cobro tal como lo ve el dueño: solo tipos de la lista blanca y una descripción
+ * GENERADA por el servidor desde el tipo. Nunca el `message` interno (emails del admin,
+ * referencias, notas, orderIds).
+ */
+export const ownerBillingEventSchema = z.object({
+  type: z.enum(OWNER_BILLING_EVENT_TYPE),
+  description: z.string(),
+  amountCents: z.number().int().nullable(),
+  status: z.string().nullable(),
+  createdAt: z.coerce.date(),
+});
+
 /** `GET /api/billing`: estado del cobro para el dueño. Sin token ni ids de la pasarela. */
 export const billingOverviewSchema = z.object({
   mode: z.enum(BILLING_MODE),
@@ -124,8 +143,8 @@ export const billingOverviewSchema = z.object({
     })
     .nullable(),
   card: savedCardSchema.nullable(),
-  /** Últimos 20, el más nuevo primero. */
-  events: z.array(billingEventSchema),
+  /** Últimos 20 visibles para el dueño, el más nuevo primero. */
+  events: z.array(ownerBillingEventSchema),
 });
 
 // ─── Plataforma ──────────────────────────────────────────────────────────────
@@ -171,6 +190,7 @@ export type PaymentMethodInput = z.infer<typeof paymentMethodInputSchema>;
 export type BillingChangePlanInput = z.infer<typeof billingChangePlanSchema>;
 export type BillingAmount = z.infer<typeof billingAmountSchema>;
 export type SavedCard = z.infer<typeof savedCardSchema>;
+export type OwnerBillingEvent = z.infer<typeof ownerBillingEventSchema>;
 export type BillingOverview = z.infer<typeof billingOverviewSchema>;
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 export type PaymentResolution = (typeof PAYMENT_RESOLUTION)[number];

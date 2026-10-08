@@ -4,6 +4,8 @@ import type {
   BillingInterval,
   BillingMode,
   BillingOverview,
+  OwnerBillingEvent,
+  OwnerBillingEventType,
   PlanCode,
 } from '@ventea/shared';
 
@@ -88,10 +90,51 @@ export function toBillingEvent(event: {
   };
 }
 
+const OWNER_DESCRIPTION: Record<OwnerBillingEventType, string> = {
+  trial_started: 'Prueba gratis iniciada',
+  trial_extended: 'Prueba gratis extendida',
+  trial_expired: 'Prueba gratis vencida',
+  plan_changed: 'Cambio de plan aplicado',
+  suspended: 'Servicio suspendido',
+  reactivated: 'Servicio reactivado',
+  canceled: 'Suscripción cancelada',
+  payment_succeeded: 'Pago registrado',
+  payment_failed: 'Cobro rechazado por el banco',
+  payment_method_updated: 'Tarjeta actualizada',
+  plan_change_scheduled: 'Cambio de plan agendado',
+  cancel_scheduled: 'Cancelación agendada',
+  cancel_resumed: 'Cancelación anulada',
+  past_due: 'Pago pendiente',
+};
+
+/**
+ * Evento para el dueño: tipo de la lista blanca y una descripción generada acá. El `message`
+ * de la base es interno (email del admin, referencia del pago, notas, orderId): no sale.
+ */
+export function toOwnerBillingEvent(event: {
+  type: OwnerBillingEventType;
+  amountCents: number | null;
+  status: string | null;
+  createdAt: Date;
+}): OwnerBillingEvent {
+  // Un 400 de la pasarela (no llegó al banco) no es un rechazo del banco.
+  const description =
+    event.type === 'payment_failed' && event.status === 'failed_non_bank'
+      ? 'No se pudo procesar el cobro'
+      : OWNER_DESCRIPTION[event.type];
+  return {
+    type: event.type,
+    description,
+    amountCents: event.amountCents,
+    status: event.status,
+    createdAt: event.createdAt,
+  };
+}
+
 export function toBillingOverview(
   subscription: BillingSubscription,
   mode: BillingMode,
-  events: Parameters<typeof toBillingEvent>[0][],
+  events: Parameters<typeof toOwnerBillingEvent>[0][],
 ): BillingOverview {
   const { plan, pendingPlan } = subscription;
   const pendingInterval = subscription.pendingInterval ?? subscription.interval;
@@ -132,6 +175,6 @@ export function toBillingOverview(
           expYear: subscription.cardExpYear,
         }
       : null,
-    events: events.map(toBillingEvent),
+    events: events.map(toOwnerBillingEvent),
   };
 }
