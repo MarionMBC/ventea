@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { orderSchema, publicMenuSchema, type Order } from '@ventea/shared';
+import { orderSchema, publicMenuSchema, staffOrderSchema, type Order } from '@ventea/shared';
 import request from 'supertest';
 
 import {
@@ -223,6 +223,111 @@ describe('Pedidos de staff (AC6)', () => {
       .expect(200);
     expect(foreign.body).toEqual([]);
     await setStatus(order.id, 'preparing', otherStaffToken, other.slug).expect(404);
+  });
+
+  it('el pedido de staff trae cliente y notas, en el listado y al cambiar de estado (TASK-003)', async () => {
+    const customer = await registerCustomer(app, tenant.slug);
+    await http()
+      .patch('/api/me')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({ phone: '+504 9999-0000' })
+      .expect(200);
+    const created = await http()
+      .post('/api/orders')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({
+        locationId: tenant.locationId,
+        fulfillmentType: 'dine_in',
+        lines: [{ ...line, notes: 'sin pepinillos' }],
+        customerNotes: 'paso en 10 min',
+      })
+      .expect(201);
+    const orderId = (created.body as Order).id;
+
+    const listed = await http()
+      .get('/api/staff/orders?status=confirmed')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(200);
+    const order = staffOrderSchema
+      .array()
+      .parse(listed.body)
+      .find((o) => o.id === orderId);
+    expect(order).toMatchObject({
+      customer: { firstName: 'Ana', lastName: 'Pérez', phone: '+504 9999-0000' },
+      customerNotes: 'paso en 10 min',
+      fulfillmentType: 'dine_in',
+    });
+    expect(order?.lines[0]?.notes).toBe('sin pepinillos');
+
+    const moved = await setStatus(orderId, 'preparing').expect(200);
+    expect(staffOrderSchema.parse(moved.body)).toMatchObject({
+      status: 'preparing',
+      customer: { firstName: 'Ana', phone: '+504 9999-0000' },
+      customerNotes: 'paso en 10 min',
+    });
+
+    // La app del cliente sigue viendo el contrato de siempre: sin datos de staff.
+    const own = await http()
+      .get(`/api/orders/${orderId}`)
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .expect(200);
+    expect(own.body).not.toHaveProperty('customer');
+    expect(own.body).not.toHaveProperty('customerNotes');
+  });
+
+  it('un pedido sin cliente (cuenta borrada) llega con customer null', async () => {
+    const customer = await registerCustomer(app, tenant.slug);
+    const order = await placeOrder(customer.accessToken);
+    await prisma.order.update({ where: { id: order.id }, data: { customerId: null } });
+
+    const listed = await http()
+      .get('/api/staff/orders')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(200);
+    const found = staffOrderSchema
+      .array()
+      .parse(listed.body)
+      .find((o) => o.id === order.id);
+    expect(found?.customer).toBeNull();
+  });
+
+  it('since filtra por fecha del pedido y rechaza fechas inválidas', async () => {
+    const customer = await registerCustomer(app, tenant.slug);
+    const old = await placeOrder(customer.accessToken);
+    const recent = await placeOrder(customer.accessToken);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await prisma.order.update({ where: { id: old.id }, data: { placedAt: yesterday } });
+
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const listed = await http()
+      .get('/api/staff/orders')
+      .query({ status: 'confirmed', since })
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(200);
+    const ids = (listed.body as Order[]).map((o) => o.id);
+    expect(ids).toContain(recent.id);
+    expect(ids).not.toContain(old.id);
+
+    await http()
+      .get('/api/staff/orders?since=ayer')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(400);
+  });
+
+  it('un token de cliente no abre los pedidos de staff', async () => {
+    const customer = await registerCustomer(app, tenant.slug);
+    await http()
+      .get('/api/staff/orders')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .expect(401);
   });
 
   it('login de staff con clave incorrecta da 401', async () => {

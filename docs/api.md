@@ -34,14 +34,19 @@ No hay revocación del lado del servidor: cerrar sesión es descartar los tokens
 
 ## Pedidos
 
-| Método | Ruta                              | Quién                                                        |
-| ------ | --------------------------------- | ------------------------------------------------------------ |
-| POST   | `/api/orders`                     | cliente                                                      |
-| GET    | `/api/orders` · `/api/orders/:id` | cliente · solo los propios                                   |
-| POST   | `/api/orders/:id/cancel`          | cliente · solo en `confirmed`                                |
-| GET    | `/api/staff/orders?status=`       | staff                                                        |
-| PATCH  | `/api/staff/orders/:id/status`    | staff · `confirmed→preparing→ready→completed`, o `cancelled` |
+| Método | Ruta                               | Quién                                                        |
+| ------ | ---------------------------------- | ------------------------------------------------------------ |
+| POST   | `/api/orders`                      | cliente                                                      |
+| GET    | `/api/orders` · `/api/orders/:id`  | cliente · solo los propios                                   |
+| POST   | `/api/orders/:id/cancel`           | cliente · solo en `confirmed`                                |
+| GET    | `/api/staff/orders?status=&since=` | staff                                                        |
+| PATCH  | `/api/staff/orders/:id/status`     | staff · `confirmed→preparing→ready→completed`, o `cancelled` |
 
+- **Pedidos de staff:** `GET /api/staff/orders` y `PATCH …/status` devuelven `staffOrderSchema`:
+  el pedido más `customer: {firstName, lastName, phone} | null` (null si la cuenta se borró) y
+  `customerNotes`. La app del cliente sigue recibiendo `orderSchema`, sin esos campos.
+  `since` (ISO 8601, opcional) deja solo los pedidos hechos desde ese instante; el panel lo
+  usa con la medianoche local para el historial del día. Una fecha inválida da 400.
 - **El cliente nunca manda precios.** La API recalcula cada línea desde el catálogo:
   `(base + deltas de las opciones) × cantidad`. También valida los mínimos y máximos de
   cada grupo de modificadores y la disponibilidad.

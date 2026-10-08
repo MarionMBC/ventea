@@ -6,7 +6,14 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { CreateOrderInput, Order, OrderStatus, TenantContext } from '@ventea/shared';
+import type {
+  CreateOrderInput,
+  Order,
+  OrderStatus,
+  StaffOrder,
+  StaffOrdersQuery,
+  TenantContext,
+} from '@ventea/shared';
 
 import { computeRedemption, type Redemption } from '@/modules/rewards/points';
 import { RewardsService } from '@/modules/rewards/rewards.service';
@@ -16,7 +23,7 @@ import { PRISMA } from '@/prisma/prisma.module';
 
 import { assertSameRequest, hashOrderRequest } from './idempotency';
 import { generateOrderCode, orderCodePrefix } from './order-code';
-import { orderInclude, toOrder } from './order.mapper';
+import { orderInclude, staffOrderInclude, toOrder, toStaffOrder } from './order.mapper';
 import { canTransition } from './order-status';
 import { priceCart, type CatalogItem } from './pricing';
 
@@ -237,26 +244,40 @@ export class OrdersService {
     if (order.status !== 'confirmed') {
       throw new ConflictException('El pedido ya no se puede cancelar');
     }
-    return this.transition(tenantId, order, 'cancelled');
+    await this.transition(tenantId, order, 'cancelled');
+    return this.getOrThrow(tenantId, { id: order.id });
   }
 
-  async listForStaff(tenantId: string, status?: OrderStatus): Promise<Order[]> {
+  async listForStaff(tenantId: string, query: StaffOrdersQuery = {}): Promise<StaffOrder[]> {
+    const { status, since } = query;
     const rows = await this.prisma.order.findMany({
-      where: { tenantId, ...(status ? { status } : {}) },
+      where: {
+        tenantId,
+        ...(status ? { status } : {}),
+        // `placedAt` puede faltar en pedidos viejos: ahí cuenta `createdAt`, como en toOrder.
+        ...(since
+          ? { OR: [{ placedAt: { gte: since } }, { placedAt: null, createdAt: { gte: since } }] }
+          : {}),
+      },
       orderBy: [{ placedAt: 'desc' }, { createdAt: 'desc' }],
       take: 200,
-      include: orderInclude(tenantId),
+      include: staffOrderInclude(tenantId),
     });
-    return rows.map(toOrder);
+    return rows.map(toStaffOrder);
   }
 
-  async updateStatusByStaff(tenantId: string, orderId: string, to: OrderStatus): Promise<Order> {
+  async updateStatusByStaff(
+    tenantId: string,
+    orderId: string,
+    to: OrderStatus,
+  ): Promise<StaffOrder> {
     const order = await this.prisma.order.findFirst({
       where: { tenantId, id: orderId },
       select: ORDER_STATE_SELECT,
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
-    return this.transition(tenantId, order, to);
+    await this.transition(tenantId, order, to);
+    return this.getStaffOrderOrThrow(tenantId, order.id);
   }
 
   /**
@@ -266,8 +287,11 @@ export class OrdersService {
    *
    * El `updateMany` condicionado al estado leído evita que dos cambios simultáneos
    * pisen uno al otro: el segundo no encuentra la fila y da 409.
+   *
+   * No devuelve el pedido: cada llamador lo relee con la forma que necesita
+   * (cliente o staff).
    */
-  private async transition(tenantId: string, order: OrderState, to: OrderStatus): Promise<Order> {
+  private async transition(tenantId: string, order: OrderState, to: OrderStatus): Promise<void> {
     if (!canTransition(order.status, to)) {
       throw new ConflictException(`No se puede pasar de ${order.status} a ${to}`);
     }
@@ -297,8 +321,6 @@ export class OrdersService {
         await this.rewards.refundRedemption(tx, tenantId, order);
       }
     });
-
-    return this.getOrThrow(tenantId, { id: order.id });
   }
 
   private async getOrThrow(
@@ -311,6 +333,15 @@ export class OrdersService {
     });
     if (!row) throw new NotFoundException('Pedido no encontrado');
     return toOrder(row);
+  }
+
+  private async getStaffOrderOrThrow(tenantId: string, id: string): Promise<StaffOrder> {
+    const row = await this.prisma.order.findFirst({
+      where: { tenantId, id },
+      include: staffOrderInclude(tenantId),
+    });
+    if (!row) throw new NotFoundException('Pedido no encontrado');
+    return toStaffOrder(row);
   }
 
   private findByIdempotencyKey(
