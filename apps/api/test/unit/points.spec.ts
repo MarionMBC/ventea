@@ -58,6 +58,13 @@ describe('computeRedemption', () => {
     });
   });
 
+  it('rechaza si lo que se debita queda bajo el mínimo (pedido muy chico)', () => {
+    // subtotal 30 centavos a 10 c/punto: solo absorbe 3 puntos, mínimo 5
+    expect(() => computeRedemption({ ...base, requestedPoints: 20, subtotalCents: 30 })).toThrow(
+      /muy chico/,
+    );
+  });
+
   it('rechaza un canje mayor al saldo', () => {
     expect(() => computeRedemption({ ...base, requestedPoints: 101 })).toThrow(
       /Saldo de puntos insuficiente/,

@@ -4,13 +4,14 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { CreateOrderInput, Order, OrderStatus, TenantContext } from '@ventea/shared';
 
 import { computeRedemption, type Redemption } from '@/modules/rewards/points';
 import { RewardsService } from '@/modules/rewards/rewards.service';
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
-import { isUniqueViolation } from '@/prisma/prisma-errors';
+import { isForeignKeyViolation, isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { generateOrderCode, orderCodePrefix } from './order-code';
@@ -50,6 +51,9 @@ export class OrdersService {
    * Crea un pedido con precios recalculados desde el catálogo. El canje de puntos se
    * debita en la MISMA transacción que crea el pedido, con la fila del cliente
    * bloqueada (`FOR UPDATE`): dos pedidos simultáneos no pueden gastar el mismo saldo.
+   *
+   * Sucursal y catálogo se leen dentro de la transacción. Si aun así un `import-menu`
+   * concurrente borra un ítem antes del insert, la FK falla y se responde 409.
    */
   async create(tenant: TenantContext, customerId: string, input: CreateOrderInput): Promise<Order> {
     const { tenantId } = tenant;
@@ -58,22 +62,32 @@ export class OrdersService {
       throw new BadRequestException('delivery no disponible');
     }
 
-    const location = await this.prisma.location.findFirst({
-      where: { tenantId, id: input.locationId, isActive: true },
-      select: { id: true },
-    });
-    if (!location) throw new BadRequestException('Sucursal no disponible');
-
-    const catalog = await this.loadCatalog(
-      tenantId,
-      input.lines.map((line) => line.menuItemId),
-    );
-    const cart = priceCart(input.lines, catalog);
     const prefix = orderCodePrefix(tenant.slug);
 
     for (let attempt = 1; ; attempt++) {
       try {
         const orderId = await this.prisma.$transaction(async (tx) => {
+          // Bloquea la fila del cliente hasta el commit: serializa los pedidos (y canjes)
+          // del mismo cliente, y de paso confirma que la cuenta sigue existiendo.
+          const locked = await tx.$queryRaw<{ id: string }[]>`
+            SELECT "id" FROM "customers"
+            WHERE "id" = ${customerId} AND "tenantId" = ${tenantId}
+            FOR UPDATE`;
+          if (locked.length === 0) throw new UnauthorizedException('Sesión inválida o expirada');
+
+          const location = await tx.location.findFirst({
+            where: { tenantId, id: input.locationId, isActive: true },
+            select: { id: true },
+          });
+          if (!location) throw new BadRequestException('Sucursal no disponible');
+
+          const catalog = await this.loadCatalog(
+            tx,
+            tenantId,
+            input.lines.map((line) => line.menuItemId),
+          );
+          const cart = priceCart(input.lines, catalog);
+
           const redemption = await this.redemptionFor(
             tx,
             tenantId,
@@ -139,6 +153,9 @@ export class OrdersService {
       } catch (error) {
         // Única violación de unicidad posible: (tenantId, code) por una carrera.
         if (isUniqueViolation(error) && attempt < CREATE_ATTEMPTS) continue;
+        if (isForeignKeyViolation(error)) {
+          throw new ConflictException('El menú cambió mientras se creaba el pedido; recarga');
+        }
         throw error;
       }
     }
@@ -247,10 +264,11 @@ export class OrdersService {
 
   /** Ítems pedidos con sus grupos y opciones, solo del tenant y de categorías activas. */
   private async loadCatalog(
+    db: PrismaDb,
     tenantId: string,
     itemIds: string[],
   ): Promise<Map<string, CatalogItem>> {
-    const items = await this.prisma.menuItem.findMany({
+    const items = await db.menuItem.findMany({
       where: { tenantId, id: { in: [...new Set(itemIds)] }, category: { isActive: true } },
       include: {
         modifierGroups: {
@@ -294,8 +312,7 @@ export class OrdersService {
   ): Promise<Redemption> {
     if (requestedPoints <= 0) return { pointsUsed: 0, discountCents: 0 };
 
-    // Bloquea la fila del cliente hasta el commit: serializa los canjes del mismo cliente.
-    await tx.$queryRaw`SELECT "id" FROM "customers" WHERE "id" = ${customerId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+    // La fila del cliente ya está bloqueada (create): el saldo no cambia hasta el commit.
     const balance = await this.rewards.balance(tx, tenantId, customerId);
     const program = await this.rewards.program(tx, tenantId);
     return computeRedemption({ requestedPoints, balance, subtotalCents, program });

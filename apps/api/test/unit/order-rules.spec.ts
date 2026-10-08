@@ -1,4 +1,4 @@
-import { parseTtl } from '@/modules/auth/token.service';
+import { assertJwtSecret, parseTtl } from '@/modules/auth/token.service';
 
 import { generateOrderCode, orderCodePrefix } from '@/modules/orders/order-code';
 import { canTransition } from '@/modules/orders/order-status';
@@ -39,6 +39,25 @@ describe('código de pedido', () => {
   it('formato PREFIJO-NNNN', () => {
     expect(generateOrderCode('CHC')).toMatch(/^CHC-\d{4}$/);
     expect(generateOrderCode('CHC', 6)).toMatch(/^CHC-\d{6}$/);
+  });
+});
+
+describe('assertJwtSecret', () => {
+  const strong = 'x'.repeat(32);
+
+  it('exige secreto en cualquier entorno', () => {
+    expect(() => assertJwtSecret(undefined, 'development')).toThrow(/Falta JWT_SECRET/);
+    expect(() => assertJwtSecret('', 'production')).toThrow(/Falta JWT_SECRET/);
+  });
+
+  it('en producción rechaza el valor de .env.example y los cortos', () => {
+    expect(() => assertJwtSecret('cambiar-en-cada-entorno', 'production')).toThrow(/env.example/);
+    expect(() => assertJwtSecret('x'.repeat(31), 'production')).toThrow(/corto/);
+    expect(assertJwtSecret(strong, 'production')).toBe(strong);
+  });
+
+  it('fuera de producción acepta un secreto corto', () => {
+    expect(assertJwtSecret('dev', 'development')).toBe('dev');
   });
 });
 

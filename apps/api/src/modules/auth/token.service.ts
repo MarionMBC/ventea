@@ -21,6 +21,29 @@ const claimsSchema = z.object({
   role: z.enum(TENANT_ROLE).optional(),
 });
 
+/** Valor de `.env.example`: público, nunca puede firmar tokens en producción. */
+const EXAMPLE_JWT_SECRET = 'cambiar-en-cada-entorno';
+const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
+/**
+ * Valida `JWT_SECRET` al arrancar. Con HS256, quien conoce el secreto forja tokens de
+ * cualquier tenant: en producción se exige uno largo y distinto del de ejemplo.
+ */
+export function assertJwtSecret(secret: string | undefined, nodeEnv: string | undefined): string {
+  if (!secret) throw new Error('Falta JWT_SECRET');
+  if (nodeEnv === 'production') {
+    if (secret === EXAMPLE_JWT_SECRET) {
+      throw new Error('JWT_SECRET es el valor de .env.example: generar uno propio');
+    }
+    if (secret.length < MIN_PRODUCTION_SECRET_LENGTH) {
+      throw new Error(
+        `JWT_SECRET demasiado corto para producción (mínimo ${MIN_PRODUCTION_SECRET_LENGTH} caracteres)`,
+      );
+    }
+  }
+  return secret;
+}
+
 const TTL_UNITS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
 
 /**

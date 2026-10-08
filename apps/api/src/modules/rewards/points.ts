@@ -42,6 +42,9 @@ export interface Redemption {
  * `discountCents = min(puntos × redemptionValueCents, subtotal)`. Si el cliente
  * pide más puntos de los que cubren el subtotal, solo se debitan los necesarios:
  * el excedente queda en su saldo en vez de quemarse sin dar descuento.
+ *
+ * El mínimo de canje se exige sobre lo pedido Y sobre lo que efectivamente se
+ * debita: un subtotal chico que solo absorbe menos del mínimo se rechaza (400).
  */
 export function computeRedemption(input: RedemptionInput): Redemption {
   const { requestedPoints, balance, subtotalCents, program } = input;
@@ -59,6 +62,11 @@ export function computeRedemption(input: RedemptionInput): Redemption {
 
   const pointsNeeded = Math.ceil(subtotalCents / program.redemptionValueCents);
   const pointsUsed = Math.min(requestedPoints, pointsNeeded);
+  if (pointsUsed > 0 && pointsUsed < program.minPointsToRedeem) {
+    throw new BadRequestException(
+      `El pedido es muy chico para canjear: el canje mínimo es de ${program.minPointsToRedeem} puntos`,
+    );
+  }
   const discountCents = Math.min(pointsUsed * program.redemptionValueCents, subtotalCents);
   return { pointsUsed, discountCents };
 }

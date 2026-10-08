@@ -6,7 +6,7 @@ import { RewardsModule } from '@/modules/rewards/rewards.module';
 
 import { AuthController, StaffAuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { TokenService } from './token.service';
+import { assertJwtSecret, TokenService } from './token.service';
 
 /**
  * Global porque `JwtAuthGuard` (que aplican `@CustomerAuth()`/`@StaffAuth()` en
@@ -19,8 +19,11 @@ import { TokenService } from './token.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const secret = config.get<string>('JWT_SECRET');
-        if (!secret) throw new Error('Falta JWT_SECRET');
+        // Falla el arranque si el secreto no sirve para el entorno (ver assertJwtSecret).
+        const secret = assertJwtSecret(
+          config.get<string>('JWT_SECRET'),
+          config.get<string>('NODE_ENV'),
+        );
         return {
           secret,
           signOptions: { algorithm: 'HS256' },

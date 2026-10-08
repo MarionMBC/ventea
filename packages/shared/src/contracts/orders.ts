@@ -17,7 +17,10 @@ export const createOrderSchema = z.object({
   locationId: z.string().uuid(),
   fulfillmentType: z.enum(FULFILLMENT_TYPE),
   lines: z.array(cartLineSchema).min(1),
-  scheduledFor: z.coerce.date().optional(),
+  scheduledFor: z.coerce
+    .date()
+    .refine((date) => date.getTime() > Date.now(), 'scheduledFor tiene que ser una fecha futura')
+    .optional(),
   redeemRewardPoints: z.number().int().nonnegative().default(0),
   customerNotes: z.string().max(500).optional(),
 });

@@ -79,7 +79,7 @@ describe('Pedidos de staff (AC6)', () => {
       signupBonusPoints: 50,
     });
     other = await seedTenant(prisma, 'staff-otro');
-    await importCarolinaMenu(prisma, tenant.slug);
+    await importCarolinaMenu(prisma, tenant.slug, { keepRewardProgram: true });
     app = await createApp();
 
     const menuResponse = await http()

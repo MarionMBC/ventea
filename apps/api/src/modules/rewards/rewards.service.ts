@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { RewardBalance, RewardLedgerEntry } from '@ventea/shared';
 
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
@@ -16,6 +16,8 @@ export const REFUND_NOTE_PREFIX = 'refund:';
  */
 @Injectable()
 export class RewardsService {
+  private readonly logger = new Logger(RewardsService.name);
+
   constructor(@Inject(PRISMA) private readonly prisma: PrismaClientExtended) {}
 
   async program(db: PrismaDb, tenantId: string): Promise<RewardProgramRules | null> {
@@ -46,9 +48,17 @@ export class RewardsService {
         _sum: { points: true },
       }),
     ]);
+    if (balance < 0) {
+      // No debería pasar: todo débito valida saldo bajo lock. Si pasa, es un bug del
+      // libro; se registra para investigarlo y a la app se le muestra 0 (el contrato
+      // exige saldo no negativo y un negativo no se puede canjear de todos modos).
+      this.logger.error(
+        `Saldo de puntos negativo (${balance}) — tenant ${tenantId}, cliente ${customerId}`,
+      );
+    }
     return {
       customerId,
-      balance: Math.max(balance, 0),
+      balance: balance < 0 ? 0 : balance,
       lifetimeEarned: earned._sum.points ?? 0,
     };
   }

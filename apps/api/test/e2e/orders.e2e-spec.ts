@@ -80,8 +80,8 @@ describe('Pedidos de cliente (AC4, AC5, AC7)', () => {
       redemptionValueCents: 10,
     });
     other = await seedTenant(prisma, 'orders-otro');
-    await importCarolinaMenu(prisma, tenant.slug);
-    await importCarolinaMenu(prisma, other.slug);
+    await importCarolinaMenu(prisma, tenant.slug, { keepRewardProgram: true });
+    await importCarolinaMenu(prisma, other.slug, { keepRewardProgram: true });
     app = await createApp();
     menu = await fetchMenu(tenant.slug);
     otherMenu = await fetchMenu(other.slug);
@@ -223,6 +223,21 @@ describe('Pedidos de cliente (AC4, AC5, AC7)', () => {
         locationId: other.locationId,
         lines: [sandwichLine()],
       }).expect(400);
+    });
+
+    it('rechaza scheduledFor en el pasado', async () => {
+      const { accessToken } = await registerCustomer(app, tenant.slug);
+      const response = await placeOrder(accessToken, {
+        lines: [sandwichLine()],
+        scheduledFor: new Date(Date.now() - 60_000).toISOString(),
+      }).expect(400);
+      expect(response.body.issues).toEqual([expect.objectContaining({ path: 'scheduledFor' })]);
+    });
+
+    it('token válido de un cliente que ya no existe da 401, no 500', async () => {
+      const { accessToken, customer } = await registerCustomer(app, tenant.slug);
+      await prisma.customer.delete({ where: { id: customer.id } });
+      await placeOrder(accessToken, { lines: [sandwichLine()] }).expect(401);
     });
 
     it('exige sesión', async () => {
