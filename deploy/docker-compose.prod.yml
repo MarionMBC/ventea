@@ -31,8 +31,12 @@ services:
   migrate:
     image: ${IMAGE_API}
     restart: 'no'
+    # Prisma escribe en node_modules/@prisma/engines al migrar; la imagen corre como
+    # `node` y node_modules es de root. Solo este servicio de un disparo va como root.
+    user: '0'
     working_dir: /app/apps/api
-    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    # node_modules vive en la raiz del monorepo (/app), no en apps/api.
+    command: ['../../node_modules/.bin/prisma', 'migrate', 'deploy']
     environment:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:
