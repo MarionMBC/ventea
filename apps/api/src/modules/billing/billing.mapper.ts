@@ -119,7 +119,7 @@ export function toOwnerBillingEvent(event: {
 }): OwnerBillingEvent {
   // Un 400 de la pasarela (no llegó al banco) no es un rechazo del banco.
   const description =
-    event.type === 'payment_failed' && event.status !== 'declined'
+    event.type === 'payment_failed' && event.status === 'failed_non_bank'
       ? 'No se pudo procesar el cobro'
       : OWNER_DESCRIPTION[event.type];
   return {
