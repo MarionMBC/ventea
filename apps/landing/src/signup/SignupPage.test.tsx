@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { callsTo, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { TERMS_VERSION } from '@/config';
+import { beaconEvents, callsTo, json, mockFetch, PLANS, text } from '@/test/fixtures';
 
-import { readInitialChoice, SignupPage } from './SignupPage';
+import { READY_MESSAGE, readInitialChoice, SignupPage } from './SignupPage';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -21,9 +22,17 @@ const SIGNUP_OK = {
 
 type SignupReply = () => Response;
 
-/** API falsa: planes, slug libre salvo `taken`, y el registro responde `reply`. */
-function api(reply: SignupReply = () => json(SIGNUP_OK, 201), taken: string[] = []) {
+/**
+ * API falsa: planes, slug libre salvo `taken`, el registro responde `reply` y la dirección
+ * está lista según `ready()` (por defecto, sí).
+ */
+function api(
+  reply: SignupReply = () => json(SIGNUP_OK, 201),
+  taken: string[] = [],
+  ready: () => boolean = () => true,
+) {
   return mockFetch((url) => {
+    if (url.startsWith('/api/platform/tenant-ready')) return json({ ready: ready() });
     if (url === '/api/platform/plans') return json(PLANS);
     if (url.startsWith('/api/platform/slug-available')) {
       const slug = new URL(url, 'http://x').searchParams.get('slug') ?? '';
@@ -52,6 +61,7 @@ function fillOwner() {
   fireEvent.change(screen.getByLabelText('Contraseña'), {
     target: { value: 'una-clave-segura-1' },
   });
+  fireEvent.click(screen.getByRole('checkbox', { name: /Acepto los términos/ }));
 }
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Crear mi restaurante' }));
@@ -120,9 +130,12 @@ describe('Registro (AC2)', () => {
     expect(text(document.querySelector('.signup__summary'))).toContain('Plan Pro anual: $590 USD');
     submit();
 
-    const link = await screen.findByRole('link', { name: 'Entrar a mi panel' });
-    expect(link.getAttribute('href')).toBe('https://pollos-dona-ana.ventea.tech/admin');
-    expect(text(screen.getByRole('status'))).toContain('Tu dirección queda activa en 1-2 minutos');
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Entrar a mi panel' }).getAttribute('href')).toBe(
+        'https://pollos-dona-ana.ventea.tech/admin',
+      ),
+    );
+    expect(text(screen.getByRole('status'))).toBe(READY_MESSAGE.ready);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain(
       'Pollos Doña Ana ya está en Ventea',
     );
@@ -138,7 +151,11 @@ describe('Registro (AC2)', () => {
       planCode: 'pro',
       interval: 'year',
       website: '',
+      acceptedTermsVersion: TERMS_VERSION,
     });
+    // Embudo: un evento por paso y ningún dato del formulario. El registro completo lo cuenta
+    // la API al crear la marca, no el navegador.
+    expect(await beaconEvents()).toEqual(['signup_start', 'signup_step_2', 'signup_step_3']);
   });
 
   it('valida los datos del dueño antes de enviar (contraseña de 10+)', async () => {

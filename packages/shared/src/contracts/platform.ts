@@ -43,6 +43,15 @@ export const countryCodeSchema = z
   .toUpperCase()
   .regex(/^[A-Z]{2}$/, 'country: código ISO de 2 letras');
 
+/**
+ * Versiones publicadas de los términos del servicio y la política de privacidad (fecha de la
+ * versión). La última es la vigente; una versión nueva se AGREGA al final, nunca se reemplaza:
+ * un formulario abierto con la anterior sigue pudiendo registrarse.
+ */
+export const TERMS_VERSIONS = ['2026-10-08'] as const;
+export const TERMS_VERSION: (typeof TERMS_VERSIONS)[number] =
+  TERMS_VERSIONS[TERMS_VERSIONS.length - 1]!;
+
 export const signupSchema = z.object({
   restaurantName: z.string().trim().min(2).max(80),
   slug: tenantSlugSchema,
@@ -61,6 +70,8 @@ export const signupSchema = z.object({
     .optional(),
   /** Honeypot: campo oculto en el formulario. Una persona lo deja vacío; un bot no. */
   website: z.string().max(200).optional(),
+  /** Versión de términos y privacidad que el dueño aceptó (checkbox del registro). */
+  acceptedTermsVersion: z.enum(TERMS_VERSIONS),
 });
 
 export const signupResponseSchema = z.object({
@@ -80,6 +91,57 @@ export const SLUG_UNAVAILABLE_REASON = ['invalid', 'reserved', 'taken'] as const
 export const slugAvailabilitySchema = z.object({
   available: z.boolean(),
   reason: z.enum(SLUG_UNAVAILABLE_REASON).optional(),
+});
+
+/** `GET /api/platform/tenant-ready?slug=`: ¿la dirección de la marca ya responde con HTTPS válido? */
+export const tenantReadyQuerySchema = z.object({ slug: tenantSlugSchema });
+export const tenantReadySchema = z.object({ ready: z.boolean() });
+
+// ─── Embudo de registro (medición propia, sin cookies ni PII) ────────────────
+
+/**
+ * Eventos que cuenta la landing. Solo el tipo: el servidor guarda contadores por día y tipo,
+ * nunca IP, navegador ni identificadores.
+ */
+export const FUNNEL_EVENT = [
+  'visit',
+  'cta_click',
+  'signup_start',
+  'signup_step_2',
+  'signup_step_3',
+  'signup_complete',
+] as const;
+
+/**
+ * Eventos que puede mandar la landing (lista blanca del endpoint público). `signup_complete`
+ * NO está: lo cuenta la API al crear la marca (`createdVia: 'signup'`), así no se infla desde
+ * afuera y no depende de que el navegador alcance a mandarlo.
+ */
+export const PUBLIC_FUNNEL_EVENT = [
+  'visit',
+  'cta_click',
+  'signup_start',
+  'signup_step_2',
+  'signup_step_3',
+] as const satisfies readonly (typeof FUNNEL_EVENT)[number][];
+
+/** Body de `POST /api/platform/analytics/event`. Estricto: un campo extra es un 400. */
+export const funnelEventInputSchema = z.strictObject({ event: z.enum(PUBLIC_FUNNEL_EVENT) });
+
+export const funnelReportQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(30),
+});
+
+const funnelCountsSchema = z.record(z.enum(FUNNEL_EVENT), z.number().int().nonnegative());
+
+/** `GET /api/platform/analytics/funnel?days=`: un día por fila (más nuevo primero), con ceros. */
+export const funnelReportSchema = z.object({
+  /** Zona horaria con la que se corta el día. */
+  timezone: z.string(),
+  days: z.array(
+    z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), counts: funnelCountsSchema }),
+  ),
+  totals: funnelCountsSchema,
 });
 
 // ─── Administración de la plataforma (JWT `kind: "platform"`) ────────────────
@@ -177,6 +239,13 @@ export type Plan = z.infer<typeof planSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type SignupResponse = z.infer<typeof signupResponseSchema>;
 export type SlugAvailability = z.infer<typeof slugAvailabilitySchema>;
+export type TermsVersion = (typeof TERMS_VERSIONS)[number];
+export type TenantReady = z.infer<typeof tenantReadySchema>;
+export type FunnelEvent = (typeof FUNNEL_EVENT)[number];
+export type PublicFunnelEvent = (typeof PUBLIC_FUNNEL_EVENT)[number];
+export type FunnelEventInput = z.infer<typeof funnelEventInputSchema>;
+export type FunnelReportQuery = z.infer<typeof funnelReportQuerySchema>;
+export type FunnelReport = z.infer<typeof funnelReportSchema>;
 export type PlatformAdmin = z.infer<typeof platformAdminSchema>;
 export type PlatformAuthResponse = z.infer<typeof platformAuthResponseSchema>;
 export type PlatformSubscription = z.infer<typeof platformSubscriptionSchema>;

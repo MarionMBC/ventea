@@ -22,10 +22,14 @@ import {
 import { StatusBadge } from '@/features/platform/StatusBadge';
 import { panelBillingOverviewSchema, type PanelBillingOverview } from '@/lib/billing-schemas';
 
-/** Contacto para coordinar el pago mientras no hay alta de tarjeta en el panel. */
-export const BILLING_CONTACT_EMAIL = 'hola@ventea.tech';
+import {
+  BILLING_CONTACT_EMAIL,
+  BILLING_QUERY_KEY,
+  StatusBanner,
+  useBillingOverview,
+} from './SubscriptionBanner';
 
-export const BILLING_QUERY_KEY = ['billing'] as const;
+export { BILLING_CONTACT_EMAIL, BILLING_QUERY_KEY };
 
 const plansSchema = {
   parse: (data: unknown): Plan[] =>
@@ -50,15 +54,7 @@ export function BillingPage() {
     document.title = 'Facturación · Ventea';
   }, []);
 
-  const billing = useQuery({
-    queryKey: BILLING_QUERY_KEY,
-    enabled: session?.staff.role === 'owner',
-    queryFn: ({ signal }) =>
-      client.request<PanelBillingOverview>('/billing', {
-        schema: panelBillingOverviewSchema,
-        signal,
-      }),
-  });
+  const billing = useBillingOverview();
 
   const action = useMutation({
     mutationFn: (input: { kind: Action; body?: unknown }) =>
@@ -262,34 +258,6 @@ export function BillingPage() {
       )}
     </section>
   );
-}
-
-function StatusBanner({ data }: { data: PanelBillingOverview }) {
-  const contact = <a href={`mailto:${BILLING_CONTACT_EMAIL}`}>{BILLING_CONTACT_EMAIL}</a>;
-  if (data.status === 'suspended') {
-    return (
-      <p className="pf-banner pf-banner--danger" role="alert">
-        Tu servicio está suspendido: tus clientes no pueden ver el menú ni hacer pedidos. Para
-        reactivarlo escríbenos a {contact}.
-      </p>
-    );
-  }
-  if (data.status === 'past_due') {
-    return (
-      <p className="pf-banner pf-banner--warn" role="alert">
-        Tienes un pago pendiente. Regularízalo para que tu servicio no se suspenda: escríbenos a{' '}
-        {contact}.
-      </p>
-    );
-  }
-  if (data.status === 'canceled') {
-    return (
-      <p className="pf-banner pf-banner--danger" role="alert">
-        Tu suscripción está cancelada. Para volver, escríbenos a {contact}.
-      </p>
-    );
-  }
-  return null;
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {

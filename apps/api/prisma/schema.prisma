@@ -46,6 +46,10 @@ model Tenant {
   /// Región donde vive la marca. La asigna la plataforma al registrarla (RegionService).
   region     String           @default("hn-1")
   createdVia TenantCreatedVia @default(script)
+  /// Versión de términos y privacidad que aceptó el dueño al registrarse (TASK-007,
+  /// `TERMS_VERSIONS` de @ventea/shared) y cuándo. Null en marcas creadas por script.
+  termsVersion    String?
+  termsAcceptedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -71,6 +75,19 @@ model Tenant {
 enum TenantCreatedVia {
   signup
   script
+}
+
+/// Embudo de registro de la landing (TASK-007): un contador por día y tipo de evento.
+/// GLOBAL (sin tenantId) y sin datos personales: ni IP, ni navegador, ni identificadores.
+model FunnelDailyCount {
+  /// Día en America/Tegucigalpa.
+  day   DateTime @db.Date
+  /// `visit` | `cta_click` | `signup_start` | … (FUNNEL_EVENT en @ventea/shared).
+  event String
+  count Int      @default(0)
+
+  @@id([day, event])
+  @@map("funnel_daily_counts")
 }
 
 // ─── Suscripción (SaaS, ADR 0007) ────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -23,6 +24,7 @@ import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
+import { AnalyticsService } from './analytics.service';
 import { toPlan } from './platform.mapper';
 import { RegionService } from './region.service';
 
@@ -47,11 +49,13 @@ const SIGNUP_LOCK_KEY = 'ventea:signup-quota';
 @Injectable()
 export class SignupService {
   private readonly baseDomain: string;
+  private readonly logger = new Logger(SignupService.name);
 
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly regions: RegionService,
     private readonly config: ConfigService,
+    private readonly analytics: AnalyticsService,
   ) {
     this.baseDomain = config.get<string>('TENANT_BASE_DOMAIN') || 'ventea.tech';
   }
@@ -78,7 +82,8 @@ export class SignupService {
   /**
    * Crea en una transacción: tenant, branding, programa de puntos por defecto, la
    * sucursal «Sucursal principal», el dueño con la contraseña elegida, la suscripción en
-   * prueba y el asiento `trial_started`.
+   * prueba y el asiento `trial_started`. Deja registrada la versión de términos que aceptó el
+   * dueño (`acceptedTermsVersion`, exigida por el schema) y la fecha.
    *
    * `headerCountry` es el país que informa el proxy (`CF-IPCountry` / `X-Country`); el del
    * body, si viene, manda.
@@ -121,6 +126,8 @@ export class SignupService {
             timezone: region.timezone,
             region: region.code,
             createdVia: 'signup',
+            termsVersion: input.acceptedTermsVersion,
+            termsAcceptedAt: now,
             branding: { create: { appDisplayName: input.restaurantName } },
             rewardProgram: { create: { ...DEFAULT_REWARD_PROGRAM } },
             staff: {
@@ -167,6 +174,12 @@ export class SignupService {
       if (isUniqueViolation(error)) throw new ConflictException(SLUG_TAKEN);
       throw error;
     }
+
+    // Embudo (TASK-007): el registro completo lo cuenta la API, no el navegador. Después del
+    // commit y sin esperar (fire-and-forget): ni una falla ni una base lenta demoran el 201.
+    void this.analytics.record('signup_complete').catch((error: unknown) => {
+      this.logger.warn(`No se pudo contar signup_complete: ${(error as Error).message}`);
+    });
 
     const url = `https://${input.slug}.${this.baseDomain}`;
     return {

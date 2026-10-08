@@ -59,3 +59,14 @@ export function callsTo(fetchMock: ReturnType<typeof mockFetch>, path: string) {
 export function text(element: Node | null | undefined): string {
   return (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
+
+/** Eventos del embudo enviados con sendBeacon en este test (ver setup.ts). */
+export async function beaconEvents(): Promise<string[]> {
+  const beacon = window.navigator.sendBeacon as unknown as ReturnType<typeof vi.fn>;
+  return Promise.all(
+    beacon.mock.calls.map(async (call) => {
+      const json = JSON.parse(await (call[1] as Blob).text()) as { event: string };
+      return json.event;
+    }),
+  );
+}

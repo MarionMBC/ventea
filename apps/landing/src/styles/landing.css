@@ -883,3 +883,188 @@
     align-items: start;
   }
 }
+
+/* ── Demo: capturas reales (TASK-007) ────────────────────────────────── */
+.demo {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.demo .eyebrow {
+  color: var(--sun);
+}
+
+.demo .section__lead {
+  color: var(--on-ink-muted);
+}
+
+.demo__grid {
+  display: grid;
+  gap: 2rem;
+  align-items: start;
+}
+
+.demo__shot {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.demo__shot figcaption {
+  color: var(--on-ink-muted);
+  font-size: var(--fs-sm);
+}
+
+.demo__frame {
+  overflow: hidden;
+  border: 1px solid rgb(251 248 243 / 0.16);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  box-shadow: var(--shadow-lg);
+}
+
+.demo__frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.demo__shot--phone {
+  justify-items: center;
+  text-align: center;
+}
+
+.demo__shot--phone figcaption {
+  max-width: 300px;
+}
+
+.demo__shot--phone .demo__frame {
+  max-width: 300px;
+  border-width: 6px;
+  border-color: #3a332c;
+  border-radius: 28px;
+}
+
+.demo__live {
+  display: grid;
+  gap: 1rem;
+  justify-items: start;
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  background: var(--ink-2);
+}
+
+.demo__live p {
+  color: var(--on-ink-muted);
+}
+
+@media (min-width: 768px) {
+  .demo__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .demo__shot--wide {
+    grid-column: 1 / -1;
+  }
+
+  .demo__live {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}
+
+/* ── Pedir una demo ──────────────────────────────────────────────────── */
+.demo-request {
+  display: grid;
+  gap: 2rem;
+}
+
+.demo-request__head {
+  margin-bottom: 0;
+}
+
+.demo-request__form {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.demo-request__form textarea {
+  resize: vertical;
+}
+
+.demo-request__actions {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.notice--ok {
+  background: var(--leaf-soft);
+  color: var(--leaf);
+}
+
+@media (min-width: 640px) {
+  .demo-request__form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .demo-request__wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1000px) {
+  .demo-request {
+    grid-template-columns: 2fr 3fr;
+    align-items: start;
+  }
+}
+
+/* ── Pie: links legales ──────────────────────────────────────────────── */
+.footer__links {
+  display: grid;
+  gap: 0.5rem;
+  font-size: var(--fs-sm);
+}
+
+.footer__links a {
+  display: inline-block;
+  padding: 0.25rem 0;
+}
+
+@media (min-width: 768px) {
+  .footer__inner {
+    grid-template-columns: 1.4fr 1.4fr 1fr;
+  }
+
+  .footer__legal {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── WhatsApp flotante ───────────────────────────────────────────────── */
+.wa-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #12643e;
+  color: #ffffff;
+  box-shadow: var(--shadow-lg);
+}
+
+.wa-fab svg {
+  width: 30px;
+  height: 30px;
+  fill: currentColor;
+}

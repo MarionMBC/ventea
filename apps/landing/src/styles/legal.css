@@ -1,0 +1,89 @@
+/* Páginas legales (TASK-007): texto largo, una columna cómoda de leer. */
+.legal {
+  padding: 2rem 0 4rem;
+}
+
+.legal__head {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.legal__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 800;
+}
+
+.legal__updated {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.legal__intro {
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+}
+
+.legal__toc {
+  margin-bottom: 2.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.legal__toc-title {
+  margin-bottom: 0.75rem;
+  font-size: var(--fs-md);
+}
+
+.legal__toc ol {
+  display: grid;
+  gap: 0.25rem;
+  padding-left: 1.5rem;
+  list-style: decimal;
+  font-size: var(--fs-sm);
+}
+
+.legal__toc a {
+  display: inline-block;
+  padding: 0.25rem 0;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.legal__section {
+  display: grid;
+  gap: 0.875rem;
+  padding: 1.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.legal__section h2 {
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+}
+
+.legal__section ul {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.legal a {
+  color: var(--brand);
+}
+
+.legal__other {
+  margin-top: 2rem;
+  color: var(--text-muted);
+}
+
+.legal__loading {
+  padding: 4rem var(--gutter);
+  color: var(--text-muted);
+}

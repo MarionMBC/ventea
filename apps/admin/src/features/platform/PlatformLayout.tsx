@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { usePlatform, usePlatformSession } from './services';
 
@@ -39,6 +39,12 @@ export function PlatformLayout() {
         <Link to="/plataforma" className="pf__brand">
           Ventea <span>Plataforma</span>
         </Link>
+        <nav className="pf__nav" aria-label="Plataforma">
+          <NavLink to="/plataforma" end>
+            Marcas
+          </NavLink>
+          <NavLink to="/plataforma/embudo">Embudo de registro</NavLink>
+        </nav>
         <div className="pf__user">
           <span className="pf__who">{current.admin.name}</span>
           <button

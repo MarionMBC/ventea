@@ -8,6 +8,7 @@ Este documento explica **por qué** el esquema es así, no repite los campos.
 ```
 PlatformAdmin                        (fuera de todo tenant — nosotros)
 Plan                                 (catálogo global: basic, pro, chain)
+FunnelDailyCount                     (global: embudo de la landing, día × evento → contador)
 
 Tenant ──┬── Subscription ── Plan    1:1  plan, intervalo, estado, período, prueba
          ├── BillingEvent[]               auditoría append-only de la suscripción
@@ -29,8 +30,10 @@ Todo lo que cuelga de `Tenant` lleva `tenantId`. Ver [multi-tenancy.md](multi-te
 
 `Subscription` (1:1 con `Tenant`) guarda plan, intervalo (`month` | `year`), estado
 (`trialing` | `active` | `past_due` | `suspended` | `canceled`), fin de la prueba y período.
-Una marca `suspended`, `canceled`, `past_due` o con la prueba vencida responde `402` en su
-API pública, pero existe: su staff entra al panel. `Tenant.isActive=false` sigue siendo
+Una marca `suspended`, `canceled` o con la prueba vencida responde `402` en su API pública,
+pero existe: su staff entra al panel. `past_due` de un período pagado sigue atendiendo durante
+la gracia (7 días desde `currentPeriodEnd`, TASK-007); una prueba vencida sin pago no tiene
+gracia (`currentPeriodEnd <= trialEndsAt`). `Tenant.isActive=false` sigue siendo
 "no existe" (404). Los campos de pago (`paymentToken`, `networkTransactionId`…) son para el
 cobro recurrente de TASK-005 y hoy quedan en null.
 
@@ -39,6 +42,20 @@ un asiento. Su `orderId` es único y será la clave idempotente hacia `ms-paymen
 
 Los planes viven en la tabla `plans` y los siembra una migración SQL idempotente; cambiar un
 precio es otra migración, así queda en el historial del repo.
+
+### Términos aceptados en `Tenant`, no en `BillingEvent` (TASK-007)
+
+`Tenant.termsVersion` y `Tenant.termsAcceptedAt` (nullable: las marcas creadas por script no
+pasaron por el checkbox) guardan la versión de términos y privacidad que aceptó el dueño al
+registrarse. No va como `BillingEvent`: no es un hecho de cobro, habría exigido sumar un valor
+al enum y el estado vigente se lee sin recorrer eventos. Si mañana hay que pedir de nuevo la
+aceptación (términos nuevos), se pisa con la versión nueva; un historial de aceptaciones sería
+otra tabla.
+
+### Embudo sin datos personales (TASK-007)
+
+`funnel_daily_counts` solo tiene `(day, event, count)`: ni IP, ni navegador, ni ids. Se suma
+con `INSERT … ON CONFLICT DO UPDATE` (atómico). Tabla global, exenta del guard de tenant.
 
 ### El dinero es `Int` en centavos
 

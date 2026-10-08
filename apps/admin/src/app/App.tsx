@@ -16,6 +16,7 @@ import {
   PlatformProvider,
   type PlatformServices,
 } from '@/features/platform/services';
+import { Funnel } from '@/features/platform/Funnel';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
 import { ApiError } from '@/lib/api';
@@ -44,7 +45,7 @@ export function createQueryClient(): QueryClient {
  * un usuario de staff pertenece a un solo tenant.
  *
  * `/admin/plataforma/*` es el panel de la plataforma (dueños del SaaS): otro login, otra
- * sesión y otro cliente HTTP; no usa nada del tenant. Se sirve en `ventea.tech/admin/plataforma`.
+ * sesión y otro cliente HTTP; no usa nada del tenant. Se sirve en `app.ventea.tech/admin/plataforma`.
  */
 export function App({
   services,
@@ -57,7 +58,7 @@ export function App({
   platform?: PlatformServices;
   queryClient?: QueryClient;
   basename?: string;
-  /** Host actual; el panel de plataforma solo se monta en el apex (ver `isPlatformHost`). */
+  /** Host actual; el panel de plataforma solo se monta en `app.` (ver `isPlatformHost`). */
   hostname?: string;
 }) {
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
@@ -75,6 +76,7 @@ export function App({
                     <Route path="/plataforma" element={<PlatformLayout />}>
                       <Route index element={<TenantList />} />
                       <Route path="marcas/:slug" element={<TenantDetail />} />
+                      <Route path="embudo" element={<Funnel />} />
                       <Route path="*" element={<Navigate to="/plataforma" replace />} />
                     </Route>
                   </>

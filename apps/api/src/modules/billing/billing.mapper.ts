@@ -10,6 +10,7 @@ import type {
 } from '@ventea/shared';
 
 import { isPlanCode } from '@/modules/platform/platform.mapper';
+import { graceEndsAt } from '@/modules/subscriptions/subscription-state';
 
 import { planPriceCents } from './billing-rules';
 
@@ -157,6 +158,7 @@ export function toBillingOverview(
     currentPeriodEnd: subscription.currentPeriodEnd,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     retryAt: subscription.retryAt,
+    graceEndsAt: graceEndsAt(subscription, new Date()),
     pendingPlan: hasPending
       ? {
           planCode: planCode(pending.code),

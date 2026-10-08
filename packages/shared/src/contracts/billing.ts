@@ -134,6 +134,11 @@ export const billingOverviewSchema = z.object({
   cancelAtPeriodEnd: z.boolean(),
   /** Próximo reintento de cobro tras un rechazo. */
   retryAt: z.coerce.date().nullable(),
+  /**
+   * `past_due` en gracia (TASK-007): hasta esta fecha la marca sigue atendiendo; después se
+   * suspende. `null` en cualquier otro estado (y en una prueba vencida sin pago: no hay gracia).
+   */
+  graceEndsAt: z.coerce.date().nullable(),
   /** Cambio de plan agendado para el próximo período. */
   pendingPlan: z
     .object({

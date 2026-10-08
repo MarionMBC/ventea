@@ -7,10 +7,10 @@ import { AppModule } from '@/app.module';
 import { productionOrigins } from '@/cors-origins';
 
 /**
- * CORS de producción (TASK-006): la landing vive en el apex `https://ventea.tech` y
- * puede llamar a `api.ventea.tech`. Se arma la app como main.ts en producción (la
- * config de e2e trae TENANT_BASE_DOMAIN=ventea.tech) y se mira el header que devuelve
- * el middleware `cors` real.
+ * CORS de producción (TASK-006, TASK-007): la landing vive en `https://app.ventea.tech`
+ * (antes en el apex, que ahora redirige) y puede llamar a `api.ventea.tech`. Se arma la app
+ * como main.ts en producción (la config de e2e trae TENANT_BASE_DOMAIN=ventea.tech) y se
+ * mira el header que devuelve el middleware `cors` real.
  */
 describe('CORS de producción (TASK-006 AC4)', () => {
   let app: INestApplication;
@@ -34,19 +34,21 @@ describe('CORS de producción (TASK-006 AC4)', () => {
       .set('Access-Control-Request-Method', 'POST')
       .set('Access-Control-Request-Headers', 'content-type');
 
-  it.each(['https://ventea.tech', 'https://pollos-juan.ventea.tech', 'https://api.ventea.tech'])(
-    'permite %s (preflight y GET)',
-    async (origin) => {
-      const pre = await preflight(origin).expect(204);
-      expect(pre.headers['access-control-allow-origin']).toBe(origin);
+  it.each([
+    'https://app.ventea.tech', // TASK-007: landing y panel de plataforma
+    'https://ventea.tech',
+    'https://pollos-juan.ventea.tech',
+    'https://api.ventea.tech',
+  ])('permite %s (preflight y GET)', async (origin) => {
+    const pre = await preflight(origin).expect(204);
+    expect(pre.headers['access-control-allow-origin']).toBe(origin);
 
-      const get = await request(app.getHttpServer())
-        .get('/api/platform/plans')
-        .set('Origin', origin)
-        .expect(200);
-      expect(get.headers['access-control-allow-origin']).toBe(origin);
-    },
-  );
+    const get = await request(app.getHttpServer())
+      .get('/api/platform/plans')
+      .set('Origin', origin)
+      .expect(200);
+    expect(get.headers['access-control-allow-origin']).toBe(origin);
+  });
 
   it.each([
     'https://evil.com',

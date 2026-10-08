@@ -1,5 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+
+import { PastDueBanner, useBillingOverview } from '@/features/billing/SubscriptionBanner';
 
 import { useServices, useSession } from './services';
 import { brandStyle, useTenant } from './tenant';
@@ -24,6 +26,11 @@ export function AppShell() {
   const current = useSession();
   const queryClient = useQueryClient();
   const { data: tenant } = useTenant();
+  // Pago pendiente (TASK-007): el dueño lo ve en todo el panel, no solo en Facturación (que
+  // tiene su propio aviso). La API de billing es solo del dueño; el resto del equipo no la pide.
+  const { data: billing } = useBillingOverview();
+  const { pathname } = useLocation();
+  const showPastDue = billing?.status === 'past_due' && !pathname.startsWith('/facturacion');
 
   const logout = () => {
     // No hay revocación en el servidor: cerrar sesión es descartar los tokens.
@@ -60,6 +67,7 @@ export function AppShell() {
         </div>
       </header>
       <main className="shell__main">
+        {billing && showPastDue && <PastDueBanner data={billing} />}
         <Outlet />
       </main>
     </div>

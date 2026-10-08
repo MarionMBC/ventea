@@ -50,7 +50,9 @@ export class TenantMiddleware implements NestMiddleware {
         id: true,
         slug: true,
         isActive: true,
-        subscription: { select: { id: true, status: true, trialEndsAt: true } },
+        subscription: {
+          select: { id: true, status: true, trialEndsAt: true, currentPeriodEnd: true },
+        },
       },
     });
 

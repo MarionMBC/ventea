@@ -59,12 +59,13 @@ async function subscriptionAllows(
     const expiry = await subscriptions.expireTrial(tenant.tenantId, subscription.id, now);
     return expiry === 'payment_pending';
   }
-  return decision === 'allow';
+  // `grace`: past_due dentro de la gracia (TASK-007) atiende; el aviso lo muestra el panel.
+  return decision === 'allow' || decision === 'grace';
 }
 
 /**
  * Corta con `402 Servicio suspendido` la API de una marca cuya suscripción no atiende
- * (suspendida, cancelada, `past_due`, o en prueba vencida). Corre después del
+ * (suspendida, cancelada, `past_due` sin gracia o con la gracia vencida, o en prueba vencida). Corre después del
  * TenantMiddleware, que deja la suscripción en el request. Se aplica a todo salvo
  * `health`, `platform/*` y `SUBSCRIPTION_OPEN_ROUTES` (ver AppModule).
  */

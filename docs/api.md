@@ -12,8 +12,11 @@ en toda ruta de la marca salvo:
 - `GET /api/orders`, `GET /api/orders/:id` y `GET /api/me`: el cliente sigue viendo su cuenta y
   sus pedidos en curso. Crear o cancelar pedidos, el menú, registro y login dan 402.
 
-Pasa con la suscripción `suspended`, `canceled`, `past_due` o en prueba vencida. Una prueba
-vencida pasa a `past_due` con el primer request de la marca, también en las rutas abiertas. Los schemas de entrada y salida son los de `@ventea/shared`
+Pasa con la suscripción `suspended`, `canceled` o en prueba vencida. Una prueba vencida pasa a
+`past_due` con el primer request de la marca, también en las rutas abiertas, y sigue en 402.
+**Gracia (TASK-007):** un `past_due` de un período pagado que venció sin pago **sigue
+atendiendo** (menú, pedidos, todo) hasta `currentPeriodEnd + 7 días` (`graceEndsAt` en
+`GET /api/billing`); pasado eso, 402 aunque el ciclo todavía no la haya pasado a `suspended`. Los schemas de entrada y salida son los de `@ventea/shared`
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
 ## Autenticación
@@ -116,13 +119,13 @@ Valores por defecto del programa (`DEFAULT_REWARD_PROGRAM`), en unidades menores
 Solo staff con rol `owner` (manager y staff → `403`). Abiertas aunque la marca esté suspendida.
 Contratos en `packages/shared/src/contracts/billing.ts`. Montos en centavos USD.
 
-| Método | Ruta                          | Qué hace                                                                           |
-| ------ | ----------------------------- | ---------------------------------------------------------------------------------- |
-| GET    | `/api/billing`                | plan, precio, estado, fechas, tarjeta (marca, últimos 4), modo, últimos 20 eventos |
-| POST   | `/api/billing/payment-method` | alta o cambio de tarjeta + primer cobro (`establish`)                              |
-| POST   | `/api/billing/change-plan`    | `{planCode, interval?}`: se aplica al **próximo período**, sin prorrateo           |
-| POST   | `/api/billing/cancel`         | cancela al terminar el período (o la prueba)                                       |
-| POST   | `/api/billing/resume`         | anula la cancelación agendada                                                      |
+| Método | Ruta                          | Qué hace                                                                                          |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| GET    | `/api/billing`                | plan, precio, estado, fechas, `graceEndsAt`, tarjeta (marca, últimos 4), modo, últimos 20 eventos |
+| POST   | `/api/billing/payment-method` | alta o cambio de tarjeta + primer cobro (`establish`)                                             |
+| POST   | `/api/billing/change-plan`    | `{planCode, interval?}`: se aplica al **próximo período**, sin prorrateo                          |
+| POST   | `/api/billing/cancel`         | cancela al terminar el período (o la prueba)                                                      |
+| POST   | `/api/billing/resume`         | anula la cancelación agendada                                                                     |
 
 - **Alta de tarjeta:** `{card: {number, expiryMonth, expiryYear, cvv, holder}, billing: {country,
 city?, line1?, state?, zip?, phone?, email?}}`. Tokeniza y cobra el próximo período con CVV
@@ -220,9 +223,14 @@ Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 | POST   | `/api/platform/tenants/:slug/record-payment`  | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período; `409` con un cobro sin confirmar |
 | POST   | `/api/platform/tenants/:slug/resolve-payment` | plataforma · `{orderId, outcome: succeeded·failed, note?}`: cierra un cobro sin confirmar                           |
 | GET    | `/api/platform/billing/summary`               | plataforma · `{currency, mrrCents, byStatus, failuresLast7Days, unresolvedPayments, alertsLast7Days}`               |
+| GET    | `/api/platform/tenant-ready?slug=`            | público · `{ready}`: ¿`https://<slug>.<dominio>` ya responde con HTTPS válido? `404` si no existe; 240/IP/h         |
+| POST   | `/api/platform/analytics/event`               | público · `{event}` del embudo → `204`; sin cookies ni PII; 120/IP/h (`ANALYTICS_RATE_LIMIT_PER_HOUR`)              |
+| GET    | `/api/platform/analytics/funnel?days=`        | plataforma · `{timezone, days: [{day, counts}], totals}` (1–90 días, default 30, más nuevo primero)                 |
 
 - **Registro:** `{restaurantName, slug, ownerName, ownerEmail, ownerPassword (≥ 10), planCode,
-interval, country?, currency?}`. Crea en una transacción la marca, su branding, el programa
+interval, acceptedTermsVersion, country?, currency?}`. `acceptedTermsVersion` (TASK-007) es
+  obligatorio y tiene que ser una de `TERMS_VERSIONS` (`@ventea/shared`); se guarda en
+  `tenants.termsVersion` con la fecha en `termsAcceptedAt`. Sin él → `400`. Crea en una transacción la marca, su branding, el programa
   de puntos por defecto, «Sucursal principal», el dueño con esa contraseña y la suscripción en
   prueba de 14 días. Responde `201 {tenant: {slug, url, adminUrl, region}, trialEndsAt}`. Slug
   tomado → `409`; reservado o inválido → `400`. El campo oculto `website` (honeypot) tiene que
@@ -230,12 +238,26 @@ interval, country?, currency?}`. Crea en una transacción la marca, su branding,
   `SIGNUP_WEEKLY_LIMIT` (25) altas por registro; lleno → `429 "Registro temporalmente
 cerrado, escríbenos"`. Slugs reservados: infraestructura, suplantación (`login`, `pagos`…),
   todo lo que empiece con `admin` y todo lo que contenga `ventea`.
-- **Clientes:** la landing (`apps/landing`, `https://ventea.tech`) usa `plans`,
-  `slug-available` y `signup`; el panel de plataforma (`apps/admin`,
-  `https://ventea.tech/admin/plataforma`) el login y `tenants/*`. Los dos llaman a `/api` del
-  mismo origen (Traefik manda `ventea.tech/api/*` a la API). En producción el CORS acepta
-  además el apex `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio
-  (`src/cors-origins.ts`), por si la landing se sirve aparte y llama a `api.ventea.tech`.
+- **Clientes:** la landing (`apps/landing`, `https://app.ventea.tech`; el apex y `www`
+  redirigen ahí desde TASK-007) usa `plans`, `slug-available`, `signup`, `tenant-ready` y
+  `analytics/event`; el panel de plataforma (`apps/admin`,
+  `https://app.ventea.tech/admin/plataforma`) el login, `tenants/*`, `billing/summary` y
+  `analytics/funnel`. Los dos llaman a `/api` del mismo origen (Traefik manda
+  `app.ventea.tech/api/*` a la API). En producción el CORS acepta además el apex
+  `https://<TENANT_BASE_DOMAIN>` y un nivel de subdominio (`src/cors-origins.ts`), que incluye
+  `app.`.
+- **Dirección lista (`tenant-ready`):** tras el alta, la dirección tarda 1-2 min (ruta en
+  Traefik + certificado de Let's Encrypt; mientras tanto el navegador da
+  `ERR_CERT_AUTHORITY_INVALID` y, con HSTS, no deja seguir). La API hace un GET a
+  `https://<slug>.<TENANT_BASE_DOMAIN>/api/health` con verificación TLS normal (timeout 3 s) y
+  cachea la respuesta 10 s por slug. Solo slugs existentes y activos: no sirve para sondear hosts
+  arbitrarios. La pantalla de éxito del registro la consulta cada 5 s.
+- **Embudo (`analytics`):** el endpoint público acepta `event` ∈ `visit · cta_click ·
+signup_start · signup_step_2 · signup_step_3` (lista blanca, body estricto: un campo extra o
+  `signup_complete` es `400`). `signup_complete` lo suma la API al crear una marca por el
+  registro (después del commit, sin bloquear el alta). Se guarda solo
+  `funnel_daily_counts (day, event, count)`, con el día en `America/Tegucigalpa`; la IP solo la
+  usa el rate limit en memoria. La landing lo manda con `navigator.sendBeacon`.
 - **Detalle de marca:** incluye `openAttempts` (`{orderId, kind, status, amountCents,
 createdAt}` de los cobros `pending`/`unknown`/`needs_review`): son los que se cierran con
   `resolve-payment`.

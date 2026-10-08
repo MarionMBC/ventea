@@ -43,6 +43,40 @@ const SUMMARY = {
   alertsLast7Days: 0,
 };
 
+const zeros = {
+  visit: 0,
+  cta_click: 0,
+  signup_start: 0,
+  signup_step_2: 0,
+  signup_step_3: 0,
+  signup_complete: 0,
+};
+const FUNNEL = {
+  timezone: 'America/Tegucigalpa',
+  days: [
+    {
+      day: '2026-10-08',
+      counts: {
+        visit: 120,
+        cta_click: 30,
+        signup_start: 25,
+        signup_step_2: 18,
+        signup_step_3: 12,
+        signup_complete: 6,
+      },
+    },
+    { day: '2026-10-07', counts: zeros },
+  ],
+  totals: {
+    visit: 120,
+    cta_click: 30,
+    signup_start: 25,
+    signup_step_2: 18,
+    signup_step_3: 12,
+    signup_complete: 6,
+  },
+};
+
 const SESSION: PlatformSession = {
   accessToken: fakeJwt(Date.now() + 60 * 60 * 1000),
   admin: { id: uuid(1), email: 'mario@ventea.tech', name: 'Mario' },
@@ -116,6 +150,7 @@ function createFakePlatformApi(count = 30) {
     if (call.auth !== `Bearer ${SESSION.accessToken}`) return apiError(401, 'Unauthorized');
 
     if (call.path === '/api/platform/billing/summary') return json(SUMMARY);
+    if (call.path === '/api/platform/analytics/funnel') return json(FUNNEL);
     if (call.method === 'GET' && call.path === '/api/platform/tenants') {
       const page = Number(call.query.get('page') ?? 1);
       const pageSize = Number(call.query.get('pageSize') ?? 50);
@@ -262,15 +297,17 @@ describe('sesión de plataforma', () => {
 });
 
 describe('host del panel de plataforma', () => {
-  it('solo el apex y localhost', () => {
-    expect(isPlatformHost('ventea.tech')).toBe(true);
-    expect(isPlatformHost('VENTEA.TECH.')).toBe(true);
+  it('solo app.<dominio> y localhost (el apex ya no: redirige a app.)', () => {
+    expect(isPlatformHost('app.ventea.tech')).toBe(true);
+    expect(isPlatformHost('APP.VENTEA.TECH.')).toBe(true);
     expect(isPlatformHost('localhost')).toBe(true);
+    expect(isPlatformHost('ventea.tech')).toBe(false);
+    expect(isPlatformHost('www.ventea.tech')).toBe(false);
     expect(isPlatformHost('pollos-juan.ventea.tech')).toBe(false);
-    expect(isPlatformHost('ventea.tech.evil.com')).toBe(false);
+    expect(isPlatformHost('app.ventea.tech.evil.com')).toBe(false);
   });
 
-  it('en el subdominio de una marca no monta el login: manda al apex', async () => {
+  it('en el subdominio de una marca no monta el login: manda a app.', async () => {
     const { api } = renderPlatform('/admin/plataforma', {
       loggedIn: false,
       hostname: 'pollos-juan.ventea.tech',
@@ -278,7 +315,7 @@ describe('host del panel de plataforma', () => {
     expect(await screen.findByRole('heading', { name: /no está acá/ })).toBeTruthy();
     expect(screen.queryByLabelText('Contraseña')).toBeNull();
     expect(screen.getByRole('link').getAttribute('href')).toBe(
-      'https://ventea.tech/admin/plataforma',
+      'https://app.ventea.tech/admin/plataforma',
     );
     expect(api.calls).toHaveLength(0);
   });
@@ -528,5 +565,45 @@ describe('panel de plataforma (AC3)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
     expect((await screen.findByRole('status')).textContent).toContain('Tu sesión expiró');
     expect(screen.getByRole('heading', { name: 'Plataforma' })).toBeTruthy();
+  });
+});
+
+describe('embudo de registro (TASK-007 AC4)', () => {
+  it('desde la cabecera: tabla por día con totales y conversión visita → registro', async () => {
+    const { api } = renderPlatform('/admin/plataforma');
+    await screen.findByRole('heading', { name: 'Marcas' });
+    fireEvent.click(screen.getByRole('link', { name: 'Embudo de registro' }));
+
+    expect(await screen.findByRole('heading', { name: 'Embudo de registro' })).toBeTruthy();
+    const funnel = api.calls.find((c) => c.path === '/api/platform/analytics/funnel');
+    expect(funnel?.query.get('days')).toBe('30');
+    expect(funnel?.auth).toBe(`Bearer ${SESSION.accessToken}`);
+
+    const table = await screen.findByRole('table');
+    const headers = within(table)
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent);
+    expect(headers).toEqual([
+      'Día',
+      'Visitas',
+      'Clic en «Probar»',
+      'Abre el registro',
+      'Paso 2',
+      'Paso 3',
+      'Registros',
+    ]);
+    const bodyRows = within(table).getAllByRole('row');
+    // cabecera + 2 días + total
+    expect(bodyRows).toHaveLength(4);
+    expect(
+      within(bodyRows[1]!)
+        .getAllByRole('cell')
+        .map((td) => td.textContent),
+    ).toEqual(['120', '30', '25', '18', '12', '6']);
+    expect(within(bodyRows[3]!).getByRole('rowheader').textContent).toBe('Total');
+
+    const summary = screen.getByLabelText('Totales de 30 días');
+    expect(summary.textContent).toContain('Conversión visita → registro5%');
+    expect(summary.textContent).toContain('Abren el registro → completan24%');
   });
 });
