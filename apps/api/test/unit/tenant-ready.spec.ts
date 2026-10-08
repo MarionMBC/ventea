@@ -36,6 +36,13 @@ describe('TenantReadyService (sonda HTTPS de la marca recién creada)', () => {
     expect(TENANT_READY_TIMEOUT_MS).toBe(3000);
   });
 
+  it('descarta el cuerpo de la respuesta (libera la conexión)', async () => {
+    const response = new Response('{"status":"ok"}', { status: 200 });
+    const cancel = jest.spyOn(response.body!, 'cancel');
+    await expect(service(() => Promise.resolve(response)).isReady('pollos')).resolves.toBe(true);
+    expect(cancel).toHaveBeenCalled();
+  });
+
   it('no listo: respuesta que no es 2xx (ruta todavía sin publicar)', async () => {
     const fetchImpl = jest.fn(() => Promise.resolve(new Response('', { status: 404 })));
     await expect(service(fetchImpl).isReady('pollos')).resolves.toBe(false);

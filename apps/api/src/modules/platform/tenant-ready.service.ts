@@ -71,7 +71,11 @@ export class TenantReadyService {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(TENANT_READY_TIMEOUT_MS),
       });
-      return response.ok;
+      const ready = response.ok;
+      // Solo importa el estado: se descarta el cuerpo para liberar la conexión ya (undici lo
+      // retendría hasta el GC).
+      await response.body?.cancel().catch(() => undefined);
+      return ready;
     } catch (error) {
       // Lo esperado mientras no hay certificado (TLS) o la ruta no existe (timeout/DNS).
       this.logger.debug(`${slug} todavía no está lista: ${(error as Error).message}`);
