@@ -155,16 +155,20 @@ city?, line1?, state?, zip?, phone?, email?}}`. Tokeniza y cobra el próximo per
 
 Invariantes de dinero:
 
-- **Un solo intento abierto por suscripción**, de cualquier tipo (alta o renovación). Mientras
-  exista no se cobra nada más, ni la suscripción cambia de estado sola (no vence ni se
-  suspende).
+- **Un solo intento abierto por suscripción** (`pending`, `unknown` o `needs_review`), de
+  cualquier tipo (alta o renovación). Mientras exista no se cobra nada más, ni la suscripción
+  cambia de estado sola: no vence ni se suspende, tampoco por el tráfico (una prueba vencida
+  con un alta sin confirmar sigue atendiendo). `reactivate` del admin da `409`.
+- **La suspensión del admin gana**: si después se confirma un cobro, se aplica al período pero
+  la marca sigue `suspended`, con alerta. `reactivate` conserva un período ya pagado.
 - **Lo cobrado queda congelado en el intento** (plan, intervalo, inicio y fin del período,
   monto). El resultado se aplica con esos datos, nunca con el estado actual.
 - **Un período pagado se aplica solo si no estaba cubierto** (`currentPeriodEnd <=` inicio del
   período pagado). Si ya lo estaba, el cobro se asienta, el período no se mueve y queda una
   alerta `billing_alert` de posible doble pago.
 - **Un aprobado se verifica**: monto, moneda y `orderId` iguales a lo pedido y sin
-  autorización parcial; si no, queda `unknown` con alerta.
+  autorización parcial; si no, queda `needs_review` con una sola alerta y no se concilia solo
+  (un `status` posterior no trae el monto): lo cierra `resolve-payment`.
 
 1. **Conciliación:** los intentos de renovación sin confirmar (`unknown`, o `pending` de un
    proceso que murió) se consultan con `status`; nunca se recobran a ciegas. Uno sin
@@ -180,7 +184,8 @@ Invariantes de dinero:
    rechazo → `suspended`. Timeout, 5xx o respuesta ilegible → `unknown` (se concilia); tres
    seguidos cortan las renovaciones de esa corrida (circuit breaker). Un 400 de la pasarela
    (no llegó al banco) → intento `failed_non_bank`: no cuenta para el dunning, reintento en
-   24 h y visible en `unresolvedPayments`.
+   24 h y visible en `unresolvedPayments`. Al 3.º del mismo período → `past_due` +
+   `billing_alert`, y desde ahí sigue el dunning normal.
 4. **Vencimientos sin cobro:** prueba vencida → `past_due`; `active` vencida sin tarjeta (o en
    modo `manual`) → `past_due`; `past_due` sin tarjeta (o manual) 7 días después del
    vencimiento → `suspended`.
@@ -203,7 +208,7 @@ Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 | GET    | `/api/platform/tenants?page=&pageSize=`       | plataforma · `{items, total, page, pageSize}` (máx 100)                                                             |
 | GET    | `/api/platform/tenants/:slug`                 | plataforma · + sucursales activas y últimos 20 eventos                                                              |
 | POST   | `/api/platform/tenants/:slug/suspend`         | plataforma · `{reason?}`                                                                                            |
-| POST   | `/api/platform/tenants/:slug/reactivate`      | plataforma · abre un período nuevo desde hoy                                                                        |
+| POST   | `/api/platform/tenants/:slug/reactivate`      | plataforma · abre un período desde hoy (conserva uno ya pagado); `409` con un cobro sin confirmar                   |
 | POST   | `/api/platform/tenants/:slug/change-plan`     | plataforma · `{planCode, interval?}`                                                                                |
 | POST   | `/api/platform/tenants/:slug/extend-trial`    | plataforma · `{days}` (1–90)                                                                                        |
 | POST   | `/api/platform/tenants/:slug/record-payment`  | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período; `409` con un cobro sin confirmar |

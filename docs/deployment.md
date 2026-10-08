@@ -58,7 +58,8 @@ curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \
 ```
 
 Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) y deja la marca
-`active`. No toca una cancelación agendada por el dueño. Con un cobro con tarjeta sin
+`active`. No toca una cancelación agendada por el dueño. El servicio `api` de los compose
+lleva `stop_grace_period: 40s`: el apagado espera la corrida de cobro en curso (hasta 35 s). Con un cobro con tarjeta sin
 confirmar responde `409`: primero `resolve-payment`.
 
 ### Alertas

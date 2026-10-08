@@ -28,6 +28,9 @@ services:
   api:
     image: ${IMAGE_API}
     restart: unless-stopped
+    # El apagado espera hasta 35 s la corrida de cobro en curso (BillingScheduler): sin esto,
+    # Docker mata el proceso a los 10 s y el cobro en vuelo queda para conciliar a mano.
+    stop_grace_period: 40s
     environment:
       NODE_ENV: production
       API_PORT: 3000
