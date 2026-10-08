@@ -1,10 +1,35 @@
 # Despliegue
 
-**Una instancia por cliente, en su propio VPS u hosting.** No hay una nube central de
-Ventea a la que se conecten todos: cada cliente corre su copia completa —base de datos,
-API y front— sobre su propia infraestructura, con su dominio y su certificado.
+**Ventea es un SaaS alojado por nosotros** ([ADR 0007](adr/0007-saas-multi-tenant.md)).
+Una instancia en `TENANT_MODE=multi` atiende a todas las marcas, cada una en
+`<slug>.ventea.tech`. Hoy corre en una VPS (región `hn-1`); con más regiones habrá una
+instancia y una base por región.
 
-## Qué corre en el VPS de un cliente
+## La plataforma (modo multi)
+
+- **Rutas y certificados**: Traefik con un router y un certificado Let's Encrypt (HTTP-01)
+  por subdominio. Un cron cada minuto (`sync-routes.sh --quiet`) regenera el archivo de
+  rutas desde los tenants activos y solo lo reescribe si cambió: una marca registrada sola
+  queda con certificado en menos de dos minutos, sin reiniciar el proxy. Detalle operativo
+  en [`deploy/test-vps/README.md`](../deploy/test-vps/README.md).
+- **Alta de marcas**: registro self-service (`POST /api/platform/signup`, prueba de 14
+  días) o `create-tenant.js` (suscripción `active`, plan por flag).
+- **Planes**: los siembra la migración `…_seed_plans_and_backfill_subscriptions` (SQL
+  idempotente); no hay paso de seed aparte. La misma migración deja a todos los tenants
+  existentes en plan Cadena anual `active`.
+- **Administración**: cuentas `PlatformAdmin`, creadas con
+  `node apps/api/dist/scripts/create-platform-admin.js --email <email> --name "<nombre>"`.
+- **Variables nuevas** (opcionales): `REGIONS` (JSON, default
+  `[{"code":"hn-1","countries":["*"]}]`) y `SIGNUP_RATE_LIMIT_PER_HOUR` (default 5 por IP).
+- **Respaldos**: centralizados y copiados fuera de la VPS; ahora un disco perdido es el de
+  todos los clientes.
+
+## Instalación dedicada (modo single, excepcional)
+
+Lo que sigue describe una instalación dedicada a un solo cliente, el modelo del ADR 0006,
+que queda solo para quien exija aislamiento físico por contrato.
+
+### Qué corre en una instalación dedicada
 
 ```
                        Internet
@@ -32,10 +57,10 @@ Cuatro contenedores más un servicio `migrate` que corre una vez y termina. Todo
 Postgres **no publica puerto al host**. Se llega solo por la red interna de Docker;
 exponer 5432 en un VPS es ofrecer la base al primer escaneo de internet.
 
-## Modo single-tenant
+### Modo single-tenant
 
-Como cada cliente tiene su instancia, el tenant no se resuelve por subdominio: se fija
-en la configuración.
+En una instalación dedicada el tenant no se resuelve por subdominio: se fija en la
+configuración.
 
 ```env
 TENANT_MODE=single
@@ -45,16 +70,9 @@ TENANT_SLUG=carolina-hot-chicken
 Con `single`, `TenantMiddleware` ignora el host y el header `X-Tenant-Slug`. Nada que
 mande el cliente cambia de qué marca son los datos que ve.
 
-El modo `multi` sigue existiendo y es el que se usa en desarrollo —permite saltar entre
-tenants y probar el aislamiento— y quedaría disponible si en algún momento conviene
-alojar varios clientes chicos en una instancia nuestra.
+El modo `multi` es el de producción de la plataforma y el de desarrollo.
 
-> El esquema mantiene `tenantId` en toda tabla aunque la instancia atienda una sola
-> marca. Sacarlo ahorraría una columna y cerraría la puerta a alojar clientes juntos,
-> a que un cliente tenga dos marcas, y a consolidar instancias más adelante. Ver
-> [ADR 0006](adr/0006-despliegue-por-cliente.md).
-
-## Puesta en marcha de un cliente nuevo
+### Puesta en marcha de una instalación dedicada
 
 **Requisitos**: VPS con Docker y Docker Compose, y el DNS del dominio ya apuntando al
 VPS. Si el DNS todavía no resolvió, el desafío ACME falla y Caddy deja el sitio sin
@@ -87,7 +105,7 @@ curl https://<dominio>/api/health
 **Un `JWT_SECRET` distinto por cliente.** Reusarlo entre instancias haría que un token
 emitido para un cliente valga en la instancia de otro.
 
-## Actualizaciones
+### Actualizaciones
 
 ```bash
 cd /opt/ventea && ./deploy.sh 0.2.0
@@ -130,12 +148,12 @@ puesta en marcha, no un extra.
 
 ## App móvil
 
-El binario nativo no se despliega en el VPS: va a las tiendas y **apunta a la API del
-cliente**. Esa URL se hornea en tiempo de build (Vite la resuelve al construir, no al
-ejecutar), así que cada marca tiene su propio binario:
+El binario nativo no se despliega en el servidor: va a las tiendas y **apunta a la API de
+la marca** (`https://<slug>.ventea.tech`). Esa URL se hornea en tiempo de build (Vite la
+resuelve al construir, no al ejecutar), así que cada marca tiene su propio binario:
 
 ```bash
-VITE_API_URL=https://pedidos.carolinahotchicken.cl \
+VITE_API_URL=https://carolina-hot-chicken.ventea.tech \
 VITE_DEFAULT_TENANT_SLUG=carolina-hot-chicken \
 VENTEA_APP_ID=app.ventea.carolina \
 npm run build -w @ventea/mobile && npx cap sync
@@ -143,24 +161,12 @@ npm run build -w @ventea/mobile && npx cap sync
 
 Detalle en [white-label.md](white-label.md).
 
-## Consecuencias de este modelo
+## Consecuencias del modelo SaaS
 
-Lo que se gana: los datos del cliente quedan en su infraestructura (argumento de venta
-real y respuesta simple a cualquier pregunta sobre privacidad), no operamos una nube
-central con el riesgo de que una caída afecte a todos, y no hay costo de infraestructura
-por cliente para nosotros.
-
-Lo que cuesta, y hay que tenerlo previsto antes del tercer cliente:
-
-- **Actualizar es N despliegues.** Con cinco clientes es un rato; con treinta, hace falta
-  automatizarlo (Ansible o similar) o el parche de seguridad no llega a todos.
-- **Versiones divergentes.** Cada cliente puede quedarse atrás. Hay que llevar registro
-  de qué versión corre cada uno.
-- **Diagnóstico a ciegas.** No hay acceso a los logs salvo que el cliente lo dé. Conviene
-  definir desde ahora qué se registra y cómo se pide.
-- **El VPS es responsabilidad de alguien.** Si el cliente lo administra, el sistema
-  depende de que aplique parches del sistema operativo. Conviene que quede por escrito
-  quién mantiene qué.
+Ver [ADR 0007](adr/0007-saas-multi-tenant.md). En corto: un despliegue actualiza a todos
+(sin versiones divergentes), pero una caída o una migración mala afecta a todos a la
+vez. Antes del primer cliente real con datos: RLS (TASK-007), monitoreo y respaldos
+fuera de la VPS.
 
 ## Qué falta
 

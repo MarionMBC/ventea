@@ -1,6 +1,6 @@
 # 0006 — Una instancia por cliente, en su VPS
 
-**Estado**: aceptada · 2026-08-31
+**Estado**: reemplazada por [0007](0007-saas-multi-tenant.md) · 2026-10-08 (aceptada 2026-08-31)
 **Modifica el alcance de**: [0002](0002-multi-tenancy-tenant-id.md)
 
 ## Contexto

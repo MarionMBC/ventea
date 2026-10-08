@@ -2,7 +2,12 @@
 
 Todas las rutas van bajo `/api` y pasan por `TenantMiddleware`: la marca sale del subdominio
 (`<slug>.ventea.tech`) o del header `X-Tenant-Slug`, que es lo que usan las apps nativas.
-`/api/health` es la única excepción. Los schemas de entrada y salida son los de `@ventea/shared`
+Las excepciones son `/api/health` y `/api/platform/*` (ver [Plataforma](#plataforma-saas)).
+
+**Marca suspendida → `402 {statusCode: 402, message: "Servicio suspendido", error: "Payment Required"}`**
+en toda ruta de la marca salvo `/api/staff/*`, `/api/tenant` y `/api/auth/refresh`: el dueño
+sigue entrando al panel para pagar. Pasa con la suscripción `suspended`, `canceled`,
+`past_due` o en prueba vencida (que en ese request pasa a `past_due`). Los schemas de entrada y salida son los de `@ventea/shared`
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
 ## Autenticación
@@ -11,7 +16,8 @@ JWT HS256 firmado con `JWT_SECRET`. Cada token lleva:
 
 - `tid`: la marca. Un token de una marca no sirve en otra.
 - `typ`: `access` (15 min) o `refresh` (30 días).
-- `kind`: `customer` o `staff`.
+- `kind`: `customer`, `staff` o `platform`. El de plataforma no lleva `tid` ni refresh (dura
+  1 h): no abre rutas de marca, y los tokens de marca no abren las de plataforma (401).
 
 | Método      | Ruta                    | Quién                                                            |
 | ----------- | ----------------------- | ---------------------------------------------------------------- |
@@ -99,11 +105,45 @@ Valores por defecto del programa (`DEFAULT_REWARD_PROGRAM`), en unidades menores
 - canje desde 100 puntos;
 - bono de bienvenida de 50 puntos.
 
+## Plataforma (SaaS)
+
+Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
+`packages/shared/src/contracts/platform.ts`.
+
+| Método | Ruta                                       | Quién                                                      |
+| ------ | ------------------------------------------ | ---------------------------------------------------------- |
+| GET    | `/api/platform/plans`                      | público · planes activos (precios en centavos USD)         |
+| GET    | `/api/platform/slug-available?slug=`       | público · `{available, reason?: invalid·reserved·taken}`   |
+| POST   | `/api/platform/signup`                     | público · 5 intentos por IP y hora (`429` + `Retry-After`) |
+| POST   | `/api/platform/auth/login`                 | público · `PlatformAdmin`; 20 intentos por IP y hora       |
+| GET    | `/api/platform/tenants`                    | plataforma · plan, estado, región, alta, pedidos 30 días   |
+| GET    | `/api/platform/tenants/:slug`              | plataforma · + sucursales activas y últimos 20 eventos     |
+| POST   | `/api/platform/tenants/:slug/suspend`      | plataforma · `{reason?}`                                   |
+| POST   | `/api/platform/tenants/:slug/reactivate`   | plataforma · abre un período nuevo desde hoy               |
+| POST   | `/api/platform/tenants/:slug/change-plan`  | plataforma · `{planCode, interval?}`                       |
+| POST   | `/api/platform/tenants/:slug/extend-trial` | plataforma · `{days}` (1–90)                               |
+
+- **Registro:** `{restaurantName, slug, ownerName, ownerEmail, ownerPassword (≥ 10), planCode,
+interval, country?, currency?}`. Crea en una transacción la marca, su branding, el programa
+  de puntos por defecto, «Sucursal principal», el dueño con esa contraseña y la suscripción en
+  prueba de 14 días. Responde `201 {tenant: {slug, url, adminUrl, region}, trialEndsAt}`. Slug
+  tomado → `409`; reservado o inválido → `400`. El campo oculto `website` (honeypot) tiene que
+  venir vacío.
+- **Región:** la asigna `REGIONS` por país: el del body, si no `CF-IPCountry` / `X-Country`.
+- **Transiciones:** suspender desde `trialing`/`active`/`past_due`; reactivar desde
+  `suspended`/`past_due`/`canceled`; extender la prueba desde `trialing`/`past_due`; cambiar de
+  plan salvo `canceled`, y nunca a uno donde no quepan las sucursales activas. Fuera de eso,
+  `409`. Cada cambio deja un `BillingEvent`.
+
 ## Scripts de operación
 
 ```bash
-# Alta de marca (dueño con contraseña aleatoria, se muestra una vez)
+# Alta de marca (dueño con contraseña aleatoria, se muestra una vez). Suscripción active,
+# plan Cadena anual salvo --plan basic|pro|chain --interval month|year
 node apps/api/dist/scripts/create-tenant.js --slug <slug> --name "<nombre>" --owner-email <email>
+
+# Admin de la plataforma (contraseña aleatoria, se muestra una vez; --reset-password genera otra)
+node apps/api/dist/scripts/create-platform-admin.js --email <email> --name "<nombre>"
 
 # Reemplazar el menú de una marca desde un JSON. Corre en una transacción; los
 # pedidos existentes no se tocan. Cambiar la moneda de una marca que ya tiene
