@@ -246,8 +246,9 @@ describe('redactSensitive (logger)', () => {
     expect(redactSensitive('cvv=987 securityCode: 4321')).not.toMatch(/987|4321/);
   });
 
-  it('PAN con puntos', () => {
+  it('PAN con puntos o barras', () => {
     expect(redactSensitive('pan 4111.1111.1111.1111 fin')).toBe('pan [PAN] fin');
+    expect(redactSensitive('pan 4111/1111/1111/1111 fin')).toBe('pan [PAN] fin');
   });
 
   it('claves csc, cvc, card_cvc, cvc2, securityCode y cardNumber', () => {

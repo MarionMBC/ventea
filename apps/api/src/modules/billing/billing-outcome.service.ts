@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { BillingEventType, BillingInterval, SubscriptionStatus } from '@ventea/shared';
 
+import { OPEN_ATTEMPT_STATUSES } from '@/modules/subscriptions/subscriptions.service';
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
@@ -41,6 +42,11 @@ export interface PaidPeriod {
    * una cancelación agendada. Conciliaciones y pagos manuales NUNCA la tocan.
    */
   resetCancel?: boolean;
+  /**
+   * Conciliaciones (ciclo o resolve-payment): una suspensión puesta por el admin gana. El pago
+   * se aplica al período, la marca sigue `suspended` y queda una alerta.
+   */
+  keepSuspended?: boolean;
   message: string;
 }
 
@@ -53,9 +59,13 @@ export interface FailedAttempt {
   result: ChargeResult;
 }
 
-export const OPEN_ATTEMPT_STATUSES: ('pending' | 'unknown')[] = ['pending', 'unknown'];
+export { OPEN_ATTEMPT_STATUSES };
+/** Lo que el ciclo concilia solo, consultando a la pasarela. */
+export const RECONCILABLE_ATTEMPT_STATUSES: ('pending' | 'unknown')[] = ['pending', 'unknown'];
 const OPEN_ATTEMPT = { in: OPEN_ATTEMPT_STATUSES };
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Rechazos de la pasarela antes del banco (400) en un período que la pasan a past_due. */
+export const NON_BANK_LIMIT = 3;
 
 /**
  * Aplica el resultado de un cobro (alta, renovación, conciliación o pago manual) a la
@@ -82,6 +92,7 @@ export class BillingOutcomeService {
       const before = await tx.subscription.findUnique({
         where: { tenantId: paid.tenantId },
         select: {
+          status: true,
           planId: true,
           interval: true,
           pendingPlanId: true,
@@ -91,8 +102,9 @@ export class BillingOutcomeService {
         },
       });
 
+      const staysSuspended = paid.keepSuspended === true && before?.status === 'suspended';
       const data: Prisma.SubscriptionUncheckedUpdateManyInput = {
-        status: 'active',
+        ...(staysSuspended ? {} : { status: 'active' as const }),
         planId: paid.plan.id,
         interval: paid.interval,
         currentPeriodStart: paid.periodStart,
@@ -182,6 +194,13 @@ export class BillingOutcomeService {
           },
         });
       }
+      if (staysSuspended) {
+        const alert = `Pago ${paid.orderId ?? 'manual'} confirmado con la marca suspendida por el admin: sigue suspendida. Reactivar o reembolsar`;
+        await tx.billingEvent.create({
+          data: { tenantId: paid.tenantId, type: 'billing_alert', message: alert },
+        });
+        return { periodApplied: true, alert };
+      }
       return { periodApplied: true, alert: null };
     });
 
@@ -234,6 +253,7 @@ export class BillingOutcomeService {
     });
 
     const { decision, failures } = result;
+    if (!result.applied) return null; // la suscripción ya no está en ese período: nada que avisar
     const next =
       decision.status === 'suspended'
         ? 'suspendida'
@@ -243,7 +263,7 @@ export class BillingOutcomeService {
       decision.status === 'suspended' ? 'suspended' : 'payment_failed',
       `Cobro rechazado (rechazo ${failures}): ${reason}; ${next}`,
     );
-    return result.applied ? decision.status : null;
+    return decision.status;
   }
 
   /**
@@ -259,7 +279,7 @@ export class BillingOutcomeService {
       0,
       300,
     );
-    await this.prisma.$transaction(async (tx) => {
+    const escalated = await this.prisma.$transaction(async (tx) => {
       await tx.paymentAttempt.updateMany({
         where: { tenantId: failed.tenantId, orderId: failed.orderId, status: OPEN_ATTEMPT },
         data: { status: 'failed_non_bank', message: reason },
@@ -282,8 +302,40 @@ export class BillingOutcomeService {
         },
         data: { retryAt: new Date(now.getTime() + DAY_MS) },
       });
+
+      // Un 400 que se repite no es transitorio (instrumento borrado, dato rechazado): tras
+      // NON_BANK_LIMIT en el mismo período la marca pasa a past_due y entra al dunning normal.
+      const nonBank = await tx.paymentAttempt.count({
+        where: {
+          tenantId: failed.tenantId,
+          subscriptionId: failed.subscriptionId,
+          kind: 'renewal',
+          periodStart: failed.periodStart,
+          status: 'failed_non_bank',
+        },
+      });
+      if (nonBank < NON_BANK_LIMIT) return null;
+      const { count } = await tx.subscription.updateMany({
+        where: {
+          tenantId: failed.tenantId,
+          id: failed.subscriptionId,
+          status: 'active',
+          currentPeriodEnd: failed.periodStart,
+        },
+        data: { status: 'past_due' },
+      });
+      if (count === 0) return null;
+      const alert = `${nonBank} cobros seguidos rechazados por la pasarela antes del banco (${reason}): la marca pasa a past_due. Revisar la tarjeta guardada`;
+      await tx.billingEvent.create({
+        data: { tenantId: failed.tenantId, type: 'billing_alert', message: alert },
+      });
+      return alert;
     });
-    await this.notify(failed.tenantId, 'payment_failed', reason);
+    await this.notify(
+      failed.tenantId,
+      escalated ? 'billing_alert' : 'payment_failed',
+      escalated ?? reason,
+    );
   }
 
   /** Rechazo de un alta de tarjeta: se asienta; la suscripción no cambia. */
@@ -316,7 +368,8 @@ export class BillingOutcomeService {
       await tx.paymentAttempt.updateMany({
         where: { tenantId: attempt.tenantId, orderId: attempt.orderId, status: OPEN_ATTEMPT },
         data: {
-          status: 'unknown',
+          // Con alerta no se concilia sola: un `status` posterior no trae el monto aprobado.
+          status: attempt.result.alert ? 'needs_review' : 'unknown',
           ...(attempt.result.transactionId
             ? { providerTransactionId: attempt.result.transactionId }
             : {}),

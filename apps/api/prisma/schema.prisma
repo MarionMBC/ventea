@@ -246,6 +246,9 @@ enum PaymentAttemptStatus {
   unknown
   /// No llegó al banco (400 de la pasarela: dato inválido). No cuenta para el dunning.
   failed_non_bank
+  /// Aprobado distinto de lo pedido (monto, moneda, orderId, parcial): abierto, pero no se
+  /// concilia solo; lo cierra una persona con `resolve-payment`.
+  needs_review
 }
 
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.

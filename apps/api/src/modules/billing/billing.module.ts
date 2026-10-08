@@ -32,6 +32,6 @@ import { PlatformBillingService } from './platform-billing.service';
     RateLimitStore,
     RateLimitGuard,
   ],
-  exports: [BillingCycleService, PlatformBillingService],
+  exports: [BillingCycleService, PlatformBillingService, BillingLockService],
 })
 export class BillingModule {}

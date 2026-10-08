@@ -649,6 +649,19 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       expect(summary.charged.unknown).toBe(1);
       expect((await subscriptionOf(target)).currentPeriodEnd).toEqual(due);
       expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+
+      // Re-review: la conciliación siguiente (status sin monto) NO lo da por pagado ni repite
+      // la alerta; queda para resolve-payment.
+      await cycle.run(later(due, 16 * MINUTE));
+      await cycle.run(later(due, 31 * MINUTE));
+      expect((await subscriptionOf(target)).currentPeriodEnd).toEqual(due);
+      expect(await eventsOf(target, 'payment_succeeded')).toHaveLength(1); // solo el alta
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+      const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+        where: { tenantId: target.tenant.id, kind: 'renewal' },
+      });
+      expect(attempt.status).toBe('needs_review');
+      expect(recurringCharges()).toHaveLength(1);
     });
 
     it('400 de la pasarela → intento failed_non_bank visible, sin dunning ni ráfaga', async () => {
@@ -730,6 +743,65 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       } finally {
         process.env.BILLING_IP_RATE_LIMIT_PER_DAY = previous;
       }
+    });
+  });
+
+  describe('re-review TASK-005', () => {
+    it('3 failed_non_bank seguidos del mismo período → past_due + alerta (entra al dunning)', async () => {
+      const target = await brand('rr-invalid3');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next('invalid', 'invalid', 'invalid');
+      await cycle.run(later(due));
+      await cycle.run(later(due, 25 * 60 * MINUTE));
+      expect((await subscriptionOf(target)).status).toBe('active');
+      await cycle.run(later(due, 50 * 60 * MINUTE));
+
+      const sub = await subscriptionOf(target);
+      expect(sub.status).toBe('past_due');
+      expect(sub.retryAt).not.toBeNull();
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+      await http().get('/api/menu').set('X-Tenant-Slug', target.tenant.slug).expect(402);
+    });
+
+    it('prueba vencida con un alta sin confirmar → el tráfico NO la vence (menú 200)', async () => {
+      const target = await brand('rr-trial-open');
+      fake.next({ timeout: 'approved', withTransactionId: false });
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(504);
+      const past = addDays(new Date(), -1);
+      await prisma.subscription.update({
+        where: { tenantId: target.tenant.id },
+        data: { trialEndsAt: past, currentPeriodEnd: past },
+      });
+
+      await http().get('/api/menu').set('X-Tenant-Slug', target.tenant.slug).expect(200);
+      await asOwner(http().get('/api/billing'), target).expect(200);
+      expect((await subscriptionOf(target)).status).toBe('trialing');
+      expect(await eventsOf(target, 'trial_expired')).toHaveLength(0);
+    });
+
+    it('suspensión del admin gana: la conciliación aprobada no la deshace; reactivate 409 con cobro abierto', async () => {
+      const target = await brand('rr-suspend');
+      await addCard(target);
+      const { currentPeriodEnd: due } = await subscriptionOf(target);
+      fake.next({ timeout: 'approved' });
+      await cycle.run(later(due));
+
+      await asPlatform(http().post(`/api/platform/tenants/${target.tenant.slug}/suspend`))
+        .send({ reason: 'fraude' })
+        .expect(200);
+      await asPlatform(
+        http().post(`/api/platform/tenants/${target.tenant.slug}/reactivate`),
+      ).expect(409);
+
+      await cycle.run(later(due, 2 * MINUTE)); // concilia: aprobado
+      const sub = await subscriptionOf(target);
+      expect(sub.status).toBe('suspended');
+      expect(sub.currentPeriodStart).toEqual(due); // el pago se aplica al período
+      expect(await eventsOf(target, 'billing_alert')).toHaveLength(1);
+      await asPlatform(
+        http().post(`/api/platform/tenants/${target.tenant.slug}/reactivate`),
+      ).expect(200);
     });
   });
 

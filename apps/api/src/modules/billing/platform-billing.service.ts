@@ -124,6 +124,7 @@ export class PlatformBillingService {
         amountCents: attempt.amountCents,
         orderId: attempt.orderId,
         providerTransactionId: attempt.providerTransactionId,
+        keepSuspended: true,
         message:
           attempt.kind === 'renewal'
             ? `Renovación confirmada a mano ${by}`
@@ -151,7 +152,7 @@ export class PlatformBillingService {
             paymentAttempts: {
               where: {
                 OR: [
-                  { status: { in: ['pending', 'unknown'] } },
+                  { status: { in: OPEN_ATTEMPT_STATUSES } },
                   { status: 'failed_non_bank', createdAt: { gte: since } },
                 ],
               },

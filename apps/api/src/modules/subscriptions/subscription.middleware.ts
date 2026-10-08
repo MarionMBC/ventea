@@ -55,7 +55,9 @@ async function subscriptionAllows(
   const now = new Date();
   const decision = accessDecision(subscription, now);
   if (decision === 'expire_trial' && subscription) {
-    await subscriptions.expireTrial(tenant.tenantId, subscription.id, now);
+    // Con un cobro sin confirmar la prueba no se vence: el dueño pagó y sigue atendiendo.
+    const expiry = await subscriptions.expireTrial(tenant.tenantId, subscription.id, now);
+    return expiry === 'payment_pending';
   }
   return decision === 'allow';
 }

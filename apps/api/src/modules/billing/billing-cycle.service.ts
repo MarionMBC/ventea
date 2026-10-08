@@ -13,7 +13,11 @@ import {
   BillingLockService,
   subscriptionLockKey,
 } from './billing-lock.service';
-import { BillingOutcomeService, OPEN_ATTEMPT_STATUSES } from './billing-outcome.service';
+import {
+  BillingOutcomeService,
+  OPEN_ATTEMPT_STATUSES,
+  RECONCILABLE_ATTEMPT_STATUSES,
+} from './billing-outcome.service';
 import {
   checkApproval,
   GRACE_DAYS,
@@ -126,12 +130,14 @@ export class BillingCycleService {
   private async reconcile(now: Date, summary: BillingCycleSummary): Promise<void> {
     const tenants = await this.prisma.tenant.findMany({
       where: {
-        paymentAttempts: { some: { kind: 'renewal', status: { in: OPEN_ATTEMPT_STATUSES } } },
+        paymentAttempts: {
+          some: { kind: 'renewal', status: { in: RECONCILABLE_ATTEMPT_STATUSES } },
+        },
       },
       select: {
         id: true,
         paymentAttempts: {
-          where: { kind: 'renewal', status: { in: OPEN_ATTEMPT_STATUSES } },
+          where: { kind: 'renewal', status: { in: RECONCILABLE_ATTEMPT_STATUSES } },
           select: { subscriptionId: true },
         },
       },
@@ -168,7 +174,7 @@ export class BillingCycleService {
         tenantId,
         subscriptionId,
         kind: 'renewal',
-        status: { in: OPEN_ATTEMPT_STATUSES },
+        status: { in: RECONCILABLE_ATTEMPT_STATUSES },
       },
       orderBy: { createdAt: 'asc' },
       include: { plan: { select: { id: true, code: true } } },
@@ -379,6 +385,7 @@ export class BillingCycleService {
           orderId: attempt.orderId,
           providerTransactionId: result.transactionId ?? null,
           message: `Renovación${reconciled ? ', confirmada al consultar a la pasarela' : ''}`,
+          keepSuspended: true,
         });
         return 'approved';
       case 'declined':

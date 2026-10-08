@@ -4,7 +4,7 @@
 CREATE TYPE "PaymentAttemptKind" AS ENUM ('establish', 'renewal');
 
 -- CreateEnum
-CREATE TYPE "PaymentAttemptStatus" AS ENUM ('pending', 'succeeded', 'failed', 'unknown', 'failed_non_bank');
+CREATE TYPE "PaymentAttemptStatus" AS ENUM ('pending', 'succeeded', 'failed', 'unknown', 'failed_non_bank', 'needs_review');
 
 -- AlterEnum
 
