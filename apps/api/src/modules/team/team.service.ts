@@ -141,7 +141,7 @@ export class TeamService {
 
   async updateMember(actor: StaffPrincipal, id: string, input: UpdateMemberInput): Promise<void> {
     const { tenantId } = actor;
-    await this.prisma.$transaction(async (tx) => {
+    const changed = await this.prisma.$transaction(async (tx) => {
       await lock(tx, tenantId);
       const member = await tx.staffMember.findFirst({
         where: { tenantId, id },
@@ -156,7 +156,7 @@ export class TeamService {
       if (error) throw new ConflictException(error);
 
       const data = memberChanges(member, input);
-      if (Object.keys(data).length === 0) return;
+      if (Object.keys(data).length === 0) return null;
       if (data.isActive === true) await this.limits.assertCanAddStaff(tenantId, tx);
 
       await tx.staffMember.updateMany({
@@ -170,16 +170,25 @@ export class TeamService {
           data: { revokedAt: new Date() },
         });
       }
-      // Un dueño que se desactiva o deja de serlo ya no respalda a quien invitó: sus
-      // invitaciones pendientes dejan de servir.
+      // Un dueño que se desactiva o deja de serlo ya no respalda lo que emitió como dueño: sus
+      // invitaciones y enlaces de contraseña pendientes dejan de servir (si no, quien se va se
+      // queda con un enlace para entrar como otro miembro). Son los únicos artefactos con
+      // autor dueño; sus sesiones ya caen por `tokenVersion`.
       if (member.role === 'owner' && (data.isActive === false || data.role !== undefined)) {
+        const now = new Date();
         await tx.staffInvitation.updateMany({
-          where: { tenantId, invitedById: id, ...pending(new Date()) },
-          data: { revokedAt: new Date() },
+          where: { tenantId, invitedById: id, ...pending(now) },
+          data: { revokedAt: now },
+        });
+        await tx.staffPasswordReset.updateMany({
+          where: { tenantId, createdById: id, usedAt: null, revokedAt: null },
+          data: { revokedAt: now },
         });
       }
-      this.audit(actor, 'member_updated', id, data);
+      return data;
     });
+    // Después del commit: el log no dice que algo cambió si la transacción se deshizo.
+    if (changed) this.audit(actor, 'member_updated', id, changed);
   }
 
   async createPasswordReset(actor: StaffPrincipal, id: string): Promise<TeamLink> {
@@ -244,9 +253,9 @@ export class TeamService {
     const { tenantId } = tenant;
     // argon2 fuera de la transacción: tarda y no tiene por qué tener el lock tomado.
     const passwordHash = await argon2.hash(input.password);
-    let staff;
+    let accepted;
     try {
-      staff = await this.prisma.$transaction(async (tx) => {
+      accepted = await this.prisma.$transaction(async (tx) => {
         await lock(tx, tenantId);
         const invitation = await this.findInvitation(tx, tenantId, input.token);
         const existing = await tx.staffMember.findFirst({
@@ -261,7 +270,7 @@ export class TeamService {
           data: { acceptedAt: new Date() },
         });
         if (claimed.count !== 1) throw new NotFoundException(INVALID_LINK);
-        return tx.staffMember.create({
+        const staff = await tx.staffMember.create({
           data: {
             tenantId,
             email: invitation.email,
@@ -271,11 +280,13 @@ export class TeamService {
           },
           select: STAFF_SESSION_SELECT,
         });
+        return { staff, invitationId: invitation.id };
       });
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException(ALREADY_MEMBER);
       throw error;
     }
+    const { staff } = accepted;
     return this.auth.staffSession(tenantId, staff);
   }
 
@@ -290,7 +301,7 @@ export class TeamService {
   ): Promise<StaffAuthResponse> {
     const { tenantId } = tenant;
     const passwordHash = await argon2.hash(input.password);
-    const staff = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const reset = await this.findReset(tx, tenantId, input.token);
       const now = new Date();
       const claimed = await tx.staffPasswordReset.updateMany({
@@ -308,15 +319,16 @@ export class TeamService {
         select: STAFF_SESSION_SELECT,
       });
       if (!updated) throw new NotFoundException(INVALID_LINK);
-      return updated;
+      return { staff: updated, resetId: reset.id };
     });
-    return this.auth.staffSession(tenantId, staff);
+    return this.auth.staffSession(tenantId, result.staff);
   }
 
   // ─── Internos ───────────────────────────────────────────────────────────────
 
+  /** `actor`: quien actúa (el dueño, o quien usa su propio enlace al aceptar o confirmar). */
   private audit(
-    actor: StaffPrincipal,
+    actor: Pick<StaffPrincipal, 'tenantId' | 'staffId'>,
     action: string,
     targetId: string,
     changes?: Record<string, unknown>,

@@ -592,6 +592,31 @@ describe('Panel: sucursales y equipo (TASK-022)', () => {
       expect(team.invitations.find((i) => i.email === email)?.invitedByName).toBe('Dueño');
     });
 
+    it('si el dueño que creó un enlace de contraseña se desactiva o pierde el rol, el enlace muere', async () => {
+      for (const change of [{ isActive: false }, { role: 'manager' }] as const) {
+        const coowner = await coOwner();
+        const email = await createStaffMember(prisma, tenant, 'manager');
+        const target = await prisma.staffMember.findFirstOrThrow({
+          where: { tenantId: tenant.id, email },
+        });
+        const link = (
+          await as(coowner.accessToken)
+            .post(`/api/staff/team/members/${target.id}/password-reset`)
+            .expect(201)
+        ).body as TeamLink;
+        await as(owner).patch(`/api/staff/team/members/${coowner.staff.id}`, change).expect(204);
+        await anon()
+          .post('/api/staff/auth/password-reset/lookup', { token: link.token })
+          .expect(404);
+        await anon()
+          .post('/api/staff/auth/password-reset/confirm', {
+            token: link.token,
+            password: 'tomada-123456',
+          })
+          .expect(404);
+      }
+    });
+
     it('si el dueño que invitó pierde el rol o se desactiva, sus invitaciones dejan de servir', async () => {
       const demoted = await coOwner();
       const first = (
