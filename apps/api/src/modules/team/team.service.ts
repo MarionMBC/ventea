@@ -286,7 +286,8 @@ export class TeamService {
       if (isUniqueViolation(error)) throw new ConflictException(ALREADY_MEMBER);
       throw error;
     }
-    const { staff } = accepted;
+    const { staff, invitationId } = accepted;
+    this.audit({ tenantId, staffId: staff.id }, 'invitation_accepted', invitationId);
     return this.auth.staffSession(tenantId, staff);
   }
 
@@ -321,6 +322,7 @@ export class TeamService {
       if (!updated) throw new NotFoundException(INVALID_LINK);
       return { staff: updated, resetId: reset.id };
     });
+    this.audit({ tenantId, staffId: result.staff.id }, 'password_reset_confirmed', result.resetId);
     return this.auth.staffSession(tenantId, result.staff);
   }
 

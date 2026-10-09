@@ -1,6 +1,7 @@
+import { jest } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import type {
   CreatedInvitation,
@@ -590,6 +591,58 @@ describe('Panel: sucursales y equipo (TASK-022)', () => {
       await invite(email).expect(201);
       const team = (await as(owner).get('/api/staff/team').expect(200)).body as Team;
       expect(team.invitations.find((i) => i.email === email)?.invitedByName).toBe('Dueño');
+    });
+
+    it('auditoría: aceptar invitación y confirmar reset dejan TeamAudit sin PII ni tokens', async () => {
+      const spy = jest.spyOn(Logger.prototype, 'log');
+      try {
+        const email = `aud-${randomUUID().slice(0, 6)}@example.com`;
+        const created = (await invite(email).expect(201)).body as CreatedInvitation;
+        const joined = (
+          await anon()
+            .post('/api/staff/auth/invitation/accept', {
+              token: created.token,
+              name: 'Auditada',
+              password: 'clave-audit-123',
+            })
+            .expect(200)
+        ).body as StaffAuthResponse;
+        const link = (
+          await as(owner)
+            .post(`/api/staff/team/members/${joined.staff.id}/password-reset`)
+            .expect(201)
+        ).body as TeamLink;
+        await anon()
+          .post('/api/staff/auth/password-reset/confirm', {
+            token: link.token,
+            password: 'otra-audit-123',
+          })
+          .expect(200);
+
+        const lines = spy.mock.calls
+          .map((call) => String(call[0]))
+          .filter((line) => line.startsWith('{"action":'))
+          .map((line) => JSON.parse(line) as Record<string, unknown>);
+        expect(lines).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              action: 'invitation_accepted',
+              actorId: joined.staff.id,
+              targetId: created.invitation.id,
+            }),
+            expect.objectContaining({
+              action: 'password_reset_confirmed',
+              actorId: joined.staff.id,
+            }),
+          ]),
+        );
+        const raw = spy.mock.calls.map((call) => String(call[0])).join(' ');
+        expect(raw).not.toContain(email);
+        expect(raw).not.toContain(created.token);
+        expect(raw).not.toContain(link.token);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('si el dueño que creó un enlace de contraseña se desactiva o pierde el rol, el enlace muere', async () => {
