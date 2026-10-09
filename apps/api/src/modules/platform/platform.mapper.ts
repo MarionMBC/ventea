@@ -26,6 +26,7 @@ export function toPlan(plan: {
   priceYearlyCents: number;
   currency: string;
   maxLocations: number | null;
+  maxStaff: number | null;
   features: Prisma.JsonValue;
 }): Plan | null {
   if (!isPlanCode(plan.code)) return null;
@@ -37,6 +38,7 @@ export function toPlan(plan: {
     priceYearlyCents: plan.priceYearlyCents,
     currency: plan.currency,
     maxLocations: plan.maxLocations,
+    maxStaff: plan.maxStaff,
     features: features.success ? features.data : NO_FEATURES,
   };
 }
