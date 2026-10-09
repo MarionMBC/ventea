@@ -1,23 +1,28 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type {
-  AcceptInvitationInput,
-  ConfirmPasswordResetInput,
-  CreateInvitationInput,
-  CreatedInvitation,
-  InvitationPreview,
-  PasswordResetPreview,
-  StaffAuthResponse,
-  Team,
-  TeamInvitation,
-  TeamLink,
-  TeamLinkKind,
-  TenantContext,
-  UpdateMemberInput,
+import {
+  teamLinkPath,
+  type AcceptInvitationInput,
+  type ConfirmPasswordResetInput,
+  type CreateInvitationInput,
+  type CreatedInvitation,
+  type InvitationPreview,
+  type PasswordResetPreview,
+  type StaffAuthResponse,
+  type Team,
+  type TeamInvitation,
+  type TeamLink,
+  type TeamLinkKind,
+  type TenantContext,
+  type TenantRole,
+  type UpdateMemberInput,
 } from '@ventea/shared';
 import argon2 from 'argon2';
 
 import type { StaffPrincipal } from '@/common/auth/auth.context';
 import { AuthService, STAFF_SESSION_SELECT } from '@/modules/auth/auth.service';
+import { MailService } from '@/modules/mail/mail.service';
+import { MailSettings } from '@/modules/mail/mail.settings';
+import { brandLanguage } from '@/modules/push/push-messages';
 import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { isUniqueViolation } from '@/prisma/prisma-errors';
@@ -62,6 +67,8 @@ export class TeamService {
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly limits: PlanLimitsService,
     private readonly auth: AuthService,
+    private readonly mail: MailService,
+    private readonly mailSettings: MailSettings,
   ) {}
 
   // ─── Dueño ──────────────────────────────────────────────────────────────────
@@ -126,7 +133,16 @@ export class TeamService {
       });
     });
     this.audit(actor, 'invitation_created', invitation.id);
-    this.deliver(tenantId, 'invitation', invitation.email, token);
+    this.deliver({
+      kind: 'invitation',
+      tenantId,
+      refId: invitation.id,
+      to: invitation.email,
+      token,
+      expiresAt: invitation.expiresAt,
+      role: invitation.role,
+      inviterId: actor.staffId,
+    });
     return { invitation, token, expiresAt: invitation.expiresAt };
   }
 
@@ -201,7 +217,7 @@ export class TeamService {
     const reset = await this.prisma.$transaction(async (tx) => {
       const member = await tx.staffMember.findFirst({
         where: { tenantId, id },
-        select: { id: true, email: true, isActive: true, role: true },
+        select: { id: true, email: true, name: true, isActive: true, role: true },
       });
       if (!member) throw new NotFoundException('Miembro no encontrado');
       // Entre dueños no: un co-dueño no puede tomar la cuenta de otro con un enlace.
@@ -221,12 +237,25 @@ export class TeamService {
           createdById: actor.staffId,
           expiresAt: teamLinkExpiry(now),
         },
-        select: { expiresAt: true },
+        select: { id: true, expiresAt: true },
       });
-      return { email: member.email, expiresAt: created.expiresAt };
+      return {
+        id: created.id,
+        email: member.email,
+        name: member.name,
+        expiresAt: created.expiresAt,
+      };
     });
     this.audit(actor, 'password_reset_created', id);
-    this.deliver(tenantId, 'reset', reset.email, token);
+    this.deliver({
+      kind: 'reset',
+      tenantId,
+      refId: reset.id,
+      to: reset.email,
+      token,
+      expiresAt: reset.expiresAt,
+      memberName: reset.name,
+    });
     return { token, expiresAt: reset.expiresAt };
   }
 
@@ -381,16 +410,80 @@ export class TeamService {
   }
 
   /**
-   * Único punto de entrega de los enlaces. Hoy no hay correo: el panel muestra el enlace y el
-   * dueño lo copia y lo comparte.
-   *
-   * TODO(TASK-021): con `MailService` en main, enviar acá el correo a `email` con
-   * `https://<slug>.<TENANT_BASE_DOMAIN>` + `teamLinkPath(kind, token)` (@ventea/shared) en el
-   * idioma de la marca, sin bloquear la respuesta y sin registrar el token en logs.
+   * Único punto de entrega de los enlaces (TASK-021): encola el correo DESPUÉS de responder
+   * (`enqueueInBackground`: nunca demora ni hace fallar la invitación). El panel igual muestra el
+   * enlace para copiar: sin SMTP el correo queda `skipped`. El link apunta solo al dominio de la
+   * marca (`https://<slug>.<TENANT_BASE_DOMAIN>/admin/join#…`; la plantilla lo valida con
+   * `isSafeLink`), los nombres van neutralizados (`neutralizeLinks`) y, enviado u omitido, el
+   * link sale del registro de la outbox. Idioma: el de la marca.
    */
-  private deliver(_tenantId: string, _kind: TeamLinkKind, _email: string, _token: string): void {
-    // Sin transporte de correo todavía (ver TODO).
+  private deliver(link: TeamLinkDelivery): void {
+    const kind = link.kind === 'invitation' ? 'staff_invite' : 'staff_password_reset';
+    this.mail.enqueueInBackground(kind, async () => {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: link.tenantId },
+        select: {
+          slug: true,
+          name: true,
+          timezone: true,
+          branding: { select: { language: true } },
+        },
+      });
+      if (!tenant) return [];
+      const base = {
+        tenantName: tenant.name,
+        timeZone: tenant.timezone,
+        supportEmail: this.mailSettings.from.address,
+        expiresAt: link.expiresAt.toISOString(),
+      };
+      const url = this.mailSettings.tenantUrl(tenant.slug, teamLinkPath(link.kind, link.token));
+      const common = {
+        to: link.to,
+        language: brandLanguage(tenant.branding?.language),
+        tenantId: link.tenantId,
+        dedupeKey: `${kind}:${link.tenantId}:${link.refId}`,
+      };
+      if (link.kind === 'reset') {
+        return [
+          {
+            ...common,
+            kind: 'staff_password_reset' as const,
+            payload: { ...base, memberName: link.memberName ?? '', resetUrl: url },
+          },
+        ];
+      }
+      const inviter = await this.prisma.staffMember.findFirst({
+        where: { tenantId: link.tenantId, id: link.inviterId },
+        select: { name: true },
+      });
+      return [
+        {
+          ...common,
+          kind: 'staff_invite' as const,
+          payload: {
+            ...base,
+            inviterName: inviter?.name ?? tenant.name,
+            role: link.role ?? 'staff',
+            inviteUrl: url,
+          },
+        },
+      ];
+    });
   }
+}
+
+/** Lo que hace falta para mandar un enlace por correo. */
+interface TeamLinkDelivery {
+  kind: TeamLinkKind;
+  tenantId: string;
+  /** Id de la invitación o del reset: clave de idempotencia del correo. */
+  refId: string;
+  to: string;
+  token: string;
+  expiresAt: Date;
+  role?: TenantRole;
+  inviterId?: string;
+  memberName?: string;
 }
 
 /** Invitación sin usar, sin revocar y vigente. */

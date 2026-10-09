@@ -344,8 +344,12 @@ Públicos (quien recibe el enlace), token SIEMPRE en el cuerpo, rate limit por I
 - **Tokens:** 32 bytes base64url, la base guarda su sha256; un solo uso, 72 h; uno nuevo revoca el
   anterior (mismo email / mismo miembro). Inválido, vencido, usado, revocado o de otra marca → el
   mismo `404`. El panel arma el enlace con el token en el fragmento (`/admin/join#…`,
-  `/admin/reset-password#…`). Sin correo todavía: el dueño copia el enlace (`TeamService.deliver`,
-  `TODO(TASK-021)`).
+  `/admin/reset-password#…`). Además se envía por correo (`staff_invite` /
+  `staff_password_reset`, outbox de TASK-021, idioma de la marca) con el link
+  `https://<slug>.<TENANT_BASE_DOMAIN>/admin/…#token` (solo ese dominio, `isSafeLink`) y los
+  nombres neutralizados. Sin SMTP el correo queda `skipped` y el dueño copia el link del panel.
+  Enviado u omitido, el link se borra del `payload` de la outbox (`[redacted]`); un `failed` lo
+  conserva para reenviarlo.
 - **Dueños y auditoría:** el listado trae `invitedByName` en cada invitación; desactivar o quitar el
   rol a un dueño revoca sus invitaciones y enlaces de contraseña pendientes. Cada invitación, revocación, cambio de miembro y
   enlace de contraseña (creado, aceptado/confirmado) deja una línea `TeamAudit` en el log (ids, nunca emails ni tokens).
