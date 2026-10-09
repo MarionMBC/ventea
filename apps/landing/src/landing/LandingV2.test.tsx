@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CONTACT_EMAIL, DEMO_URL } from '@/config';
 import { beaconEvents, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { PanelAccess } from '@/site/PanelAccess';
 import { WhatsAppButton } from '@/site/WhatsAppButton';
 
 import { buildDemoMailto, DemoRequest } from './DemoRequest';
@@ -19,13 +20,12 @@ async function renderLanding() {
   return view;
 }
 
-describe('Demo con capturas reales (TASK-007 AC2)', () => {
-  it('tres capturas AVIF+WebP con dimensiones, lazy y texto alternativo', async () => {
-    await renderLanding();
-    const section = screen.getByRole('region', { name: 'Mírala funcionando' });
-    const images = within(section).getAllByRole('img');
-    expect(images).toHaveLength(3);
-    for (const img of images) {
+describe('Capturas reales del producto (TASK-007 AC2, TASK-010)', () => {
+  it('panel y app de Carolina: AVIF+WebP con dimensiones, lazy y texto alternativo', async () => {
+    const { container } = await renderLanding();
+    const shots = [...container.querySelectorAll<HTMLImageElement>('#panel img, #identidad img')];
+    expect(shots).toHaveLength(3);
+    for (const img of shots) {
       expect(Number(img.getAttribute('width'))).toBeGreaterThan(0);
       expect(Number(img.getAttribute('height'))).toBeGreaterThan(0);
       expect(img.getAttribute('loading')).toBe('lazy');
@@ -36,16 +36,23 @@ describe('Demo con capturas reales (TASK-007 AC2)', () => {
     }
   });
 
-  it('link a la demo en vivo y mención neutral de Carolina, sin testimonios ni cifras', async () => {
+  it('mención neutral de Carolina y el restaurante de ejemplo presentado como tal', async () => {
     const { container } = await renderLanding();
-    const live = screen.getByRole('link', { name: /Ver una demo en vivo/ });
-    expect(live.getAttribute('href')).toBe(DEMO_URL);
-    expect(live.getAttribute('rel')).toContain('noopener');
     expect(text(container)).toContain('Carolina Hot Chicken ya recibe pedidos con Ventea');
-    expect(container.querySelector('blockquote')).toBeNull();
-    expect(text(container)).not.toMatch(
-      /\d[\d.,]*\s*(restaurantes|clientes|pedidos)\s+(usan|confían)/i,
-    );
+    expect(text(container)).toContain('Demostración con un restaurante de ejemplo');
+    // El menú web de las marcas todavía no está publicado: no se enlaza una «demo en vivo».
+    expect(container.querySelector(`a[href="${DEMO_URL}"]`)).toBeNull();
+  });
+
+  it('las fotos de platillos son decorativas o con alt, con srcset y tamaño fijo', async () => {
+    const { container } = await renderLanding();
+    const photos = [...container.querySelectorAll<HTMLImageElement>('img[srcset]')];
+    expect(photos.length).toBeGreaterThan(4);
+    for (const img of photos) {
+      expect(img.getAttribute('width')).toBe('320');
+      expect(img.getAttribute('height')).toBe('320');
+      expect(img.getAttribute('alt')).not.toBeNull();
+    }
   });
 });
 
@@ -54,8 +61,8 @@ describe('FAQ alineada con los términos (review TASK-007)', () => {
     const { container } = await renderLanding();
     const faq = text(container.querySelector('#preguntas'));
     expect(faq).not.toMatch(/te avisamos/i);
-    expect(faq).toContain('en la sección Facturación de tu panel ves hasta cuándo dura tu prueba');
-    expect(faq).toContain('coordinamos el pago contigo');
+    expect(faq).toContain('en la sección Facturación de su panel ve hasta cuándo dura su prueba');
+    expect(faq).toContain('coordinamos el pago con usted');
   });
 });
 
@@ -75,10 +82,10 @@ describe('Contacto (TASK-007)', () => {
     const navigate = vi.fn();
     render(<DemoRequest navigate={navigate} />);
     fireEvent.click(screen.getByRole('button', { name: 'Pedir una demo' }));
-    expect(screen.getByText('Escribe tu nombre.')).toBeTruthy();
+    expect(screen.getByText('Escriba su nombre.')).toBeTruthy();
     expect(navigate).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText('Tu nombre'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByLabelText('Su nombre'), { target: { value: 'Ana' } });
     fireEvent.change(screen.getByLabelText('Nombre del restaurante'), {
       target: { value: 'Pollos Doña Ana' },
     });
@@ -118,7 +125,7 @@ describe('Embudo sin cookies (TASK-007 AC4)', () => {
     // Otra vista en la misma pestaña no cuenta otra visita.
     first.unmount();
     render(<LandingPage />);
-    fireEvent.click(screen.getAllByRole('link', { name: /Prueba 14 días gratis/ })[0]!);
+    fireEvent.click(screen.getAllByRole('link', { name: /Registrar mi restaurante/ })[0]!);
     expect(await beaconEvents()).toEqual(['visit', 'cta_click']);
 
     const [url, body] = (window.navigator.sendBeacon as unknown as ReturnType<typeof vi.fn>).mock
@@ -132,5 +139,21 @@ describe('Embudo sin cookies (TASK-007 AC4)', () => {
     const legal = screen.getByRole('navigation', { name: 'Legal' });
     expect(within(legal).getByRole('link', { name: 'Términos del servicio' })).toBeTruthy();
     expect(within(legal).getByRole('link', { name: 'Política de privacidad' })).toBeTruthy();
+  });
+});
+
+describe('Acceso al panel (TASK-010)', () => {
+  it('arma la dirección del panel de la marca y valida el formato', async () => {
+    const navigate = vi.fn();
+    render(<PanelAccess navigate={navigate} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ir' }));
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(navigate).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Entrar a mi panel'), {
+      target: { value: 'https://Casa-Brasa.ventea.tech/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Ir' }));
+    expect(navigate).toHaveBeenCalledWith('https://casa-brasa.ventea.tech/admin');
   });
 });

@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#1d1a16"/>
-  <path d="M16 18h9l7 20 7-20h9L37 48h-10z" fill="#f6b54a"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="190.0 212.5 905.0 905.0" width="905" height="905" role="img" aria-label="Ventea"><style>@media (prefers-color-scheme: dark){.n{fill:#FFFFFF}}</style><title>Ventea</title><path class="n" fill="#0B1E3A" d="M224 345 L385 345 C424 345 449 367 465 395 L730 830 Q746 854 731 878 L680 950 C660 977 636 986 610 985 C582 984 557 968 540 940 L210 380 C201 365 203 345 224 345 Z"/><path fill="#03ADAE" d="M760 850 C757.5 836.7 758.3 800.8 745.0 770.0 C731.7 739.2 693.8 691.7 680.0 665.0 C666.2 638.3 665.0 627.5 662.0 610.0 C659.0 592.5 662.0 568.3 662.0 560.0 L662 490 C662 420 715 345 800 345 L1068 345 Q1090 345 1081 366 L1030 450 C1012 482 985 500 945 500 L850 500 Q815 500 815 535 L815 715 C815 770 795 815 760 850 Z"/></svg>

@@ -50,3 +50,4 @@ graphify-out/
 .atl/
 deploy/test-vps/.sync-routes.lock
 deploy/test-vps/*.tmp
+dist-ssr/

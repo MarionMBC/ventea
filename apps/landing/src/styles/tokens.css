@@ -1,44 +1,53 @@
 /*
- * Tokens de la landing. Paleta cálida (carbón, papel, achiote y maíz) pensada para
- * restaurantes. Todos los pares texto/fondo usados cumplen AA (≥ 4.5:1; los títulos
- * grandes ≥ 3:1). Sin fuentes web: la pila del sistema carga al instante.
+ * Tokens de la landing, el registro y las legales (TASK-010). Paleta de la marca Ventea: azul
+ * marino y turquesa del logotipo oficial, con neutros fríos y un ámbar para los puntos. Todos
+ * los pares texto/fondo usados cumplen AA (≥ 4.5:1; títulos grandes ≥ 3:1). Contrastes
+ * medidos con la fórmula WCAG 2.x.
+ *
+ * El turquesa del logo (#01A5A4) con texto blanco no llega a 4.5:1 (3.0:1): como fondo de botón
+ * lleva texto marino (5.9:1); los botones con texto blanco usan el turquesa profundo --brand.
  */
 :root {
   --font-sans:
     system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   --font-display:
-    ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --fs-xs: 0.8125rem;
   --fs-sm: 0.9375rem;
   --fs-md: 1.0625rem;
   --fs-lg: 1.25rem;
-  --fs-xl: clamp(1.625rem, 1.2rem + 1.8vw, 2.375rem);
-  --fs-hero: clamp(2.125rem, 1.4rem + 3.6vw, 3.75rem);
+  --fs-xl: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+  --fs-hero: clamp(2.5rem, 1.35rem + 5vw, 5.25rem);
   --lh: 1.55;
 
   /* Superficies */
-  --ink: #1d1a16; /* carbón: hero, footer y texto */
-  --ink-2: #2b2621;
-  --paper: #fbf8f3;
+  --ink: #06182c; /* azul marino: hero, footer y texto */
+  --ink-2: #0c2440;
+  --ink-3: #133152;
+  --paper: #f7f9fa;
   --surface: #ffffff;
-  --tint: #f4eee4;
-  --line: #e2d9cb;
-  --line-strong: #c9bca8;
+  --tint: #eef3f5;
+  --line: #dce4ea;
+  --line-strong: #b8c5d0;
 
   /* Texto */
-  --text: #1d1a16; /* 16.6:1 sobre --paper */
-  --text-muted: #5b5248; /* 7.4:1 sobre --paper, 6.7:1 sobre --tint */
-  --on-ink: #fbf8f3;
-  --on-ink-muted: #d6ccbd; /* 11:1 sobre --ink */
+  --text: #06182c; /* 16.5:1 sobre --tint */
+  --text-muted: #4a5b6d; /* 6.4:1 sobre --tint, 7:1 sobre blanco */
+  --on-ink: #ffffff;
+  --on-ink-muted: #c9d5e0; /* 12:1 sobre --ink */
 
-  /* Acentos */
-  --brand: #b23f0e; /* achiote: botones primarios, 5.9:1 con blanco */
-  --brand-hover: #94330a;
-  --brand-soft: #fbe7da;
-  --sun: #f6b54a; /* maíz: CTA sobre carbón, 9.6:1 con --ink */
-  --sun-hover: #f8c56d;
-  --leaf: #12643e; /* el 0 % y lo positivo, 7:1 sobre blanco */
+  /* Marca */
+  --teal: #01a5a4; /* turquesa del logo: fondos y acentos, con texto --ink (5.9:1) */
+  --teal-bright: #5dd6d4; /* texto turquesa sobre --ink (10.2:1) */
+  --brand: #007a79; /* turquesa profundo: botones con texto blanco (5.2:1) y links */
+  --brand-hover: #00615f;
+  --brand-soft: #e0f4f3;
+  --sun: #01a5a4; /* CTA sobre marino (texto --ink). Nombre heredado del registro. */
+  --sun-hover: #2bbdbb;
+  --amber: #e9a23b; /* puntos y recompensas, sobre marino (8.2:1 con --ink como texto) */
+  --amber-soft: #fdf1dc;
+  --leaf: #12643e; /* lo positivo, 7:1 sobre blanco */
   --leaf-soft: #e1f2e7;
   --danger: #b42318;
   --danger-soft: #fdecea;
@@ -51,12 +60,16 @@
   /* Medidas */
   --tap: 48px;
   --radius-sm: 10px;
-  --radius: 16px;
-  --radius-lg: 24px;
+  --radius: 18px;
+  --radius-lg: 28px;
   --gutter: 16px;
-  --container: 1160px;
-  --shadow: 0 1px 2px rgb(29 26 22 / 0.06), 0 4px 16px rgb(29 26 22 / 0.06);
-  --shadow-lg: 0 18px 48px rgb(29 26 22 / 0.18);
+  --container: 1200px;
+  --shadow: 0 1px 2px rgb(6 24 44 / 0.06), 0 6px 20px rgb(6 24 44 / 0.07);
+  --shadow-lg: 0 24px 60px rgb(6 24 44 / 0.22);
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 @media (min-width: 768px) {
