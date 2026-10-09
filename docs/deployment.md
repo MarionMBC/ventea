@@ -227,15 +227,19 @@ puesta en marcha, no un extra.
 
 ## App móvil
 
-El binario nativo no se despliega en el servidor: va a las tiendas y **apunta a la API de
-la marca** (`https://<slug>.ventea.tech`). Esa URL se hornea en tiempo de build (Vite la
-resuelve al construir, no al ejecutar), así que cada marca tiene su propio binario:
+**Web** (menú público en `<slug>.ventea.tech`, servido por el nginx de la imagen web): un
+solo build para todas las marcas. La marca sale del hostname (apex, `app.`, `www.` y
+`api.` no son marcas) y la API es siempre el mismo origen (`/api`), así que la CSP
+`connect-src 'self'` alcanza y no hay que hornear nada por marca.
+
+**Nativo**: no se despliega en el servidor, va a las tiendas, y cada marca tiene su binario.
+Bundle id, nombre, tenant y API salen de `apps/mobile/brand.config.json` (lo escribe el
+generador, TASK-019):
 
 ```bash
-VITE_API_URL=https://carolina-hot-chicken.ventea.tech \
-VITE_DEFAULT_TENANT_SLUG=carolina-hot-chicken \
-VENTEA_APP_ID=app.ventea.carolina \
-npm run build -w @ventea/mobile && npx cap sync
+cd apps/mobile
+VENTEA_BRAND_FILE=brands/brand.carolina.json npm run build
+VENTEA_BRAND_FILE=brands/brand.carolina.json npx cap sync
 ```
 
 Detalle en [white-label.md](white-label.md).

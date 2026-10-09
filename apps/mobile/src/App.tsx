@@ -11,6 +11,7 @@ import {
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { HAS_BRAND } from './brand/runtime';
 import { useBrand, useTenantRefresh } from './brand/useBrand';
 import { icons } from './components/ui/icons';
 import { CartBadge } from './components/navigation/CartBadge';
@@ -119,9 +120,20 @@ const AppShell = () => (
   </IonTabs>
 );
 
+/** A host that is no brand's subdomain: say so, call nothing. */
+const NoBrand = () => (
+  <IonApp>
+    <main className="vt-no-brand">
+      <h1 className="vt-h2">{t('noBrand.title')}</h1>
+      <p className="vt-body vt-text-secondary">{t('noBrand.description')}</p>
+    </main>
+  </IonApp>
+);
+
 const App = () => {
   useTenantRefresh();
   const { currency } = useBrand();
+  if (!HAS_BRAND) return <NoBrand />;
   /* Prices are formatted outside React state: if the brand's currency turns
      out different from the cached/built one, the tree is rebuilt once. */
   return (

@@ -4,11 +4,12 @@ import type { BrandConfig } from './brand/brandConfig';
 declare global {
   interface ImportMetaEnv {
     /**
-     * API origin, without `/api`. Overrides the brand's `apiUrl`. In `vite dev`
-     * the default is the dev server itself, which proxies `/api` to
-     * `API_PROXY_TARGET` (default `http://localhost:3000`).
+     * API origin, without `/api`, for native builds and `vite dev` (see
+     * `brand/runtime.ts`). The production web build ignores it: same origin.
      */
     readonly VITE_API_URL?: string;
+    /** Platform domain whose subdomains are brands (web build). Default `ventea.tech`. */
+    readonly VITE_BASE_DOMAIN?: string;
   }
 
   interface ImportMeta {

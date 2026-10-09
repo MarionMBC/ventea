@@ -45,25 +45,33 @@ const readCache = (storage: KeyValueStorage | null, key: string): BrandState | n
   return null;
 };
 
-/** `/api/tenant` → brand state. Tolerates the fields TASK-016 adds being absent. */
+/**
+ * `/api/tenant` → brand state. A field the API does not send at all
+ * (`undefined`: an API from before TASK-016) keeps the previous value; a field
+ * sent as `null` means the brand removed it (logo, icon, accent) and clears it.
+ * An invalid value counts as removed for optional fields and is ignored for the
+ * required primary colour.
+ */
 export const brandFromTenant = (
   previous: BrandState,
   tenant: Tenant,
   apiUrl: string,
 ): BrandState => {
   const branding = tenant.branding ?? ({} as Partial<Tenant['branding']>);
-  const color = (value: unknown, fallback: string | null | undefined) =>
-    isHexColor(value) ? value : (fallback ?? null);
+  const optionalColor = (value: unknown, kept: string | null) =>
+    value === undefined ? kept : isHexColor(value) ? value : null;
+  const optionalMedia = (value: string | null | undefined, kept: string | null) =>
+    value === undefined ? kept : (resolveMediaUrl(value, apiUrl) ?? null);
   return {
     slug: previous.slug,
     appName: branding.appDisplayName?.trim() || tenant.name || previous.appName,
-    logoUrl: resolveMediaUrl(branding.logoUrl, apiUrl) ?? previous.logoUrl,
-    iconUrl: resolveMediaUrl(branding.iconUrl, apiUrl) ?? previous.iconUrl,
+    logoUrl: optionalMedia(branding.logoUrl, previous.logoUrl),
+    iconUrl: optionalMedia(branding.iconUrl, previous.iconUrl),
     currency: /^[A-Z]{3}$/.test(tenant.currency ?? '') ? tenant.currency : previous.currency,
     colors: {
-      primary: color(branding.primaryColor, previous.colors.primary) as string,
-      secondary: color(branding.secondaryColor, previous.colors.secondary),
-      accent: color(branding.accentColor, previous.colors.accent),
+      primary: isHexColor(branding.primaryColor) ? branding.primaryColor : previous.colors.primary,
+      secondary: optionalColor(branding.secondaryColor, previous.colors.secondary ?? null),
+      accent: optionalColor(branding.accentColor, previous.colors.accent ?? null),
     },
   };
 };

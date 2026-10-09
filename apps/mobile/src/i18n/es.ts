@@ -2,6 +2,10 @@ import type { MessageKey } from './en';
 
 /** Spanish copy (neutral Latin-American, «tú»). Must define every key of `en`. */
 export const es: Record<MessageKey, string> = {
+  'noBrand.title': 'Restaurante no encontrado',
+  'noBrand.description':
+    'Esta dirección no corresponde a ningún restaurante. Revisa el enlace que te dieron.',
+
   'tab.home': 'Inicio',
   'tab.menu': 'Menú',
   'tab.cart': 'Carrito',

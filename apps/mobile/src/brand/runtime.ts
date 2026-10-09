@@ -20,18 +20,51 @@ export const BUILD_BRAND: BrandConfig = __BRAND__;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+){0,20}$/;
 const PREVIEW_KEY = 'ventea.preview.tenant';
 
+/** Subdomains of the platform that are never a brand (nginx serves them other sites). */
+export const NON_BRAND_SUBDOMAINS: readonly string[] = ['app', 'www', 'api'];
+
+/**
+ * `<slug>.<baseDomain>` → slug. The apex, the platform subdomains and any
+ * other host give null: a brand is only ever its own subdomain.
+ */
+export const slugFromHostname = (hostname: string, baseDomain: string): string | null => {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+  const suffix = `.${baseDomain.toLowerCase()}`;
+  if (!host.endsWith(suffix)) return null;
+  const label = host.slice(0, -suffix.length);
+  if (!SLUG.test(label) || label.length > 63 || NON_BRAND_SUBDOMAINS.includes(label)) return null;
+  return label;
+};
+
+/**
+ * Which brand this run is:
+ *
+ * - native binary → always the brand it was built for (`brand.config.json`);
+ * - production web (the public menu at `<slug>.ventea.tech`, served by nginx)
+ *   → the brand of the hostname; any other host → none ('');
+ * - `vite dev` → `?tenant=<slug>` previews any brand (kept in sessionStorage
+ *   so in-app navigation keeps it), else the build brand. Never in production:
+ *   a query string must not re-brand somebody else's subdomain.
+ */
 export const resolveTenantSlug = ({
   native,
+  dev,
+  hostname,
+  baseDomain,
   search,
   storage,
   fallback,
 }: {
   native: boolean;
+  dev: boolean;
+  hostname: string;
+  baseDomain: string;
   search: string;
   storage: KeyValueStorage | null;
   fallback: string;
 }): string => {
   if (native) return fallback;
+  if (!dev) return slugFromHostname(hostname, baseDomain) ?? '';
   const requested = new URLSearchParams(search).get('tenant')?.trim().toLowerCase();
   if (requested && SLUG.test(requested) && requested.length <= 63) {
     try {
@@ -51,41 +84,63 @@ export const resolveTenantSlug = ({
 };
 
 /**
- * API origin. `VITE_API_URL` wins; in `vite dev` the default is the dev
- * server itself (same origin), whose proxy forwards `/api` to
- * `API_PROXY_TARGET` (default `http://localhost:3000`) — no CORS involved.
- * A production build uses the brand's `apiUrl`.
+ * API origin:
+ * - native → `VITE_API_URL`, else the brand's `apiUrl`;
+ * - `vite dev` → `VITE_API_URL`, else the dev server itself, whose proxy
+ *   forwards `/api` to `API_PROXY_TARGET` (default `http://localhost:3000`);
+ * - production web → always the same origin (`/api` of `<slug>.ventea.tech`,
+ *   routed by Traefik; the host picks the tenant and the CSP `connect-src
+ *   'self'` holds). No env can point it elsewhere.
  */
 export const resolveApiUrl = ({
-  envUrl,
+  native,
   dev,
+  envUrl,
   brandUrl,
 }: {
-  envUrl: string | undefined;
+  native: boolean;
   dev: boolean;
+  envUrl: string | undefined;
   brandUrl: string;
-}): string => (envUrl ? envUrl.replace(/\/+$/, '') : dev ? '' : brandUrl);
+}): string => {
+  const env = envUrl ? envUrl.replace(/\/+$/, '') : '';
+  if (native) return env || brandUrl;
+  if (dev) return env;
+  return '';
+};
 
 export const IS_NATIVE = Capacitor.isNativePlatform();
 
+const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'ventea.tech';
+
 export const TENANT_SLUG = resolveTenantSlug({
   native: IS_NATIVE,
+  dev: import.meta.env.DEV,
+  hostname: typeof window !== 'undefined' ? window.location.hostname : '',
+  baseDomain: BASE_DOMAIN,
   search: typeof window !== 'undefined' ? window.location.search : '',
   storage: sessionStorageOrNull(),
   fallback: BUILD_BRAND.tenantSlug,
 });
 
-/** True when the web preview shows a brand other than the build's. */
-export const IS_PREVIEW_OF_OTHER_BRAND = TENANT_SLUG !== BUILD_BRAND.tenantSlug;
+/** False on a host that is no brand's: the app shows a neutral notice and calls nothing. */
+export const HAS_BRAND = TENANT_SLUG !== '';
+
+/** True when this run is the brand the build was made for (native, or dev without ?tenant=). */
+export const IS_BUILD_BRAND = TENANT_SLUG === BUILD_BRAND.tenantSlug;
 
 export const API_URL = resolveApiUrl({
-  envUrl: import.meta.env.VITE_API_URL,
+  native: IS_NATIVE,
   dev: import.meta.env.DEV,
+  envUrl: import.meta.env.VITE_API_URL,
   brandUrl: BUILD_BRAND.apiUrl,
 });
 
-/** Per-brand storage key: the web preview can hold several brands in one browser. */
-export const storageKey = (name: string): string => `ventea.${TENANT_SLUG}.${name}`;
+/** Per-brand storage key: one browser can hold several brands without crossing sessions. */
+export const storageKey = (name: string): string => `ventea.${TENANT_SLUG || 'none'}.${name}`;
+
+/** Neutral look until another brand's `/api/tenant` answers (never another brand's colours). */
+const NEUTRAL_COLORS: BrandColors = { primary: '#6B6B6B', secondary: null, accent: null };
 
 /** The brand as the app shows it right now. */
 export interface BrandState {
@@ -98,12 +153,12 @@ export interface BrandState {
 }
 
 /**
- * First paint: the build brand, or — when previewing another brand — neutral
- * values with that brand's last known look (cached from `/api/tenant`).
+ * First paint: this brand's last known look (cached from `/api/tenant`), else
+ * the build brand when it is the same one, else neutral values.
  */
 export const initialBrandState = (cached: BrandState | null): BrandState => {
   if (cached && cached.slug === TENANT_SLUG) return cached;
-  if (!IS_PREVIEW_OF_OTHER_BRAND) {
+  if (IS_BUILD_BRAND) {
     return {
       slug: TENANT_SLUG,
       appName: BUILD_BRAND.appName,
@@ -119,7 +174,7 @@ export const initialBrandState = (cached: BrandState | null): BrandState => {
     logoUrl: null,
     iconUrl: null,
     currency: BUILD_BRAND.currency,
-    colors: BUILD_BRAND.colors,
+    colors: NEUTRAL_COLORS,
   };
 };
 

@@ -32,6 +32,21 @@ const NAME = `ventea-nginx-smoke-${process.pid}`;
 
 const docker = (...cmd) => execFileSync('docker', cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
+/** Cuerpo `Transfer-Encoding: chunked` → texto plano (las marcas de tamaño cortan etiquetas). */
+function dechunk(text) {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const eol = text.indexOf('\r\n', i);
+    if (eol < 0) break;
+    const size = Number.parseInt(text.slice(i, eol), 16);
+    if (!size) break;
+    out += text.slice(eol + 2, eol + 2 + size);
+    i = eol + 2 + size + 2;
+  }
+  return out;
+}
+
 /** Pedido HTTP/1.1 con bytes exactos (sin normalizar la ruta). */
 function raw(host, target, method = 'GET') {
   return new Promise((resolve, reject) => {
@@ -59,7 +74,12 @@ function raw(host, target, method = 'GET') {
         const key = line.slice(0, i).trim().toLowerCase();
         headers[key] = headers[key] ? `${headers[key]}\n${line.slice(i + 1).trim()}` : line.slice(i + 1).trim();
       }
-      resolve({ status: Number(statusLine.split(' ')[1]), headers, body: rest.join('\r\n\r\n') });
+      const body = rest.join('\r\n\r\n');
+      resolve({
+        status: Number(statusLine.split(' ')[1]),
+        headers,
+        body: /chunked/i.test(headers['transfer-encoding'] ?? '') ? dechunk(body) : body,
+      });
     });
   });
 }
@@ -210,6 +230,25 @@ async function main() {
     await expectPage('app.ventea.tech', '/registro', 200);
     await expectPage('carolina.ventea.tech', '/', 200);
     await expectRedirect('carolina.ventea.tech', '/admin/plataforma', 301, 'https://app.ventea.tech/admin/plataforma');
+
+    // ── Menú público (apps/mobile) en una marca, TASK-018 ────────────────────────────────
+    // La app saca la marca del host y llama a /api del mismo origen: la CSP del header
+    // (connect-src 'self') y la del <meta> del build tienen que dejarla funcionar.
+    {
+      const B = 'demo-burgers.ventea.tech';
+      const r = await raw(B, '/');
+      const header = r.headers['content-security-policy'] ?? '';
+      const meta = (/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(r.body)?.[1] ?? '').replaceAll('&#39;', "'");
+      check(`${B}/ sirve la app (#root)`, r.status === 200 && r.body.includes('id="root"'), `${r.status}`);
+      check(`${B}/ CSP header connect-src 'self'`, header.includes("connect-src 'self'") && header.includes("script-src 'self'"), header);
+      check(`${B}/ CSP meta del build: scripts propios, sin unsafe-eval`, meta.includes("script-src 'self'") && !meta.includes('unsafe-eval'), meta);
+      check(`${B}/ sin <script> inline (CSP script-src 'self')`, !/<script(?![^>]*\bsrc=)[^>]*>/i.test(r.body));
+      const deep = await raw(B, '/menu');
+      check(`${B}/menu → index de la SPA`, deep.status === 200 && deep.body.includes('id="root"'), `${deep.status}`);
+      const js = /<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(r.body)?.[1];
+      const bundle = js ? await raw(B, js) : { status: 0, body: '' };
+      check(`${B}${js ?? '/assets/*.js'} bundle 200`, bundle.status === 200, `${bundle.status}`);
+    }
 
     // ── Headers ────────────────────────────────────────────────────────────────────────────
     for (const path of ['/', '/es/', '/en/', '/nope', '/es/nada', '/en/privacy']) {
