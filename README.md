@@ -73,6 +73,11 @@ npm run cap:sync -w @ventea/mobile
 npm run cap:android -w @ventea/mobile
 ```
 
+La app usa `@ventea/shared` compilado. `build`, `dev`, `test` y `typecheck` de mobile lo
+compilan antes si falta `packages/shared/dist` o está desactualizado
+(`apps/mobile/scripts/ensure-shared.mjs`), así que funcionan en un clon recién clonado; con
+turbo (`npm run build`) no hace nada, porque turbo ya compiló shared.
+
 Capacidades nativas en uso: biometría (desbloqueo de sesión), push, geolocalización
 puntual (ordenar sucursales por cercanía — **no** hay tracking continuo) y cámara.
 Todas pasan por la fachada `apps/mobile/src/lib/native/`; las features nunca importan
