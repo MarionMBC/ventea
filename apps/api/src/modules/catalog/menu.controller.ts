@@ -7,6 +7,7 @@ import {
   type TenantContext,
 } from '@ventea/shared';
 
+import { PublicBaseUrl } from '@/common/decorators/public-base-url.decorator';
 import { CurrentTenant } from '@/common/tenant.context';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe';
 
@@ -22,7 +23,8 @@ export class MenuController {
   get(
     @CurrentTenant() tenant: TenantContext,
     @Query(new ZodValidationPipe(menuQuerySchema)) query: MenuQuery,
+    @PublicBaseUrl() base: string,
   ): Promise<PublicMenu> {
-    return this.menu.publicMenu(tenant.tenantId, query.locationId);
+    return this.menu.publicMenu(tenant.tenantId, query.locationId, base);
   }
 }

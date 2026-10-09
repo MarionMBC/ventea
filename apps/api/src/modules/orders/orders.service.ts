@@ -363,7 +363,13 @@ export class OrdersService {
     itemIds: string[],
   ): Promise<Map<string, CatalogItem>> {
     const items = await db.menuItem.findMany({
-      where: { tenantId, id: { in: [...new Set(itemIds)] }, category: { isActive: true } },
+      // Ni ítems ni categorías borrados desde el panel (soft-delete, TASK-016).
+      where: {
+        tenantId,
+        id: { in: [...new Set(itemIds)] },
+        deletedAt: null,
+        category: { isActive: true, deletedAt: null },
+      },
       include: {
         modifierGroups: {
           where: { group: { tenantId } },
