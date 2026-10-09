@@ -8,6 +8,7 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common';
+import { planLimitSchema, type ApiErrorCode, type PlanLimit } from '@ventea/shared';
 import type { Response } from 'express';
 
 interface ErrorBody {
@@ -15,11 +16,14 @@ interface ErrorBody {
   message: string | string[];
   error: string;
   issues?: unknown[];
+  /** Código estable para que el cliente traduzca (hoy `plan_limit`), con su detalle. */
+  code?: ApiErrorCode;
+  limit?: PlanLimit;
 }
 
 /**
  * Formato único de error: `{statusCode, message, error}` (+ `issues` en los 400 de
- * validación). Las apps cliente parsean un solo shape.
+ * validación, y `code` + `limit` en los límites de plan). Las apps cliente parsean un solo shape.
  *
  * Lo que no es HttpException es un bug o una caída de infraestructura: se registra
  * completo en el log y al cliente le llega un 500 genérico, sin stack ni SQL.
@@ -52,6 +56,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
           body.message = fields.message as string | string[];
         }
         if (Array.isArray(fields.issues)) body.issues = fields.issues;
+        // Solo códigos conocidos con su detalle válido: nada arbitrario llega al cliente.
+        const limit = planLimitSchema.safeParse(fields.limit);
+        if (fields.code === 'plan_limit' && limit.success) {
+          body.code = 'plan_limit';
+          body.limit = limit.data;
+        }
       }
       return body;
     }

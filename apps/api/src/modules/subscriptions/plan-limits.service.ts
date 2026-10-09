@@ -17,31 +17,40 @@ export class PlanLimitsService {
   async assertCanAddLocation(tenantId: string, db: PrismaDb = this.prisma): Promise<void> {
     const subscription = await db.subscription.findUnique({
       where: { tenantId },
-      select: { plan: { select: { name: true, maxLocations: true } } },
+      select: { plan: { select: { code: true, name: true, maxLocations: true } } },
     });
     // Sin suscripción no hay plan que limite (ver accessDecision: falla abierta).
     if (!subscription) return;
 
     const active = await db.location.count({ where: { tenantId, isActive: true } });
-    const { name, maxLocations } = subscription.plan;
+    const { code, name, maxLocations } = subscription.plan;
     if (!canAddLocation(maxLocations, active)) {
-      throw new ForbiddenException(
-        `El plan ${name} permite hasta ${locationsLabel(maxLocations ?? 0)}`,
-      );
+      throw new ForbiddenException({
+        message: `El plan ${name} permite hasta ${locationsLabel(maxLocations ?? 0)}`,
+        code: 'plan_limit',
+        limit: { resource: 'locations', plan: code, planName: name, max: maxLocations ?? 0 },
+      });
     }
   }
 
   /** 409 si la marca tiene más sucursales activas de las que permite el plan destino. */
   async assertFitsPlan(
     tenantId: string,
-    plan: { name: string; maxLocations: number | null },
+    plan: { code: string; name: string; maxLocations: number | null },
     db: PrismaDb = this.prisma,
   ): Promise<void> {
     const active = await db.location.count({ where: { tenantId, isActive: true } });
     if (!fitsLocationLimit(plan.maxLocations, active)) {
-      throw new ConflictException(
-        `La marca tiene ${locationsLabel(active)} y el plan ${plan.name} permite ${plan.maxLocations}`,
-      );
+      throw new ConflictException({
+        message: `La marca tiene ${locationsLabel(active)} y el plan ${plan.name} permite ${plan.maxLocations}`,
+        code: 'plan_limit',
+        limit: {
+          resource: 'locations',
+          plan: plan.code,
+          planName: plan.name,
+          max: plan.maxLocations,
+        },
+      });
     }
   }
 }

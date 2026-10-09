@@ -57,13 +57,13 @@ describe('Shell del panel', () => {
     const links = within(nav())
       .getAllByRole('link')
       .map((link) => link.textContent);
-    expect(links).toEqual(['Orders', 'History', 'Billing']);
+    expect(links).toEqual(['Orders', 'History', 'Menu', 'My brand', 'Billing']);
     expect(within(nav()).getByRole('link', { name: 'Orders' }).getAttribute('aria-current')).toBe(
       'page',
     );
 
     const soon = within(nav()).getByRole('list', { name: 'Coming soon' });
-    for (const name of ['Menu', 'Locations', 'Rewards', 'Team', 'Reports']) {
+    for (const name of ['Locations', 'Rewards', 'Team', 'Reports']) {
       expect(within(soon).getByText(name)).toBeTruthy();
     }
     expect(within(soon).queryAllByRole('link')).toHaveLength(0);
@@ -77,6 +77,9 @@ describe('Shell del panel', () => {
     expect(screen.getAllByText('Staff').length).toBeGreaterThan(0);
     expect(screen.getByText('Powered by Ventea')).toBeTruthy();
     expect(within(nav()).queryByRole('link', { name: 'Billing' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'My brand' })).toBeNull();
+    // El menú lo ve todo el equipo (solo lectura para staff).
+    expect(within(nav()).getByRole('link', { name: 'Menu' })).toBeTruthy();
     // Marca del tenant: nombre e inicial (sin logo).
     expect(screen.getAllByText('Carolina Hot Chicken').length).toBeGreaterThan(0);
   });
@@ -103,8 +106,8 @@ describe('Shell del panel', () => {
   });
 
   it('una sección sin implementar (ruta vieja) avisa y ofrece volver a pedidos', async () => {
-    renderPanel([], { path: '/admin/menu' });
-    expect(await screen.findByRole('heading', { name: 'Menu' })).toBeTruthy();
+    renderPanel([], { path: '/admin/locations' });
+    expect(await screen.findByRole('heading', { name: 'Locations' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe(
       '/admin/orders',
     );

@@ -255,7 +255,7 @@ function renderPlatform(
   render(
     <App services={services} platform={platform} queryClient={queryClient} hostname={hostname} />,
   );
-  return { api, platformSession };
+  return { api, platformSession, queryClient };
 }
 
 const rows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1);
@@ -628,5 +628,196 @@ describe('Plataforma en español', () => {
     expect(formatUsdCents(123456)).toBe('$1,234.56');
     expect(formatUsdCents(123456, 'en-US')).toBe('$1,234.56');
     expect(formatUsdCents(123456, 'de-DE')).toBe('1.234,56 $');
+  });
+});
+
+describe('apps de las marcas', () => {
+  const PEM = '-----BEGIN PRIVATE KEY-----\nSECRETO-NO-MOSTRAR\n-----END PRIVATE KEY-----\n';
+  const SERVICE_ACCOUNT = JSON.stringify({
+    type: 'service_account',
+    project_id: 'marca-01-app',
+    private_key_id: 'abc',
+    private_key: PEM,
+    client_email: 'fcm@marca-01-app.iam.gserviceaccount.com',
+  });
+
+  function appState() {
+    return {
+      tenant: { slug: 'marca-01', name: 'Marca 1', planCode: 'pro' },
+      exists: true,
+      bundleId: 'app.ventea.marca01',
+      publisher: 'ventea',
+      status: 'requested',
+      version: null,
+      buildNumber: null,
+      storeUrls: { android: null, ios: null },
+      requestedAt: '2026-10-09T12:00:00.000Z',
+      push: { configured: false, projectId: null, updatedAt: null } as {
+        configured: boolean;
+        projectId: string | null;
+        updatedAt: string | null;
+      },
+      events: [
+        {
+          type: 'requested',
+          actor: 'owner@marca.test',
+          message: null,
+          createdAt: '2026-10-09T12:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  function withApps(api: ReturnType<typeof createFakePlatformApi>, failPut = () => false) {
+    const app = appState();
+    api.setOverride((call) => {
+      if (call.method === 'PUT' && failPut()) return apiError(500, 'Error interno');
+      if (call.path === '/api/platform/app-requests') {
+        const status = call.query.get('status');
+        const item = {
+          slug: 'marca-01',
+          name: 'Marca 1',
+          planCode: 'pro',
+          status: app.status,
+          publisher: app.publisher,
+          bundleId: app.bundleId,
+          requestedAt: app.requestedAt,
+          updatedAt: '2026-10-09T13:00:00.000Z',
+        };
+        return json(!status || status === app.status ? [item] : []);
+      }
+      if (call.path === '/api/platform/tenants/marca-01/app') {
+        if (call.method === 'PATCH') {
+          const body = call.body as Record<string, unknown>;
+          Object.assign(app, body);
+        }
+        return json(app);
+      }
+      if (call.path === '/api/platform/tenants/marca-01/push-credentials') {
+        app.push =
+          call.method === 'PUT'
+            ? {
+                configured: true,
+                projectId: (call.body as { project_id: string }).project_id,
+                updatedAt: '2026-10-09T14:00:00.000Z',
+              }
+            : { configured: false, projectId: null, updatedAt: null };
+        return json(app.push);
+      }
+      return undefined;
+    });
+    return app;
+  }
+
+  it('cola: las pendientes, con link a la app de la marca; filtro por estado', async () => {
+    let api!: ReturnType<typeof createFakePlatformApi>;
+    renderPlatform('/admin/plataforma/apps', { before: (a) => ((api = a), withApps(a)) });
+    expect(await screen.findByRole('heading', { name: 'Apps de las marcas' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Marca 1' })).toBeTruthy();
+    expect(screen.getByText('app.ventea.marca01')).toBeTruthy();
+    expect(within(rows()[0]!).getByText('Solicitada')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'published' } });
+    expect(await screen.findByText('Nada en la cola')).toBeTruthy();
+    expect(api.calls.some((c) => c.query.get('status') === 'published')).toBe(true);
+  });
+
+  it('edita la AppConfig mandando solo lo cambiado y valida la versión', async () => {
+    let api!: ReturnType<typeof createFakePlatformApi>;
+    renderPlatform('/admin/plataforma/marcas/marca-01/app', {
+      before: (a) => ((api = a), withApps(a)),
+    });
+    expect(await screen.findByRole('heading', { name: 'App de Marca 1' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Versión (X.Y.Z)'), { target: { value: '1.0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(screen.getByText(/La versión va como X.Y.Z/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Versión (X.Y.Z)'), { target: { value: '1.0.0' } });
+    fireEvent.change(screen.getAllByLabelText('Estado')[0]!, { target: { value: 'building' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(await screen.findByText('App actualizada.')).toBeTruthy();
+    expect(api.calls.find((c) => c.method === 'PATCH')!.body).toEqual({
+      status: 'building',
+      version: '1.0.0',
+    });
+  });
+
+  it('credenciales push: se cargan, nunca se muestran y quedan como «Configurado»', async () => {
+    let api!: ReturnType<typeof createFakePlatformApi>;
+    renderPlatform('/admin/plataforma/marcas/marca-01/app', {
+      before: (a) => ((api = a), withApps(a)),
+    });
+    expect(await screen.findByText('Sin configurar')).toBeTruthy();
+    const area = screen.getByLabelText('Cargar credenciales') as HTMLTextAreaElement;
+    expect(area.value).toBe('');
+
+    fireEvent.change(area, { target: { value: '{no es json' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(screen.getByText(/No es un JSON válido/)).toBeTruthy();
+
+    fireEvent.change(area, { target: { value: SERVICE_ACCOUNT } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(await screen.findByText('Configurado')).toBeTruthy();
+    expect(screen.getByText('marca-01-app')).toBeTruthy();
+    const put = api.calls.find((c) => c.method === 'PUT')!;
+    // Solo los cuatro campos que la API acepta; nada extra del archivo.
+    expect(Object.keys(put.body as object).sort()).toEqual([
+      'client_email',
+      'private_key',
+      'project_id',
+      'type',
+    ]);
+    expect((screen.getByLabelText('Reemplazar credenciales') as HTMLTextAreaElement).value).toBe(
+      '',
+    );
+    expect(document.body.innerHTML).not.toContain('SECRETO-NO-MOSTRAR');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar credenciales' }));
+    const dialog = screen.getByRole('dialog', { name: '¿Borrar las credenciales push?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, borrar' }));
+    expect(await screen.findByText('Sin configurar')).toBeTruthy();
+    expect(api.calls.some((c) => c.method === 'DELETE')).toBe(true);
+  });
+
+  it('la private_key no queda en la caché de react-query ni en el estado (OK y con error)', async () => {
+    let fail = true;
+    const { queryClient } = renderPlatform('/admin/plataforma/marcas/marca-01/app', {
+      before: (a) => withApps(a, () => fail),
+    });
+    await screen.findByText('Sin configurar');
+    const area = () => screen.getByLabelText(/credenciales/) as HTMLTextAreaElement;
+    const leaks = () =>
+      JSON.stringify(
+        queryClient
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state),
+      ).includes('SECRETO-NO-MOSTRAR') ||
+      JSON.stringify(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      ).includes('SECRETO-NO-MOSTRAR');
+
+    fireEvent.change(area(), { target: { value: SERVICE_ACCOUNT } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(await screen.findByText(/Vuelve a pegar el JSON/)).toBeTruthy();
+    expect(area().value).toBe('');
+    expect(leaks()).toBe(false);
+
+    fail = false;
+    fireEvent.change(area(), { target: { value: SERVICE_ACCOUNT } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(await screen.findByText('Configurado')).toBeTruthy();
+    expect(area().value).toBe('');
+    expect(leaks()).toBe(false);
+    expect(document.body.innerHTML).not.toContain('SECRETO-NO-MOSTRAR');
+  });
+
+  it('el detalle de la marca enlaza a su app', async () => {
+    renderPlatform('/admin/plataforma/marcas/marca-01');
+    expect(await screen.findByRole('link', { name: 'Ver app y push' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Apps' }).getAttribute('href')).toBe(
+      '/admin/plataforma/apps',
+    );
   });
 });

@@ -415,6 +415,11 @@ describe('API de plataforma y suspensión (AC5, AC6)', () => {
       }
       const blocked = await changePlan({ planCode: 'basic' }).expect(409);
       expect(blocked.body.message).toContain('4 sucursales activas');
+      // Código estable para que el panel lo traduzca (TASK-017).
+      expect(blocked.body).toMatchObject({
+        code: 'plan_limit',
+        limit: { resource: 'locations', plan: 'basic', planName: 'Básico', max: 1 },
+      });
 
       const back = await changePlan({ planCode: 'chain' }).expect(200);
       const detail = platformTenantDetailSchema.parse(back.body);

@@ -1,4 +1,10 @@
-import { authTokensSchema, TENANT_HEADER } from '@ventea/shared';
+import {
+  authTokensSchema,
+  planLimitSchema,
+  TENANT_HEADER,
+  type ApiErrorCode,
+  type PlanLimit,
+} from '@ventea/shared';
 
 import type { SessionStore } from './session';
 
@@ -18,6 +24,9 @@ export class ApiError extends Error {
      * failure, expired session, a fallback by status). The UI translates the latter.
      */
     readonly kind?: 'network' | 'session' | 'fallback',
+    /** Stable code from the API (`plan_limit`) so the panel translates it instead of `message`. */
+    readonly code?: ApiErrorCode,
+    readonly limit?: PlanLimit,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -42,8 +51,80 @@ export interface RequestOptions<T> {
   signal?: AbortSignal;
 }
 
+export interface UploadOptions<T> {
+  /** Nombre del campo del archivo en el multipart (la API de medios usa `file`). */
+  field?: string;
+  schema?: ResponseSchema<T>;
+  signal?: AbortSignal;
+  /** Avance de la subida, de 0 a 1 (sin dato de tamaño, solo se avisa el 1 final). */
+  onProgress?: (fraction: number) => void;
+}
+
 export interface ApiClient {
   request<T>(path: string, options?: RequestOptions<T>): Promise<T>;
+  /** `POST` multipart con un archivo (imágenes de la marca), con progreso y la misma sesión. */
+  upload<T>(path: string, file: Blob, options?: UploadOptions<T>): Promise<T>;
+}
+
+/** Respuesta de una subida: el status y el cuerpo ya leído (JSON o `undefined`). */
+export interface UploadResponse {
+  status: number;
+  body: unknown;
+}
+
+export type UploadTransport = (
+  url: string,
+  form: FormData,
+  headers: Record<string, string>,
+  onProgress: ((fraction: number) => void) | undefined,
+  signal: AbortSignal,
+) => Promise<UploadResponse>;
+
+/** Una imagen de 5 MB en una conexión lenta tarda: tope más largo que el de las requests. */
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+function parseBody(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Subida con `XMLHttpRequest`: `fetch` no informa el avance de lo que se manda, y una foto
+ * desde el teléfono del dueño puede tardar varios segundos.
+ */
+export const xhrUpload: UploadTransport = (url, form, headers, onProgress, signal) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total);
+    };
+    xhr.onload = () => resolve({ status: xhr.status, body: parseBody(xhr.responseText) });
+    xhr.onerror = () => reject(new ApiError(0, NETWORK_ERROR_MESSAGE, 'network'));
+    xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'));
+    if (signal.aborted) {
+      reject(new DOMException('Upload aborted', 'AbortError'));
+      return;
+    }
+    signal.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.send(form);
+  });
+
+/** Con un `fetch` inyectado (tests) la subida va por ahí; el avance solo llega al final. */
+function fetchUpload(doFetch: typeof fetch): UploadTransport {
+  return async (url, form, headers, _onProgress, signal) => {
+    try {
+      const response = await doFetch(url, { method: 'POST', headers, body: form, signal });
+      return { status: response.status, body: parseBody(await response.text()) };
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new ApiError(0, NETWORK_ERROR_MESSAGE, 'network');
+    }
+  };
 }
 
 export interface ApiClientOptions {
@@ -53,27 +134,45 @@ export interface ApiClientOptions {
   /** Solo desarrollo: en `localhost` no hay subdominio del que sacar el tenant. */
   tenantSlug?: string;
   fetch?: typeof fetch;
+  /** Transporte de las subidas (por defecto XHR; con `fetch` inyectado, ese fetch). */
+  upload?: UploadTransport;
 }
 
 /** Mensaje legible de una respuesta de error de la API, con fallback por status. */
 export async function errorFrom(response: Response): Promise<ApiError> {
-  let message = '';
-  let kind: ApiError['kind'];
+  let body: unknown;
   try {
-    const body = (await response.json()) as { message?: unknown };
-    if (typeof body.message === 'string') message = body.message;
-    else if (Array.isArray(body.message)) message = body.message.join('. ');
+    body = await response.json();
   } catch {
     // Cuerpo vacío o no JSON (p. ej. un 502 del proxy).
+  }
+  return errorFromBody(response.status, body);
+}
+
+/** Como `errorFrom`, con el cuerpo ya leído (la subida con XHR lo lee por su cuenta). */
+export function errorFromBody(status: number, raw: unknown): ApiError {
+  let message = '';
+  let kind: ApiError['kind'];
+  let code: ApiErrorCode | undefined;
+  let limit: PlanLimit | undefined;
+  if (raw && typeof raw === 'object') {
+    const body = raw as { message?: unknown; code?: unknown; limit?: unknown };
+    if (typeof body.message === 'string') message = body.message;
+    else if (Array.isArray(body.message)) message = body.message.join('. ');
+    const parsedLimit = planLimitSchema.safeParse(body.limit);
+    if (body.code === 'plan_limit' && parsedLimit.success) {
+      code = 'plan_limit';
+      limit = parsedLimit.data;
+    }
   }
   if (!message) {
     kind = 'fallback';
     message =
-      response.status >= 500
-        ? `El servidor no respondió bien (${response.status}). Intenta de nuevo.`
-        : `La petición falló (${response.status}).`;
+      status >= 500
+        ? `El servidor no respondió bien (${status}). Intenta de nuevo.`
+        : `La petición falló (${status}).`;
   }
-  return new ApiError(response.status, message, kind);
+  return new ApiError(status, message, kind, code, limit);
 }
 
 /**
@@ -183,5 +282,51 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return schema ? schema.parse(json) : (json as T);
   }
 
-  return { request };
+  const transport = options.upload ?? (options.fetch ? fetchUpload(doFetch) : xhrUpload);
+
+  async function upload<T>(path: string, file: Blob, opts: UploadOptions<T> = {}): Promise<T> {
+    const { field = 'file', schema, signal, onProgress } = opts;
+    const form = new FormData();
+    form.append(field, file);
+
+    const attempt = (token: string | undefined) => {
+      // Sin Content-Type: el navegador pone el del multipart con su boundary.
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (tenantSlug) headers[TENANT_HEADER] = tenantSlug;
+      const timeout = AbortSignal.timeout(UPLOAD_TIMEOUT_MS);
+      const combined =
+        signal && typeof AbortSignal.any === 'function'
+          ? AbortSignal.any([signal, timeout])
+          : (signal ?? timeout);
+      return transport(`${baseUrl}${path}`, form, headers, onProgress, combined).catch(
+        (error: unknown) => {
+          // Un corte por el tope de tiempo es un problema de red, no un «cancelado».
+          if (!signal?.aborted && timeout.aborted) {
+            throw new ApiError(0, NETWORK_ERROR_MESSAGE, 'network');
+          }
+          throw error;
+        },
+      );
+    };
+
+    const token = session.get()?.accessToken;
+    if (!token) throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
+    let response = await attempt(token);
+    if (response.status === 401) {
+      if (session.get()?.accessToken === token) await refreshOnce();
+      response = await attempt(session.get()?.accessToken);
+      if (response.status === 401) {
+        session.set(null);
+        throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
+      }
+    }
+    if (response.status < 200 || response.status >= 300) {
+      throw errorFromBody(response.status, response.body);
+    }
+    onProgress?.(1);
+    return schema ? schema.parse(response.body) : (response.body as T);
+  }
+
+  return { request, upload };
 }

@@ -133,6 +133,11 @@ export function TenantDetail() {
             <Fact label="Publicada">{tenant.isActive ? 'Sí' : 'No (desactivada)'}</Fact>
             <Fact label="Sucursales activas">{tenant.activeLocations}</Fact>
             <Fact label="Pedidos (30 días)">{tenant.ordersLast30Days}</Fact>
+            <Fact label="App propia">
+              <Link className="pf-link" to={`/plataforma/marcas/${tenant.slug}/app`}>
+                Ver app y push
+              </Link>
+            </Fact>
           </dl>
         </article>
 

@@ -13,6 +13,7 @@ import {
   IconLogout,
   IconMenuBook,
   IconOrders,
+  IconPalette,
   IconSidebar,
   IconStar,
   IconUsers,
@@ -36,10 +37,12 @@ interface NavItem {
 const NAV: readonly NavItem[] = [
   { to: '/orders', label: 'nav.orders', icon: IconOrders, end: true },
   { to: '/orders/history', label: 'nav.history', icon: IconHistory },
+  { to: '/menu', label: 'nav.menu', icon: IconMenuBook },
 ];
 
-/** Solo el dueño ve la facturación (la API responde 403 al resto). */
+/** Solo el dueño ve Mi marca y la facturación (la API responde 403 al resto). */
 const OWNER_NAV: readonly NavItem[] = [
+  { to: '/brand', label: 'nav.brand', icon: IconPalette },
   { to: '/facturacion', label: 'nav.billing', icon: IconBilling },
 ];
 
@@ -48,7 +51,6 @@ const OWNER_NAV: readonly NavItem[] = [
  * enlace; sus rutas siguen montadas (con un aviso) para no romper enlaces viejos.
  */
 const SOON: readonly { label: TKey; icon: Icon }[] = [
-  { label: 'nav.menu', icon: IconMenuBook },
   { label: 'nav.locations', icon: IconLocation },
   { label: 'nav.rewards', icon: IconStar },
   { label: 'nav.staff', icon: IconUsers },

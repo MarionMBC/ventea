@@ -21,6 +21,12 @@ atendiendo** (menú, pedidos, todo) hasta `currentPeriodEnd + 7 días` (`graceEn
 `GET /api/billing`); pasado eso, 402 aunque el ciclo todavía no la haya pasado a `suspended`. Los schemas de entrada y salida son los de `@ventea/shared`
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
+**Códigos estables de error (TASK-017):** el cuerpo de error es `{statusCode, message, error}`;
+los límites del plan agregan `code: "plan_limit"` y `limit: {resource: locations · branded_app,
+plan (código), planName, max}` (`max: null` = el plan no lo incluye). `message` sigue en español; los clientes
+traducen por `code` (`packages/shared/src/contracts/errors.ts`). Hoy: alta de sucursal y cambio de
+plan con sucursales de más (`locations`, 403/409) y solicitud de app propia (`branded_app`, 403).
+
 ## Autenticación
 
 JWT HS256 firmado con `JWT_SECRET`. Cada token lleva:
