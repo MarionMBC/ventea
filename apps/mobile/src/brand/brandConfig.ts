@@ -43,12 +43,18 @@ export interface BrandConfig {
      */
     enabled: boolean;
   };
+  /**
+   * Only for a brand whose previous app stored its session under another
+   * prefix (Carolina: `chc.`). See `legacyStorage.ts`.
+   */
+  legacyStoragePrefix?: string;
 }
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const BUNDLE_ID = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const CURRENCY = /^[A-Z]{3}$/;
+const STORAGE_PREFIX = /^[a-z][a-z0-9_-]{0,15}\.$/;
 
 export class BrandConfigError extends Error {
   constructor(message: string) {
@@ -122,5 +128,8 @@ export const parseBrandConfig = (input: unknown): BrandConfig => {
     defaultLanguage: language as Language,
     currency: input.currency === undefined ? 'USD' : requireString(input, 'currency', CURRENCY),
     push: { enabled: push.enabled === true },
+    ...(input.legacyStoragePrefix === undefined || input.legacyStoragePrefix === null
+      ? {}
+      : { legacyStoragePrefix: requireString(input, 'legacyStoragePrefix', STORAGE_PREFIX) }),
   };
 };
