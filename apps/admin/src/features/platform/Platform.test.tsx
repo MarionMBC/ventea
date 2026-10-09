@@ -255,7 +255,7 @@ function renderPlatform(
   render(
     <App services={services} platform={platform} queryClient={queryClient} hostname={hostname} />,
   );
-  return { api, platformSession };
+  return { api, platformSession, queryClient };
 }
 
 const rows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1);
@@ -668,9 +668,10 @@ describe('apps de las marcas', () => {
     };
   }
 
-  function withApps(api: ReturnType<typeof createFakePlatformApi>) {
+  function withApps(api: ReturnType<typeof createFakePlatformApi>, failPut = () => false) {
     const app = appState();
     api.setOverride((call) => {
+      if (call.method === 'PUT' && failPut()) return apiError(500, 'Error interno');
       if (call.path === '/api/platform/app-requests') {
         const status = call.query.get('status');
         const item = {
@@ -774,6 +775,42 @@ describe('apps de las marcas', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, borrar' }));
     expect(await screen.findByText('Sin configurar')).toBeTruthy();
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(true);
+  });
+
+  it('la private_key no queda en la caché de react-query ni en el estado (OK y con error)', async () => {
+    let fail = true;
+    const { queryClient } = renderPlatform('/admin/plataforma/marcas/marca-01/app', {
+      before: (a) => withApps(a, () => fail),
+    });
+    await screen.findByText('Sin configurar');
+    const area = () => screen.getByLabelText(/credenciales/) as HTMLTextAreaElement;
+    const leaks = () =>
+      JSON.stringify(
+        queryClient
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state),
+      ).includes('SECRETO-NO-MOSTRAR') ||
+      JSON.stringify(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      ).includes('SECRETO-NO-MOSTRAR');
+
+    fireEvent.change(area(), { target: { value: SERVICE_ACCOUNT } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(await screen.findByText(/Vuelve a pegar el JSON/)).toBeTruthy();
+    expect(area().value).toBe('');
+    expect(leaks()).toBe(false);
+
+    fail = false;
+    fireEvent.change(area(), { target: { value: SERVICE_ACCOUNT } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar credenciales' }));
+    expect(await screen.findByText('Configurado')).toBeTruthy();
+    expect(area().value).toBe('');
+    expect(leaks()).toBe(false);
+    expect(document.body.innerHTML).not.toContain('SECRETO-NO-MOSTRAR');
   });
 
   it('el detalle de la marca enlaza a su app', async () => {

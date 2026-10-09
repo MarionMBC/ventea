@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import {
   appRequestQueueItemSchema,
   billingSummarySchema,
@@ -273,23 +274,55 @@ export function useUpdateTenantApp(slug: string) {
 /**
  * Credenciales push: `PUT` con el JSON de la service account o `DELETE`. La respuesta es solo
  * `{configured, projectId, updatedAt}`: las claves nunca vuelven al navegador.
+ *
+ * A propósito FUERA de `useMutation`: react-query guarda las variables de cada mutación en su
+ * `MutationCache` (visibles con devtools y vivas hasta su gcTime). La `private_key` solo vive en
+ * esta llamada; en estado queda nada más si está en curso y el mensaje de error.
  */
 export function usePushCredentials(slug: string) {
   const { client } = usePlatform();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { credentials: PushCredentialsInput } | { clear: true }) =>
-      client.request<PushStatus>(
-        `/platform/tenants/${encodeURIComponent(slug)}/push-credentials`,
+  const [isPending, setPending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    (
+      input: { credentials: PushCredentialsInput } | { clear: true },
+      options: { onSuccess?: () => void } = {},
+    ) => {
+      setPending(true);
+      setError(null);
+      const path = `/platform/tenants/${encodeURIComponent(slug)}/push-credentials`;
+      const request =
         'clear' in input
-          ? { method: 'DELETE', schema: pushStatusSchema }
-          : { method: 'PUT', body: input.credentials, schema: pushStatusSchema },
-      ),
-    onSuccess: (push) => {
-      queryClient.setQueryData<PlatformApp>(appKeys.detail(slug), (app) =>
-        app ? { ...app, push } : app,
-      );
-      void queryClient.invalidateQueries({ queryKey: appKeys.detail(slug) });
+          ? client.request<PushStatus>(path, { method: 'DELETE', schema: pushStatusSchema })
+          : client.request<PushStatus>(path, {
+              method: 'PUT',
+              body: input.credentials,
+              schema: pushStatusSchema,
+            });
+      request
+        .then((push) => {
+          queryClient.setQueryData<PlatformApp>(appKeys.detail(slug), (app) =>
+            app ? { ...app, push } : app,
+          );
+          void queryClient.invalidateQueries({ queryKey: appKeys.detail(slug) });
+          options.onSuccess?.();
+        })
+        .catch((caught: unknown) =>
+          setError(
+            new Error(
+              `${caught instanceof Error ? caught.message : 'Error inesperado'}${
+                'clear' in input ? '' : ' Vuelve a pegar el JSON para reintentar.'
+              }`,
+            ),
+          ),
+        )
+        .finally(() => setPending(false));
     },
-  });
+    [client, queryClient, slug],
+  );
+
+  const reset = useCallback(() => setError(null), []);
+  return { mutate, isPending, error, reset };
 }

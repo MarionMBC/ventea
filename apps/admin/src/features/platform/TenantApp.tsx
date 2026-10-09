@@ -155,7 +155,8 @@ export function TenantApp() {
   const data = app.data;
   const current = draft ?? draftOf(data);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    setDraft({ ...current, [key]: value });
+    // Funcional: nunca pisa otro cambio hecho entre este render y el que lo aplica.
+    setDraft((prev) => ({ ...(prev ?? draftOf(data)), [key]: value }));
     setFormError(null);
     setFlash(null);
   };
@@ -178,15 +179,11 @@ export function TenantApp() {
     const result = parseServiceAccount(secret);
     if ('error' in result) return setSecretError(result.error);
     setSecretError(null);
+    // La clave sale del estado YA, salga bien o mal: si falla, se vuelve a pegar el archivo.
+    setSecret('');
     push.mutate(
       { credentials: result.credentials },
-      {
-        onSuccess: () => {
-          // La clave no queda en pantalla ni en el estado una vez guardada.
-          setSecret('');
-          setFlash('Credenciales push guardadas (cifradas).');
-        },
-      },
+      { onSuccess: () => setFlash('Credenciales push guardadas (cifradas).') },
     );
   };
 
