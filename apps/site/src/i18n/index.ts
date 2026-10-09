@@ -4,8 +4,8 @@ import type { Dict, Locale } from './types';
 
 export type * from './types';
 
-export const LOCALES: readonly Locale[] = ['es', 'en'];
-export const DEFAULT_LOCALE: Locale = 'es';
+export const LOCALES: readonly Locale[] = ['en', 'es'];
+export const DEFAULT_LOCALE: Locale = 'en';
 
 const DICTS: Readonly<Record<Locale, Dict>> = { es, en };
 

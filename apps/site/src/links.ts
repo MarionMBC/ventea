@@ -2,7 +2,7 @@ import type { Anchors, Locale } from './i18n';
 import { dict } from './i18n';
 import { PATHS } from './routes';
 
-/** Link a una sección de la home de un idioma: `/#servicios`, `/en/#services`. */
+/** Link a una sección de la home de un idioma: `/#services`, `/es/#servicios`. */
 export function sectionHref(locale: Locale, key: keyof Anchors): string {
   return `${PATHS.home[locale]}#${dict(locale).anchors[key]}`;
 }

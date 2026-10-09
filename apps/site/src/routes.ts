@@ -1,9 +1,10 @@
 import type { Locale } from './i18n';
 
 /**
- * Rutas del sitio (TASK-009). Español en la raíz, inglés bajo `/en/`. La privacidad en español
- * NO puede ser `/privacidad`: esa ruta del apex redirige a app.ventea.tech (nginx, TASK-008).
- * `/privacy` (la ruta vieja, en inglés) → 301 a `/en/privacy` en nginx.
+ * Rutas del sitio (TASK-014: inglés por defecto). Inglés en la raíz (`/`, `/privacy`), español
+ * bajo `/es/`. La privacidad en español NO puede ser `/privacidad` (esa ruta del apex redirige a
+ * app.ventea.tech, TASK-008): es `/es/politica-de-privacidad`. Las rutas de TASK-009 (`/en/*`,
+ * `/politica-de-privacidad`) redirigen con 301 en nginx.
  */
 export type PageId = 'home' | 'privacy' | 'notFound';
 
@@ -16,37 +17,38 @@ export interface Route {
 export const PATHS: Readonly<
   Record<Exclude<PageId, 'notFound'>, Readonly<Record<Locale, string>>>
 > = {
-  home: { es: '/', en: '/en/' },
-  privacy: { es: '/politica-de-privacidad', en: '/en/privacy' },
+  home: { en: '/', es: '/es/' },
+  privacy: { en: '/privacy', es: '/es/politica-de-privacidad' },
 };
 
 /** Archivo de la 404 por idioma (nginx: `error_page 404`). */
 export const NOT_FOUND_PATHS: Readonly<Record<Locale, string>> = {
-  es: '/404',
-  en: '/en/404',
+  en: '/404',
+  es: '/es/404',
 };
 
+/** El primero es la home por defecto (inglés): el plugin de desarrollo usa su `<head>`. */
 export const ROUTES: readonly Route[] = [
-  { page: 'home', locale: 'es', path: PATHS.home.es },
   { page: 'home', locale: 'en', path: PATHS.home.en },
-  { page: 'privacy', locale: 'es', path: PATHS.privacy.es },
+  { page: 'home', locale: 'es', path: PATHS.home.es },
   { page: 'privacy', locale: 'en', path: PATHS.privacy.en },
-  { page: 'notFound', locale: 'es', path: NOT_FOUND_PATHS.es },
+  { page: 'privacy', locale: 'es', path: PATHS.privacy.es },
   { page: 'notFound', locale: 'en', path: NOT_FOUND_PATHS.en },
+  { page: 'notFound', locale: 'es', path: NOT_FOUND_PATHS.es },
 ];
 
-/** Normaliza `pathname`: sin `index.html`, sin barras finales (salvo `/en/`). */
+/** Normaliza `pathname`: sin `index.html`, sin barras finales (salvo `/es/`). */
 function normalize(pathname: string): string {
   const clean =
     pathname
       .replace(/\/index\.html$/, '')
       .replace(/\.html$/, '')
       .replace(/\/+$/, '') || '/';
-  return clean === '/en' ? '/en/' : clean;
+  return clean === '/es' ? '/es/' : clean;
 }
 
 export function localeOfPath(pathname: string): Locale {
-  return /^\/en(\/|$)/.test(pathname) ? 'en' : 'es';
+  return /^\/es(\/|$)/.test(pathname) ? 'es' : 'en';
 }
 
 /** Ruta de un `pathname`; cualquier otro camino es la 404 de su idioma. */

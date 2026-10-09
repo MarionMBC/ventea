@@ -125,6 +125,6 @@ describe('Servicios (maestro-detalle / acordeón)', () => {
   it('el CTA del servicio lleva al contacto de su idioma', () => {
     render(<Services t={en} />);
     const cta = screen.getByRole('link', { name: /let’s talk about your system/i });
-    expect(cta.getAttribute('href')).toBe('/en/#contact');
+    expect(cta.getAttribute('href')).toBe('/#contact');
   });
 });

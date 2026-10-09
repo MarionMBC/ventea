@@ -124,6 +124,24 @@ curl -sS -X POST https://api.ventea.tech/api/platform/tenants/pollos-juan/suspen
 curl -sS -X POST https://api.ventea.tech/api/platform/tenants/pollos-juan/reactivate -H "Authorization: Bearer $T"
 ```
 
+## Prueba de humo del nginx (antes de desplegar la imagen web)
+
+`nginx-smoke.mjs` levanta la imagen web en un contenedor descartable y la recorre por socket crudo
+(con el `Host` de cada sitio): páginas EN/ES y 404 por idioma, redirecciones de idioma (301 con la
+query y `Cache-Control: max-age=86400`), que ninguna redirección salga del host (`//`, `\`,
+`%2F%2F`, CR/LF), que los 301 que producción ya publicó y los navegadores tienen en caché no
+formen bucle con los nuevos (p. ej. `/privacy` → `/en/privacy`), rutas del SaaS en el apex, `www`,
+`app.` y una marca, y headers. Sale con 1 si algún caso falla.
+
+```bash
+# desde la raíz del repo, con Docker y Node ≥ 22
+node deploy/test-vps/nginx-smoke.mjs --build                # construye ventea-web:smoke y prueba
+node deploy/test-vps/nginx-smoke.mjs --image <imagen:tag>   # prueba una imagen ya construida
+```
+
+Si cambian las rutas del sitio, actualizar la tabla del script (y `CACHED_OLD` con los 301 que ya
+estén publicados en producción).
+
 ## Desplegar otra versión
 
 Orden obligatorio: **backup → build de las imágenes → `IMAGE_API`/`IMAGE_WEB=<tag>` en `.env` →
