@@ -82,5 +82,10 @@ export function createMailTransport(smtpUrl: string | undefined): MailTransport 
   if (!['smtp:', 'smtps:'].includes(parsed.protocol) || !parsed.hostname) {
     throw new Error('SMTP_URL mal formada (use smtps://usuario:clave@host:465)');
   }
+  // nodemailer convierte los parámetros de la URL en opciones: `?requireTLS=false`/`ignoreTLS`
+  // mandarían la clave en claro y `?debug=true&logger=true` loguea el AUTH sin redactar.
+  if (parsed.search || parsed.hash) {
+    throw new Error('SMTP_URL no admite parámetros (?…) ni fragmento (#…)');
+  }
   return new SmtpMailTransport(url);
 }

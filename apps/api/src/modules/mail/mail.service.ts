@@ -49,6 +49,12 @@ export const MAX_ATTEMPTS = 5;
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
 /** Un `sending` más viejo que esto es un despachador que murió a mitad: vuelve a la cola. */
 const STALE_SENDING_MS = 10 * 60_000;
+const STALE_ERROR = 'Envío interrumpido: el proceso se cortó a mitad del envío';
+/**
+ * Cuánto espera el apagado a los envíos en curso: un SMTP lento tarda hasta ~40 s (10+10+20 de
+ * timeouts); 30 s entra en el `stop_grace_period` de 40 s de los compose.
+ */
+export const SHUTDOWN_WAIT_MS = 30_000;
 const BATCH_SIZE = 20;
 const MAX_ERROR_LENGTH = 300;
 
@@ -89,7 +95,7 @@ export class MailService implements BeforeApplicationShutdown {
       throw new Error(`dedupeKey inválida para el correo ${mail.kind}`);
     }
     // Se arma ya: datos inválidos fallan acá (en el llamador), no horas después en el envío.
-    const { subject } = renderEmail(mail.kind, mail.language, mail.payload);
+    const { subject } = renderEmail(mail.kind, mail.language, mail.payload, this.settings.links);
     const { count } = await (db ?? this.prisma).emailMessage.createMany({
       data: [
         {
@@ -121,7 +127,9 @@ export class MailService implements BeforeApplicationShutdown {
               for (const mail of mails) await this.enqueue(mail);
             })
             .catch((error: unknown) => {
-              this.logger.error(`No se pudo encolar el correo ${label}: ${describe(error)}`);
+              this.logger.error(
+                `No se pudo encolar el correo ${label}: ${maskEmails(describe(error))}`,
+              );
             })
             .finally(resolve);
         });
@@ -157,10 +165,7 @@ export class MailService implements BeforeApplicationShutdown {
    * procesó. `now` es inyectable para probar reintentos sin esperar.
    */
   async dispatchPending(now = new Date()): Promise<number> {
-    await this.prisma.emailMessage.updateMany({
-      where: { status: 'sending', updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
-      data: { status: 'pending' },
-    });
+    await this.reclaimStale(now);
 
     let processed = 0;
     for (;;) {
@@ -188,6 +193,38 @@ export class MailService implements BeforeApplicationShutdown {
       }
     }
     return processed;
+  }
+
+  /**
+   * Un `sending` viejo es un envío que se cortó a mitad (el proceso murió): ese intento cuenta.
+   * Vuelve a la cola con la espera del reintento, o queda `failed` si era el último: un correo
+   * que tumba al proceso no se reintenta para siempre. Condicional sobre `updatedAt`: si dos
+   * réplicas lo ven a la vez, solo una lo mueve.
+   */
+  private async reclaimStale(now: Date): Promise<void> {
+    const stale = await this.prisma.emailMessage.findMany({
+      where: { status: 'sending', updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
+      select: { id: true, attempts: true, updatedAt: true },
+      take: 100,
+    });
+    for (const row of stale) {
+      const attempts = row.attempts + 1;
+      const delay = RETRY_DELAYS_MS[Math.min(attempts - 1, RETRY_DELAYS_MS.length - 1)] ?? 0;
+      const { count } = await this.prisma.emailMessage.updateMany({
+        where: { id: row.id, status: 'sending', updatedAt: row.updatedAt },
+        data:
+          attempts >= MAX_ATTEMPTS
+            ? { status: 'failed', attempts, error: STALE_ERROR }
+            : {
+                status: 'pending',
+                attempts,
+                error: STALE_ERROR,
+                nextAttemptAt: new Date(now.getTime() + delay),
+              },
+      });
+      if (count === 1)
+        this.logger.warn(`Correo ${row.id}: envío interrumpido (intento ${attempts})`);
+    }
   }
 
   /** Plataforma: vuelve a encolar un correo `failed` (404 si no existe, 409 si no falló). */
@@ -234,7 +271,10 @@ export class MailService implements BeforeApplicationShutdown {
   /** Antes de que se cierre Prisma: termina (con tope) lo que está en vuelo. */
   async beforeApplicationShutdown(): Promise<void> {
     if (this.rateTimer) clearTimeout(this.rateTimer);
-    await Promise.race([this.drain(), new Promise((resolve) => setTimeout(resolve, 10_000))]);
+    await Promise.race([
+      this.drain(),
+      new Promise((resolve) => setTimeout(resolve, SHUTDOWN_WAIT_MS)),
+    ]);
   }
 
   private async deliver(id: string, now: Date): Promise<void> {
@@ -256,6 +296,7 @@ export class MailService implements BeforeApplicationShutdown {
         message.kind,
         message.language === 'en' ? 'en' : 'es',
         message.payload,
+        this.settings.links,
       );
     } catch (error) {
       // Datos que no arman el correo: reintentar no lo arregla.
@@ -328,7 +369,7 @@ export class MailService implements BeforeApplicationShutdown {
 }
 
 /** Los logs no llevan direcciones (un rechazo SMTP suele citar al destinatario). */
-function maskEmails(text: string): string {
+export function maskEmails(text: string): string {
   return text.replace(/[^\s<>"'@]+@[^\s<>"']+/g, '[email]');
 }
 
