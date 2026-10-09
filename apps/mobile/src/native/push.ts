@@ -117,6 +117,16 @@ export const createPushController = (deps: PushDeps): PushController => {
   let initialised = false;
   let openOrder: (orderId: string) => void = () => undefined;
   const timeoutMs = deps.signOutTimeoutMs ?? 3000;
+  /**
+   * Bumped on every native `register()`. A sign-out clean-up that outlives its
+   * 3 s cap compares it before killing the local token: if someone registered
+   * since (the next person signed in), the token is theirs now.
+   */
+  let generation = 0;
+  const registerNative = () => {
+    generation += 1;
+    return deps.plugin.register();
+  };
 
   const registerToken = async (token: string) => {
     if (!deps.isSignedIn() || !token) return;
@@ -157,7 +167,7 @@ export const createPushController = (deps: PushDeps): PushController => {
       try {
         if (read(deps.storage, deps.keys.asked)) {
           const current = toPermission(await deps.plugin.checkPermissions());
-          if (current === 'granted') await deps.plugin.register();
+          if (current === 'granted') await registerNative();
           return 'already-asked';
         }
         write(deps.storage, deps.keys.asked, '1');
@@ -166,7 +176,7 @@ export const createPushController = (deps: PushDeps): PushController => {
           status.receive === 'prompt' || status.receive === 'prompt-with-rationale'
             ? toPermission(await deps.plugin.requestPermissions())
             : toPermission(status);
-        if (permission === 'granted') await deps.plugin.register();
+        if (permission === 'granted') await registerNative();
         return permission;
       } catch {
         return 'unavailable';
@@ -177,7 +187,7 @@ export const createPushController = (deps: PushDeps): PushController => {
       if (!deps.available) return;
       try {
         if (toPermission(await deps.plugin.checkPermissions()) === 'granted') {
-          await deps.plugin.register();
+          await registerNative();
         }
       } catch {
         /* Not this time. */
@@ -188,6 +198,7 @@ export const createPushController = (deps: PushDeps): PushController => {
       const id = read(deps.storage, deps.keys.deviceId);
       write(deps.storage, deps.keys.deviceId, null);
       if (!deps.available) return;
+      const signedOutAt = generation;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const deadline = new Promise<void>((resolve) => {
         timer = setTimeout(resolve, timeoutMs);
@@ -196,6 +207,8 @@ export const createPushController = (deps: PushDeps): PushController => {
         /* Still signed in here: the DELETE goes with the session (and its
            refresh, if the access token expired) of the person leaving. */
         if (id) await deps.unregister(id).catch(() => undefined);
+        /* Past the cap and someone registered since: that token is theirs. */
+        if (generation !== signedOutAt) return;
         /* Even if the API was unreachable, the token dies on the device: FCM
            answers UNREGISTERED and the API drops it on the next send. */
         await deps.plugin.unregister().catch(() => undefined);

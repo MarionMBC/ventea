@@ -183,6 +183,26 @@ describe('push', () => {
     await expect(controller.beforeSignOut()).resolves.toBeUndefined();
   });
 
+  test('a late sign-out clean-up does not kill the token of the next person who signs in', async () => {
+    let finishDelete: () => void = () => undefined;
+    const { controller, storage, plugin } = setup(
+      {
+        unregister: () => new Promise<void>((resolve) => (finishDelete = resolve)),
+        signOutTimeoutMs: 20,
+      },
+      'granted',
+    );
+    await controller.init(() => undefined);
+    storage.setItem('device', 'device-9');
+    await controller.beforeSignOut(); // the 3 s cap wins: the API is still answering
+    await controller.afterSignIn(); // someone else signs in right away
+    expect(plugin.register).toHaveBeenCalledTimes(1);
+    finishDelete(); // the old DELETE finally answers
+    await flush();
+    expect(plugin.unregister).not.toHaveBeenCalled();
+    expect(plugin.removeAllDeliveredNotifications).not.toHaveBeenCalled();
+  });
+
   test('a remounted router replaces where a tapped notification goes', async () => {
     const { controller, listeners } = setup();
     const first = vi.fn();
