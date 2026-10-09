@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { parseMailFrom, parseRecipientList, type MailSender } from './mail-address';
+import type { LinkPolicy } from './mail-templates';
 
 const DEFAULT_RATE_PER_MINUTE = 30;
 
@@ -13,7 +14,8 @@ const DEFAULT_RATE_PER_MINUTE = 30;
  * - `MAIL_FROM`: remitente (`Ventea <hola@ventea.tech>` por defecto).
  * - `PLATFORM_ALERT_EMAILS`: avisos a la plataforma (lista). Vacía = los admins de plataforma.
  * - `MAIL_RATE_LIMIT_PER_MINUTE`: tope de envíos SMTP por minuto y proceso (30).
- * - `TENANT_BASE_DOMAIN`: dominio de los links (`<slug>.<dominio>`, `app.<dominio>`).
+ * - `TENANT_BASE_DOMAIN`: dominio de los links (`<slug>.<dominio>`, `app.<dominio>`). Un correo
+ *   solo enlaza a ese dominio (y sus subdominios) o al host de `PUBLIC_ORIGIN`.
  */
 @Injectable()
 export class MailSettings {
@@ -21,6 +23,7 @@ export class MailSettings {
   readonly platformAlertEmails: string[];
   readonly ratePerMinute: number;
   readonly baseDomain: string;
+  readonly links: LinkPolicy;
 
   constructor(config: ConfigService) {
     this.from = parseMailFrom(config.get<string>('MAIL_FROM'));
@@ -31,6 +34,16 @@ export class MailSettings {
     const rate = Number.parseInt(config.get<string>('MAIL_RATE_LIMIT_PER_MINUTE') ?? '', 10);
     this.ratePerMinute = Number.isInteger(rate) && rate > 0 ? rate : DEFAULT_RATE_PER_MINUTE;
     this.baseDomain = config.get<string>('TENANT_BASE_DOMAIN') || 'ventea.tech';
+    const hosts = [this.baseDomain];
+    const origin = config.get<string>('PUBLIC_ORIGIN')?.trim();
+    if (origin) {
+      try {
+        hosts.push(new URL(origin).hostname);
+      } catch {
+        // PUBLIC_ORIGIN mal formada: la valida CORS; acá solo no se suma.
+      }
+    }
+    this.links = { hosts };
   }
 
   /** `https://<slug>.<dominio>` (el slug viene de la base, ya validado al crearse la marca). */

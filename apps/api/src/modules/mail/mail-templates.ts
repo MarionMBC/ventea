@@ -1,4 +1,4 @@
-import type { BrandLanguage, EmailKind } from '@ventea/shared';
+import { neutralizeLinks, type BrandLanguage, type EmailKind } from '@ventea/shared';
 import { z } from 'zod';
 
 import { headerText, inlineText } from './mail-address';
@@ -9,7 +9,11 @@ import { headerText, inlineText } from './mail-address';
  *
  * Seguridad: todo dato que viene de una marca (nombre, dueño…) entra como TEXTO a los bloques
  * y se escapa UNA vez, al armar el HTML (`escapeHtml`). Ninguna plantilla concatena HTML con
- * datos. Los links solo se aceptan `https:` (o `http:` a localhost en desarrollo).
+ * datos. Los links solo se aceptan `https:` hacia el dominio de la plataforma (`LinkPolicy`).
+ *
+ * Anti-phishing (review TASK-021): los nombres que eligió quien se registra (marca, dueño) van
+ * sin links ni dominios (`neutralizeLinks`) y recortados a 60; la bienvenida, que sale hacia un
+ * correo todavía sin verificar, no los pone en el asunto.
  *
  * Para agregar un tipo de correo: sumarlo a `EMAIL_KIND` (@ventea/shared) y una entrada en
  * `TEMPLATES` con el schema de sus datos y sus textos ES/EN.
@@ -38,7 +42,8 @@ const baseSchema = z.object({
   supportEmail: z.string().max(254),
 });
 
-const urlSchema = z.string().max(500).refine(isSafeLink, 'link no permitido');
+/** Los links se validan después del schema, contra el dominio de la plataforma (`LinkPolicy`). */
+const urlSchema = z.string().max(500);
 
 const nameSchema = z.string().min(1).max(200);
 
@@ -60,7 +65,8 @@ const TEMPLATE_DATA = {
   }),
   trial_ending: baseSchema.extend({
     tenantName: nameSchema,
-    daysLeft: z.union([z.literal(1), z.literal(3)]),
+    /** Días reales que faltan (1 a 3). */
+    daysLeft: z.number().int().min(1).max(3),
     trialEndsAt: z.iso.datetime(),
     billingUrl: urlSchema,
   }),
@@ -106,7 +112,7 @@ const TEMPLATES: {
   welcome: (d, lang, fmt) =>
     lang === 'en'
       ? {
-          subject: `Welcome to Ventea, ${d.tenantName}`,
+          subject: 'Your Ventea account is ready',
           heading: `${d.ownerName}, your brand is live on Ventea`,
           paragraphs: [
             d.trialEndsAt
@@ -123,7 +129,7 @@ const TEMPLATES: {
           footer: `You are receiving this email because you created the ${d.tenantName} account on Ventea. It is a service notice, not marketing. Questions: ${d.supportEmail}`,
         }
       : {
-          subject: `Bienvenido a Ventea, ${d.tenantName}`,
+          subject: 'Tu cuenta de Ventea está lista',
           heading: `${d.ownerName}, tu marca ya está en Ventea`,
           paragraphs: [
             d.trialEndsAt
@@ -146,8 +152,9 @@ const TEMPLATES: {
           subject:
             d.daysLeft === 1
               ? `Your Ventea trial ends tomorrow · ${d.tenantName}`
-              : `Your Ventea trial ends in 3 days · ${d.tenantName}`,
-          heading: d.daysLeft === 1 ? 'Your trial ends tomorrow' : 'Your trial ends in 3 days',
+              : `Your Ventea trial ends in ${d.daysLeft} days · ${d.tenantName}`,
+          heading:
+            d.daysLeft === 1 ? 'Your trial ends tomorrow' : `Your trial ends in ${d.daysLeft} days`,
           paragraphs: [
             `The free trial of ${d.tenantName} ends on ${fmt(d.trialEndsAt)}. After that, your menu stops taking orders until the plan is paid.`,
             `Payment is arranged with the Ventea team: check your plan in Billing and write to us at ${d.supportEmail}. If you already arranged it, you can ignore this notice.`,
@@ -159,8 +166,11 @@ const TEMPLATES: {
           subject:
             d.daysLeft === 1
               ? `Tu prueba de Ventea termina mañana · ${d.tenantName}`
-              : `Tu prueba de Ventea termina en 3 días · ${d.tenantName}`,
-          heading: d.daysLeft === 1 ? 'Tu prueba termina mañana' : 'Tu prueba termina en 3 días',
+              : `Tu prueba de Ventea termina en ${d.daysLeft} días · ${d.tenantName}`,
+          heading:
+            d.daysLeft === 1
+              ? 'Tu prueba termina mañana'
+              : `Tu prueba termina en ${d.daysLeft} días`,
           paragraphs: [
             `La prueba gratis de ${d.tenantName} termina el ${fmt(d.trialEndsAt)}. Después, tu menú deja de recibir pedidos hasta que se pague el plan.`,
             `El pago se coordina con el equipo de Ventea: revisa tu plan en Facturación y escríbenos a ${d.supportEmail}. Si ya lo coordinaste, ignora este aviso.`,
@@ -244,18 +254,32 @@ export function isEmailKind(kind: string): kind is EmailKind {
   return Object.hasOwn(TEMPLATES, kind);
 }
 
+/** Dominios a los que puede apuntar un link del correo (y sus subdominios). */
+export interface LinkPolicy {
+  hosts: readonly string[];
+}
+
+/** Largo máximo de un nombre (marca, dueño) dentro del correo. */
+export const MAX_NAME_IN_EMAIL = 60;
+
 /**
- * Arma el correo. Tira si el tipo no existe o los datos no cumplen su schema (error
- * permanente: el despachador lo marca `failed` sin reintentar).
+ * Arma el correo. Tira si el tipo no existe, los datos no cumplen su schema o un link sale del
+ * dominio de la plataforma (error permanente: el despachador lo marca `failed` sin reintentar).
  */
 export function renderEmail(
   kind: string,
   language: BrandLanguage,
   payload: unknown,
+  links: LinkPolicy,
 ): RenderedEmail {
   if (!isEmailKind(kind)) throw new Error(`Tipo de correo desconocido: ${kind}`);
   const parsed = TEMPLATE_DATA[kind].safeParse(payload);
   if (!parsed.success) throw new Error(`Datos inválidos para el correo ${kind}`);
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (key.endsWith('Url') && typeof value === 'string' && !isSafeLink(value, links.hosts)) {
+      throw new Error(`Datos inválidos para el correo ${kind}: link no permitido (${key})`);
+    }
+  }
   const data = sanitizeNames(parsed.data as Record<string, unknown>);
   const lang: BrandLanguage = kind === 'app_request' ? 'es' : language;
   const fmt = dateFormatter(lang, (data as { timeZone: string }).timeZone);
@@ -267,10 +291,19 @@ export function renderEmail(
   return layout(build(data, lang, fmt), lang);
 }
 
-/** Nombres de una sola línea: un `\n` en el nombre de la marca no arma párrafos ni headers. */
+/**
+ * Nombres de una sola línea (un `\n` no arma párrafos ni headers). Los que elige quien se
+ * registra (marca, dueño) además van sin links ni dominios y recortados a 60.
+ */
 function sanitizeNames(data: Record<string, unknown>): Record<string, unknown> {
   const out = { ...data };
-  for (const key of ['tenantName', 'ownerName', 'planName', 'slug'] as const) {
+  for (const key of ['tenantName', 'ownerName'] as const) {
+    const value = out[key];
+    if (typeof value === 'string') {
+      out[key] = inlineText(neutralizeLinks(inlineText(value, 200)), MAX_NAME_IN_EMAIL);
+    }
+  }
+  for (const key of ['planName', 'slug'] as const) {
     if (typeof out[key] === 'string') out[key] = inlineText(out[key]);
   }
   return out;
@@ -306,8 +339,11 @@ export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-/** `https:` siempre; `http:` solo a localhost (desarrollo). Nada de `javascript:` ni `data:`. */
-export function isSafeLink(raw: string): boolean {
+/**
+ * Link permitido: `https:` a uno de `hosts` o a un subdominio suyo (`http:` solo a localhost, y
+ * solo si `hosts` lo incluye: desarrollo). Sin usuario/clave. Nada de `javascript:` ni `data:`.
+ */
+export function isSafeLink(raw: string, hosts: readonly string[]): boolean {
   let url: URL;
   try {
     url = new URL(raw);
@@ -315,8 +351,14 @@ export function isSafeLink(raw: string): boolean {
     return false;
   }
   if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  const allowed = hosts.some((base) => {
+    const b = base.toLowerCase();
+    return b !== '' && (host === b || host.endsWith(`.${b}`));
+  });
+  if (!allowed) return false;
   if (url.protocol === 'https:') return true;
-  return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+  return url.protocol === 'http:' && (host === 'localhost' || host === '127.0.0.1');
 }
 
 const COLORS = {
