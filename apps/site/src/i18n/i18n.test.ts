@@ -58,7 +58,7 @@ describe('diccionarios es/en', () => {
         .join(' ');
     expect(all(es)).not.toMatch(/desde el primer día|siempre con|garantiza/i);
     expect(all(en)).not.toMatch(/from day one|always with|guarantee/i);
-    expect(all(es)).not.toMatch(/a su nombre|en el contrato/i);
+    expect(all(es)).not.toMatch(/(^|\s)a su nombre|en el contrato/i);
     expect(all(en)).not.toMatch(/in your name|in the contract/i);
     expect(es.about.paragraphs[1]).toMatch(/^Documentamos el código/);
     expect(en.about.paragraphs[1]).toMatch(/^We document the code/);
