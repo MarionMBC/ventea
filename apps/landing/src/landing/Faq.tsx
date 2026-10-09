@@ -1,7 +1,7 @@
 import { CONTACT_EMAIL, TRIAL_DAYS } from '@/config';
 import { useT } from '@/i18n';
 
-import { REWARDS } from './food';
+import { REWARDS } from './rewards';
 
 /**
  * Preguntas frecuentes, con respuestas alineadas al producto y a los términos: sin delivery ni

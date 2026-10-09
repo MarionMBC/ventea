@@ -1,6 +1,6 @@
 import { useT } from '@/i18n';
 
-import { DEMO_RESTAURANT, DishPhoto } from './food';
+import { ShotPhone } from './shots';
 
 /**
  * Sección A — por qué un canal propio. Sin nombrar a nadie y sin decir que las apps de
@@ -24,7 +24,7 @@ export function OwnBrand() {
             <div className="crowd" aria-hidden="true">
               {Array.from({ length: 9 }, (_, i) => (
                 <span key={i} className={`crowd__tile${i === 4 ? ' is-you' : ''}`}>
-                  {i === 4 ? DEMO_RESTAURANT.initials : ''}
+                  {i === 4 ? '★' : ''}
                 </span>
               ))}
             </div>
@@ -35,23 +35,7 @@ export function OwnBrand() {
           </figure>
 
           <figure className="own__panel own__panel--own" data-reveal>
-            <div className="ownapp" aria-hidden="true">
-              <div className="ownapp__url">
-                <span className="ownapp__lock" /> {o.ownUrl(DEMO_RESTAURANT.name)}
-              </div>
-              <div className="ownapp__hero">
-                <DishPhoto dish="chicken" sizes="(min-width: 768px) 280px, 70vw" />
-                <span className="ownapp__brand">
-                  <span className="ownapp__logo">{DEMO_RESTAURANT.initials}</span>
-                  {DEMO_RESTAURANT.name}
-                </span>
-              </div>
-              <div className="ownapp__row">
-                <span>{o.ownTabs[0]}</span>
-                <span>{o.ownTabs[1]}</span>
-                <span className="is-on">{o.ownTabs[2]}</span>
-              </div>
-            </div>
+            <ShotPhone screens={['home']} className="own__phone" />
             <figcaption>
               <strong>{o.ownTitle}</strong>
               {o.ownText}

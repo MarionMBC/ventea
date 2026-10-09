@@ -3,22 +3,15 @@ import { useState } from 'react';
 import { TRIAL_DAYS } from '@/config';
 import { signupHref, useLocale, useT } from '@/i18n';
 
-import { DEMO_EARNED, DEMO_RESTAURANT, DEMO_TOTAL, DishPhoto, lempiras } from './food';
 import { useReducedMotion, useSequence } from './motion';
-import { Phone, type PhoneScreen } from './Phone';
+import { SAMPLE_ORDER, ShotPhone, usd, type AppShot } from './shots';
 
 /**
- * Coreografía del hero: el cliente abre el menú, agrega, confirma, el pedido llega al
- * restaurante y suma puntos. Cinco pasos que avanzan solos (pausables; con movimiento reducido
+ * Coreografía del hero con capturas reales de la app de Carolina: inicio, platillo, estado del
+ * pedido (y el pedido llega al restaurante) y puntos. Cuatro pasos que avanzan solos (pausables; con movimiento reducido
  * quedan quietos y se avanzan a mano). Los CTA no se mueven nunca.
  */
-const STEPS: { screen: PhoneScreen; added: boolean }[] = [
-  { screen: 'menu', added: false },
-  { screen: 'menu', added: true },
-  { screen: 'cart', added: true },
-  { screen: 'confirmed', added: true },
-  { screen: 'points', added: true },
-];
+const SCREENS: AppShot[] = ['home', 'product', 'tracking', 'profile'];
 
 const STEP_MS = 2600;
 
@@ -28,8 +21,7 @@ export function Hero() {
   const reduced = useReducedMotion();
   const [paused, setPaused] = useState(false);
   const playing = !reduced && !paused;
-  const [step, setStep] = useSequence(STEPS.length, STEP_MS, playing);
-  const current = STEPS[step]!;
+  const [step, setStep] = useSequence(SCREENS.length, STEP_MS, playing);
 
   return (
     <section className="hero" aria-labelledby="hero-title">
@@ -64,33 +56,26 @@ export function Hero() {
         </div>
 
         <div className="hero__stage" data-step={step}>
-          <figure className="hero__dish hero__dish--a" aria-hidden="true">
-            <DishPhoto dish="burger" sizes="(min-width: 1024px) 220px, 140px" eager />
-          </figure>
-          <figure className="hero__dish hero__dish--b" aria-hidden="true">
-            <DishPhoto dish="tacos" sizes="(min-width: 1024px) 160px, 110px" eager />
-          </figure>
-
-          <Phone screen={current.screen} added={current.added} eager className="hero__phone" />
+          <ShotPhone screens={SCREENS} active={SCREENS[step]} eager className="hero__phone" />
 
           <div className="hero__ticket" aria-hidden="true">
             <p className="hero__ticket-head">
-              <span className="dot" /> {t.hero.ticketNew} · #{DEMO_RESTAURANT.orderNumber}
+              <span className="dot" /> {t.hero.ticketNew} · #{SAMPLE_ORDER.code}
             </p>
             <p>
-              {t.hero.ticketTakeout} · {lempiras(DEMO_TOTAL)}
+              {t.hero.ticketTakeout} · {usd(SAMPLE_ORDER.totalCents)}
             </p>
             <p className="hero__ticket-fee">
-              {t.hero.ticketFee} <strong>{lempiras(0)}</strong>
+              {t.hero.ticketFee} <strong>{usd(0)}</strong>
             </p>
           </div>
           <div className="hero__points" aria-hidden="true">
-            <span>★</span> {t.hero.pointsBadge(DEMO_EARNED)}
+            <span>★</span> {t.hero.pointsBadge(SAMPLE_ORDER.earnedPoints)}
           </div>
 
           <div className="hero__controls">
             <ol className="hero__steps" aria-label={t.hero.stepsLabel}>
-              {STEPS.map((_s, index) => (
+              {SCREENS.map((_s, index) => (
                 <li key={index}>
                   <button
                     type="button"

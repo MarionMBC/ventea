@@ -61,56 +61,13 @@ export const en = {
     ticketTakeout: 'Takeout',
     ticketFee: 'Ventea commission',
     pointsBadge: (points: number) => `+${points} points`,
-    steps: ['Menu', 'Add', 'Confirm', 'In the kitchen', 'Points'] as [
-      string,
-      string,
-      string,
-      string,
-      string,
-    ],
+    steps: ['Home', 'Dish', 'Order status', 'Points'] as [string, string, string, string],
     stepsLabel: 'Demo steps',
     stepPrefix: (n: number) => `Step ${n}: `,
     play: 'Play',
     pause: 'Pause',
     controlSuffix: ' the demo',
-    disclaimer: 'Demo with a sample restaurant.',
-  },
-
-  phone: {
-    screenLabel: {
-      menu: 'Sample restaurant menu with photos and prices in lempiras',
-      cart: (total: string, earned: number) =>
-        `Takeout order paid at pickup, total ${total} and ${earned} points to earn`,
-      confirmed: (order: string) => `Order ${order} received, status New`,
-      points: (balance: number, bonus: number, earned: number) =>
-        `Balance of ${balance} points: ${bonus} welcome points and ${earned} from the order`,
-    },
-    modes: 'Takeout · Dine in',
-    chips: ['Popular', 'Burgers', 'Tacos'] as [string, string, string],
-    welcomeChip: (points: number) => `${points} welcome points`,
-    cartTitle: 'Your order',
-    takeout: 'Takeout',
-    dineIn: 'Dine in',
-    payAtPickup: 'Pay at pickup, in store',
-    total: 'Total',
-    earn: (points: number) => `Earn ${points} points with this order`,
-    confirm: 'Place order',
-    received: 'Order received!',
-    readyForPickup: 'Ready for pickup!',
-    track: ['New', 'In the kitchen', 'Ready'] as [string, string, string],
-    trackNote: 'Follow your order status right here.',
-    pointsLabel: 'Your points',
-    pointsHint: 'You can redeem them on your next order',
-    ledgerOrder: (order: string) => `Order #${order}`,
-    welcomeBonus: 'Welcome bonus',
-  },
-
-  /** Menú del restaurante de ejemplo («Casa Brasa»). Los precios (L) no cambian. */
-  menu: {
-    burger: { name: 'House burger', detail: 'Double patty, cheddar' },
-    tacos: { name: 'Tacos al pastor', detail: 'Three tacos, pineapple, cilantro' },
-    chicken: { name: 'Crispy chicken', detail: 'Three pieces and fries' },
-    bowl: { name: 'Chicken bowl', detail: 'Rice, avocado, corn' },
+    disclaimer: 'Real screenshots of the Carolina Hot Chicken app. Sample account and order.',
   },
 
   ownBrand: {
@@ -119,8 +76,6 @@ export const en = {
     lead: 'Third-party apps can help new customers discover you. Ventea is the channel for the people who already know you: a menu and an order under your name, your own address on ventea.tech and your own points program.',
     crowdTitle: 'On a third-party app',
     crowdText: 'Your restaurant is one more option in a list, under the app’s brand.',
-    ownUrl: (name: string) => `${name} app`,
-    ownTabs: ['Menu', 'My orders', '★ My points'] as [string, string, string],
     ownTitle: 'On your own channel',
     ownText:
       'Your name, your photos and your colors from start to finish. Customers order from you.',
@@ -145,7 +100,7 @@ export const en = {
         tab: 'Earn rewards',
         title: 'Every order earns points for the next one',
         text: (bonus: number, earned: number) =>
-          `With the default settings they earn 1 point per lempira, plus ${bonus} welcome points when they create their account. This order earned them ${earned}.`,
+          `With the default settings they earn 1 point per unit of currency spent, plus ${bonus} welcome points when they create their account. The sample order on screen earned them ${earned}.`,
       },
     },
     play: 'Play journey',
@@ -156,16 +111,6 @@ export const en = {
     eyebrow: 'Direct orders',
     title: 'A closer relationship with your customers. Fewer middlemen.',
     lead: 'The order your customer confirms shows up on your kitchen board, with a sound alert if you turn it on. Your team moves it forward with one tap and the customer sees the status on their phone.',
-    columns: ['New', 'In the kitchen', 'Ready'] as [string, string, string],
-    actions: ['Start', 'Ready', 'Delivered'] as [string, string, string],
-    boardLabel: (order: string) =>
-      `Restaurant order board: order ${order} moves from New to In the kitchen to Ready.`,
-    boardTitle: 'Orders',
-    tabActive: 'Active',
-    tabHistory: 'Today’s history',
-    sound: '🔔 Sound: on',
-    ago: '1 min ago',
-    takeout: 'Takeout',
     facts: [
       { strong: 'Takeout or dine in.', text: 'The customer chooses when confirming.' },
       { strong: 'Pay at pickup.', text: 'Straight to your register, no middlemen.' },
@@ -181,19 +126,31 @@ export const en = {
     title: 'Turn a good experience into another visit.',
     lead: 'Your customers earn points with every delivered order and redeem them as a discount on the next one. They see their balance and where every point came from.',
     earnTerm: 'Earn',
-    earnDef: '1 point per lempira of the order',
+    earnDef: '1 point per unit of currency spent (lempira or dollar)',
     welcomeTerm: 'Welcome',
     welcomeDef: (points: number) => `${points} points when they create their account`,
     redeemTerm: 'Redeem',
     redeemDef: (points: number) => `From ${points} points; each point is worth 1 cent`,
     note: 'These are the values every restaurant starts with. If you want different ones, we adjust them with you.',
-    cardLabel: (total: string, balance: number, value: string) =>
-      `Example: with a ${total} order and the welcome bonus, the customer has ${balance} points, worth ${value} off.`,
-    points: 'points',
-    welcomeBonus: 'Welcome bonus',
-    order: (order: string, total: string) => `Order #${order} · ${total}`,
-    available: 'Available discount',
-    example: 'Example with the default settings.',
+    example: 'Sample account with the default settings.',
+  },
+
+  shots: {
+    app: {
+      home: 'Home screen of the Carolina Hot Chicken app: pickup at a branch, a weekly promo and the menu categories.',
+      menu: 'Menu in the Carolina Hot Chicken app: categories, a discounted combo and dishes with photo and price.',
+      product:
+        'Dish detail in the Carolina Hot Chicken app: Reaper Tender Sandwich with heat level, extras and an Add button.',
+      tracking:
+        'Order CHC-1042 in the Carolina Hot Chicken app: a pickup order in the kitchen, with its items and total.',
+      profile:
+        'Customer profile in the Carolina Hot Chicken app with 74 points: 50 welcome points and 24 from an order.',
+    },
+    panelAlt:
+      'Ventea restaurant panel: orders board with New, In the kitchen and Ready columns, each order with its items, notes and total, next to a sidebar with Orders, History and Billing.',
+    historyAlt:
+      'Ventea restaurant panel, Today’s history: a summary of delivered and cancelled orders and sales, and the list of closed orders.',
+    appCaption: 'Real screenshots of the Carolina Hot Chicken app. Sample account and order.',
   },
 
   control: {
@@ -201,8 +158,6 @@ export const en = {
     title: 'Run your business from one place.',
     lead: 'A panel your team gets in minutes. It works in the browser on a computer, a tablet or a phone.',
     url: 'your-restaurant.ventea.tech/admin',
-    imageAlt:
-      'Ventea’s order panel with the columns Nuevos (New), En cocina (In the kitchen) and Listos (Ready), each order with its items, notes and total.',
     caption: 'Screenshot of the real panel, with sample orders.',
     features: [
       {
@@ -274,10 +229,6 @@ export const en = {
         text: 'Your own points, earned and redeemed only at your restaurant.',
       },
     ] as { title: string; text: string }[],
-    menuAlt:
-      'Menu in the Carolina Hot Chicken app: categories, a discounted combo and products with photo and price.',
-    profileAlt:
-      'A customer profile in the Carolina Hot Chicken app with 62 points and its history: welcome bonus and points from an order.',
     caption:
       'Carolina Hot Chicken already takes orders with Ventea. Screenshots of its app, with its brand.',
   },
@@ -401,10 +352,6 @@ export const en = {
     primaryCta: 'Get started with Ventea',
     secondaryCta: 'Request a demo',
     fine: (days: number) => `${days} days free · No card required · 0% commission per order`,
-    column: 'Ready',
-    takeout: 'Takeout',
-    readyForPickup: 'Ready for pickup',
-    delivered: 'Delivered',
   },
 
   footer: {

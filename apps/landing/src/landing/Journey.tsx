@@ -2,20 +2,20 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 
 import { useT } from '@/i18n';
 
-import { DEMO_EARNED, REWARDS } from './food';
 import { useInView, useReducedMotion, useSequence } from './motion';
-import { Phone, type PhoneScreen } from './Phone';
+import { REWARDS } from './rewards';
+import { SAMPLE_ORDER, ShotPhone, type AppShot } from './shots';
 
 /**
  * Sección B — el recorrido del cliente en tres etapas, como pestañas (WAI-ARIA tabs: flechas,
  * Inicio y Fin). Avanza sola solo cuando está en pantalla, se pausa, y deja de avanzar en cuanto
- * la persona elige una etapa. Es una demostración: no hace pedidos ni toca datos reales. Los
+ * la persona elige una etapa. Capturas reales de la app de Carolina (cuenta y pedido de ejemplo). Los
  * textos de cada etapa, por idioma, en `t.journey.stages`.
  */
-const STAGES: { id: string; key: 'explore' | 'order' | 'return'; screen: PhoneScreen }[] = [
+const STAGES: { id: string; key: 'explore' | 'order' | 'return'; screen: AppShot }[] = [
   { id: 'explorar', key: 'explore', screen: 'menu' },
-  { id: 'pedir', key: 'order', screen: 'cart' },
-  { id: 'volver', key: 'return', screen: 'points' },
+  { id: 'pedir', key: 'order', screen: 'tracking' },
+  { id: 'volver', key: 'return', screen: 'profile' },
 ];
 
 export function Journey() {
@@ -32,7 +32,7 @@ export function Journey() {
     order: j.stages.order,
     return: {
       ...j.stages.return,
-      text: j.stages.return.text(REWARDS.welcomeBonus, DEMO_EARNED),
+      text: j.stages.return.text(REWARDS.welcomeBonus, SAMPLE_ORDER.earnedPoints),
     },
   };
 
@@ -139,7 +139,7 @@ export function Journey() {
 
           <div className="journey__device">
             <div className="journey__halo" aria-hidden="true" />
-            <Phone screen={stage.screen} />
+            <ShotPhone screens={STAGES.map((s) => s.screen)} active={stage.screen} />
           </div>
         </div>
       </div>

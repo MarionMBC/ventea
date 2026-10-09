@@ -1,13 +1,10 @@
-import menuAvif from '@/assets/demo/carolina-menu.avif';
-import menuWebp from '@/assets/demo/carolina-menu.webp';
-import profileAvif from '@/assets/demo/carolina-profile.avif';
-import profileWebp from '@/assets/demo/carolina-profile.webp';
 import { useT } from '@/i18n';
+
+import { ShotPhone } from './shots';
 
 /**
  * Sección G — la diferencia, con el producto real: capturas de la app de Carolina Hot Chicken,
- * la primera marca en Ventea (menú y perfil con puntos; el correo de la cuenta de prueba está
- * tapado). Sin testimonios ni cifras.
+ * la primera marca en Ventea (menú real desde la API y detalle de un platillo; TASK-013). Sin testimonios ni cifras.
  */
 export function Identity() {
   const id = useT().identity;
@@ -35,32 +32,8 @@ export function Identity() {
         </div>
 
         <figure className="identity__shots" data-reveal>
-          <div className="shot shot--menu">
-            <picture>
-              <source srcSet={menuAvif} type="image/avif" />
-              <img
-                src={menuWebp}
-                width={520}
-                height={1126}
-                alt={id.menuAlt}
-                loading="lazy"
-                decoding="async"
-              />
-            </picture>
-          </div>
-          <div className="shot shot--profile">
-            <picture>
-              <source srcSet={profileAvif} type="image/avif" />
-              <img
-                src={profileWebp}
-                width={520}
-                height={480}
-                alt={id.profileAlt}
-                loading="lazy"
-                decoding="async"
-              />
-            </picture>
-          </div>
+          <ShotPhone screens={['menu']} className="shot shot--menu" />
+          <ShotPhone screens={['product']} className="shot shot--profile" />
           <figcaption>{id.caption}</figcaption>
         </figure>
       </div>

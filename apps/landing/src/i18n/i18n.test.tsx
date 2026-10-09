@@ -171,17 +171,21 @@ describe('Landing en inglés (TASK-012)', () => {
     ).toBe('/signup?plan=pro&interval=annual');
   });
 
-  it('el demo es Casa Brasa con precios en lempiras; puntos con la configuración real', async () => {
+  it('capturas reales presentadas como tales; puntos con la configuración real', async () => {
     mockFetch(() => json(PLANS));
     const { container } = renderEn(<LandingPage />);
     await screen.findByTestId('price-pro');
     const all = text(container);
-    expect(all).toContain('Casa Brasa');
-    expect(all).toContain('House burger');
-    expect(all).toContain('L 405.00');
-    expect(all).toContain('Demo with a sample restaurant.');
+    expect(all).not.toContain('Casa Brasa');
+    expect(all).toContain(
+      'Real screenshots of the Carolina Hot Chicken app. Sample account and order.',
+    );
+    expect(all).toContain('#CHC-1042');
+    expect(all).toContain('$24.30');
+    const panel = container.querySelector<HTMLImageElement>('#pedidos .browser img');
+    expect(panel?.getAttribute('src')).toMatch(/panel-board-en/);
     const loyalty = text(container.querySelector('#puntos'));
-    expect(loyalty).toContain('1 point per lempira of the order');
+    expect(loyalty).toContain('1 point per unit of currency spent (lempira or dollar)');
     expect(loyalty).toContain('50 points when they create their account');
     expect(loyalty).toContain('From 100 points; each point is worth 1 cent');
     expect(container.querySelector('blockquote')).toBeNull();

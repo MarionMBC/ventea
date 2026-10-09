@@ -1,12 +1,11 @@
-import kitchenAvif from '@/assets/demo/carolina-kitchen.avif';
-import kitchenWebp from '@/assets/demo/carolina-kitchen.webp';
 import { useT } from '@/i18n';
+
+import { PanelShot } from './shots';
 
 /**
  * Sección E — el panel del restaurante. Solo lo que el panel hace hoy (apps/admin): el tablero
  * de pedidos con su historial del día y la facturación del plan. La captura es del panel real
- * con pedidos de ejemplo (TASK-007); el panel está en español, y el texto alternativo en inglés
- * lo dice con los nombres de las columnas.
+ * rediseñado (TASK-011), con pedidos de ejemplo, en el idioma de la página.
  */
 const ICONS = [
   'M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v6h-4z',
@@ -35,17 +34,7 @@ export function Control() {
             <span />
             <em>{c.url}</em>
           </div>
-          <picture>
-            <source srcSet={kitchenAvif} type="image/avif" />
-            <img
-              src={kitchenWebp}
-              width={1200}
-              height={522}
-              alt={c.imageAlt}
-              loading="lazy"
-              decoding="async"
-            />
-          </picture>
+          <PanelShot view="history" />
           <figcaption>{c.caption}</figcaption>
         </figure>
 

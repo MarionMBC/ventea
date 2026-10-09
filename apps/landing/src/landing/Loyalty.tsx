@@ -1,20 +1,15 @@
-import { useRef, type CSSProperties } from 'react';
-
 import { useT } from '@/i18n';
 
-import { DEMO_BALANCE, DEMO_EARNED, DEMO_RESTAURANT, DEMO_TOTAL, lempiras, REWARDS } from './food';
-import { useInView } from './motion';
+import { REWARDS } from './rewards';
+import { ShotPhone } from './shots';
 
 /**
  * Sección D — puntos. Los números salen de la configuración inicial real de cada marca
- * (DEFAULT_REWARD_PROGRAM): nada de recompensas inventadas. El anillo se llena una vez al
- * entrar en pantalla (CSS; con movimiento reducido aparece lleno).
+ * (DEFAULT_REWARD_PROGRAM): nada de recompensas inventadas. Al lado, el perfil real de un
+ * cliente en la app de Carolina (cuenta de ejemplo) con su saldo y de dónde salió cada punto.
  */
 export function Loyalty() {
   const l = useT().loyalty;
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, 0.4);
-  const value = (DEMO_BALANCE * REWARDS.centsPerPoint) / 100;
 
   return (
     <section className="section loyalty" id="puntos" aria-labelledby="loyalty-title">
@@ -43,38 +38,10 @@ export function Loyalty() {
           <p className="loyalty__note">{l.note}</p>
         </div>
 
-        <div
-          className={`loyalty__card${seen ? ' is-in' : ''}`}
-          ref={ref}
-          role="img"
-          aria-label={l.cardLabel(lempiras(DEMO_TOTAL), DEMO_BALANCE, lempiras(value))}
-        >
-          <div className="ring" aria-hidden="true">
-            <svg viewBox="0 0 120 120">
-              <circle className="ring__track" cx="60" cy="60" r="52" />
-              <circle className="ring__fill" cx="60" cy="60" r="52" pathLength="100" />
-            </svg>
-            <span className="ring__value">
-              <strong>{DEMO_BALANCE}</strong>
-              <small>{l.points}</small>
-            </span>
-          </div>
-          <ul className="ledger" aria-hidden="true">
-            <li style={{ '--d': '0.2s' } as CSSProperties}>
-              <span>{l.welcomeBonus}</span>
-              <strong>+{REWARDS.welcomeBonus}</strong>
-            </li>
-            <li style={{ '--d': '0.6s' } as CSSProperties}>
-              <span>{l.order(DEMO_RESTAURANT.orderNumber, lempiras(DEMO_TOTAL))}</span>
-              <strong>+{DEMO_EARNED}</strong>
-            </li>
-            <li className="ledger__total" style={{ '--d': '1s' } as CSSProperties}>
-              <span>{l.available}</span>
-              <strong>{lempiras(value)}</strong>
-            </li>
-          </ul>
-          <p className="loyalty__example">{l.example}</p>
-        </div>
+        <figure className="loyalty__shot" data-reveal>
+          <ShotPhone screens={['profile']} />
+          <figcaption>{l.example}</figcaption>
+        </figure>
       </div>
     </section>
   );

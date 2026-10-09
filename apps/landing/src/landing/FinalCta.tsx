@@ -2,7 +2,6 @@ import { TRIAL_DAYS } from '@/config';
 import { signupHref, useLocale, useT } from '@/i18n';
 
 import { Isotype, Logo } from './Brand';
-import { DEMO_RESTAURANT, DEMO_TOTAL, lempiras } from './food';
 
 /**
  * Sección J — cierre. Marino con el isotipo oficial a gran escala y el último pedido del
@@ -29,21 +28,6 @@ export function FinalCta() {
             </a>
           </div>
           <p className="final__fine">{f.fine(TRIAL_DAYS)}</p>
-        </div>
-
-        <div className="final__ticket" aria-hidden="true" data-reveal>
-          <p className="final__ticket-col">{f.column}</p>
-          <article className="ticket is-ready">
-            <header>
-              <strong>#{DEMO_RESTAURANT.orderNumber}</strong>
-              <span>{f.takeout}</span>
-            </header>
-            <p className="ticket__mode">{f.readyForPickup}</p>
-            <footer>
-              <span>{lempiras(DEMO_TOTAL)}</span>
-              <span className="ticket__action">{f.delivered}</span>
-            </footer>
-          </article>
         </div>
       </div>
     </section>

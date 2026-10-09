@@ -44,49 +44,13 @@ export const es: Messages = {
     ticketTakeout: 'Para llevar',
     ticketFee: 'Comisión Ventea',
     pointsBadge: (points) => `+${points} puntos`,
-    steps: ['Menú', 'Agregar', 'Confirmar', 'En la cocina', 'Puntos'],
+    steps: ['Inicio', 'Platillo', 'Estado del pedido', 'Puntos'],
     stepsLabel: 'Pasos de la demostración',
     stepPrefix: (n) => `Paso ${n}: `,
     play: 'Reproducir',
     pause: 'Pausar',
     controlSuffix: ' la demostración',
-    disclaimer: 'Demostración con un restaurante de ejemplo.',
-  },
-
-  phone: {
-    screenLabel: {
-      menu: 'Menú del restaurante de ejemplo con fotos y precios en lempiras',
-      cart: (total, earned) =>
-        `Pedido para llevar con pago al retirar, total ${total} y ${earned} puntos por ganar`,
-      confirmed: (order) => `Pedido ${order} recibido, en estado Nuevo`,
-      points: (balance, bonus, earned) =>
-        `Saldo de ${balance} puntos: ${bonus} de bienvenida y ${earned} del pedido`,
-    },
-    modes: 'Para llevar · Comer aquí',
-    chips: ['Populares', 'Hamburguesas', 'Tacos'],
-    welcomeChip: (points) => `${points} puntos de bienvenida`,
-    cartTitle: 'Su pedido',
-    takeout: 'Para llevar',
-    dineIn: 'Comer aquí',
-    payAtPickup: 'Paga al retirar en el local',
-    total: 'Total',
-    earn: (points) => `Gana ${points} puntos con este pedido`,
-    confirm: 'Confirmar pedido',
-    received: '¡Pedido recibido!',
-    readyForPickup: '¡Listo para retirar!',
-    track: ['Nuevo', 'En cocina', 'Listo'],
-    trackNote: 'Siga el estado de su pedido desde aquí.',
-    pointsLabel: 'Sus puntos',
-    pointsHint: 'Ya puede canjearlos en su próximo pedido',
-    ledgerOrder: (order) => `Pedido #${order}`,
-    welcomeBonus: 'Bono de bienvenida',
-  },
-
-  menu: {
-    burger: { name: 'Hamburguesa de la casa', detail: 'Doble carne, cheddar' },
-    tacos: { name: 'Tacos al pastor', detail: 'Tres tacos, piña, cilantro' },
-    chicken: { name: 'Pollo crujiente', detail: 'Tres piezas y papas' },
-    bowl: { name: 'Bowl de pollo', detail: 'Arroz, aguacate, maíz' },
+    disclaimer: 'Capturas reales de la app de Carolina Hot Chicken. Cuenta y pedido de ejemplo.',
   },
 
   ownBrand: {
@@ -95,8 +59,6 @@ export const es: Messages = {
     lead: 'Las apps de terceros pueden ayudarle a que clientes nuevos lo descubran. Ventea es el canal para quienes ya lo conocen: un menú y un pedido con su nombre, su propia dirección en ventea.tech y su propio programa de puntos.',
     crowdTitle: 'En una app de terceros',
     crowdText: 'Su restaurante es una opción más en una lista, con la marca de la app.',
-    ownUrl: (name) => `App de ${name}`,
-    ownTabs: ['Menú', 'Mis pedidos', '★ Mis puntos'],
     ownTitle: 'En su canal propio',
     ownText: 'Su nombre, sus fotos y sus colores de principio a fin. El cliente le pide a usted.',
   },
@@ -120,7 +82,7 @@ export const es: Messages = {
         tab: 'Acumular recompensas',
         title: 'Cada pedido suma puntos para el siguiente',
         text: (bonus, earned) =>
-          `Con la configuración inicial gana 1 punto por cada lempira y ${bonus} de bienvenida al crear su cuenta. Este pedido le dio ${earned}.`,
+          `Con la configuración inicial gana 1 punto por unidad de moneda gastada, más ${bonus} de bienvenida al crear su cuenta. El pedido de ejemplo en pantalla le dio ${earned}.`,
       },
     },
     play: 'Reproducir recorrido',
@@ -131,16 +93,6 @@ export const es: Messages = {
     eyebrow: 'Pedidos directos',
     title: 'Más relación con sus clientes. Menos intermediarios.',
     lead: 'El pedido que confirma su cliente aparece en el tablero de su cocina, con aviso sonoro si lo activa. Su equipo lo avanza con un toque y el cliente ve el estado en su teléfono.',
-    columns: ['Nuevos', 'En cocina', 'Listos'],
-    actions: ['Empezar', 'Listo', 'Entregado'],
-    boardLabel: (order) =>
-      `Tablero de pedidos del restaurante: el pedido ${order} pasa de Nuevos a En cocina y a Listos.`,
-    boardTitle: 'Pedidos',
-    tabActive: 'Activos',
-    tabHistory: 'Historial de hoy',
-    sound: '🔔 Sonido: activado',
-    ago: 'hace 1 min',
-    takeout: 'Para llevar',
     facts: [
       { strong: 'Para llevar o comer en el local.', text: 'El cliente elige al confirmar.' },
       { strong: 'Pago al retirar.', text: 'Directo en su caja, sin intermediarios.' },
@@ -156,19 +108,31 @@ export const es: Messages = {
     title: 'Convierta una buena experiencia en otra visita.',
     lead: 'Sus clientes suman puntos con cada pedido entregado y los canjean como descuento en el siguiente. Ven su saldo y de dónde salió cada punto.',
     earnTerm: 'Gana',
-    earnDef: '1 punto por cada lempira del pedido',
+    earnDef: '1 punto por unidad de moneda gastada (lempira o dólar)',
     welcomeTerm: 'Bienvenida',
     welcomeDef: (points) => `${points} puntos al crear su cuenta`,
     redeemTerm: 'Canjea',
     redeemDef: (points) => `Desde ${points} puntos; cada punto vale 1 centavo`,
     note: 'Son los valores con los que arranca cada restaurante. Si quiere otros, los ajustamos con usted.',
-    cardLabel: (total, balance, value) =>
-      `Ejemplo: con un pedido de ${total} y el bono de bienvenida, el cliente reúne ${balance} puntos, que equivalen a ${value} de descuento.`,
-    points: 'puntos',
-    welcomeBonus: 'Bono de bienvenida',
-    order: (order, total) => `Pedido #${order} · ${total}`,
-    available: 'Descuento disponible',
     example: 'Ejemplo con la configuración inicial.',
+  },
+
+  shots: {
+    app: {
+      home: 'Inicio de la app de Carolina Hot Chicken: retiro en sucursal, una promoción de la semana y las categorías del menú.',
+      menu: 'Menú en la app de Carolina Hot Chicken: categorías, un combo con descuento y platillos con foto y precio.',
+      product:
+        'Detalle de un platillo en la app de Carolina Hot Chicken: Reaper Tender Sandwich con nivel de picante, extras y botón para agregar.',
+      tracking:
+        'Pedido CHC-1042 en la app de Carolina Hot Chicken: pedido para llevar en cocina, con sus productos y total.',
+      profile:
+        'Perfil de un cliente en la app de Carolina Hot Chicken con 74 puntos: 50 de bienvenida y 24 de un pedido.',
+    },
+    panelAlt:
+      'Panel del restaurante de Ventea: tablero de pedidos con las columnas Nuevos, En cocina y Listos, cada pedido con sus productos, notas y total, junto a la barra lateral con Pedidos, Historial y Facturación.',
+    historyAlt:
+      'Panel del restaurante de Ventea, Historial de hoy: resumen de pedidos entregados, cancelados y ventas, y la lista de pedidos cerrados.',
+    appCaption: 'Capturas reales de la app de Carolina Hot Chicken. Cuenta y pedido de ejemplo.',
   },
 
   control: {
@@ -176,8 +140,6 @@ export const es: Messages = {
     title: 'El control de su negocio, desde un solo lugar.',
     lead: 'Un panel que su equipo entiende en minutos. Funciona en el navegador de una computadora, una tableta o un teléfono.',
     url: 'su-restaurante.ventea.tech/admin',
-    imageAlt:
-      'Panel de pedidos de Ventea con las columnas Nuevos, En cocina y Listos, cada pedido con sus productos, notas y total.',
     caption: 'Captura del panel real, con pedidos de ejemplo.',
     features: [
       {
@@ -249,10 +211,6 @@ export const es: Messages = {
         text: 'Puntos propios que solo se ganan y se canjean en su restaurante.',
       },
     ],
-    menuAlt:
-      'Menú en la app de Carolina Hot Chicken: categorías, un combo con descuento y productos con foto y precio.',
-    profileAlt:
-      'Perfil de un cliente en la app de Carolina Hot Chicken con 62 puntos y su historial: bono de bienvenida y puntos por un pedido.',
     caption: 'Carolina Hot Chicken ya recibe pedidos con Ventea. Capturas de su app, con su marca.',
   },
 
@@ -374,10 +332,6 @@ export const es: Messages = {
     primaryCta: 'Empezar con Ventea',
     secondaryCta: 'Pedir una demostración',
     fine: (days) => `${days} días gratis · Sin tarjeta · 0% de comisión por pedido`,
-    column: 'Listos',
-    takeout: 'Para llevar',
-    readyForPickup: 'Listo para retirar',
-    delivered: 'Entregado',
   },
 
   footer: {
