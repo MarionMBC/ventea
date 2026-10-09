@@ -10,7 +10,8 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tools/*"
   ],
   "scripts": {
     "build": "turbo run build",
@@ -23,7 +24,9 @@
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:migrate": "npm run prisma:migrate -w @ventea/api",
-    "db:seed": "npm run prisma:seed -w @ventea/api"
+    "db:seed": "npm run prisma:seed -w @ventea/api",
+    "brand:app": "npm run build -w @ventea/shared --silent && npm run app -w @ventea/brand-app --",
+    "brand:import-images": "npm run build -w @ventea/shared --silent && npm run import-images -w @ventea/brand-app --"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

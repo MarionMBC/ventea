@@ -51,3 +51,6 @@ graphify-out/
 deploy/test-vps/.sync-routes.lock
 deploy/test-vps/*.tmp
 dist-ssr/
+
+# apps nativas generadas por marca (TASK-019): binarios, copias de trabajo y metadatos
+dist-apps/
