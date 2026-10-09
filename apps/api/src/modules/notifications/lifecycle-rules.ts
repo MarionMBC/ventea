@@ -22,7 +22,7 @@ export interface LifecycleSubscription {
 }
 
 export type LifecycleEmail =
-  | { kind: 'trial_ending'; occurrence: string; daysLeft: 1 | 3; trialEndsAt: Date }
+  | { kind: 'trial_ending'; occurrence: string; daysLeft: number; trialEndsAt: Date }
   | { kind: 'past_due'; occurrence: string; periodEnd: Date; graceEndsAt: Date | null }
   | { kind: 'past_due_reminder'; occurrence: string; graceEndsAt: Date; daysLeft: number };
 
@@ -33,12 +33,14 @@ export function lifecycleEmailDue(sub: LifecycleSubscription, now: Date): Lifecy
     if (!sub.trialEndsAt) return null;
     const remaining = sub.trialEndsAt.getTime() - now.getTime();
     if (remaining <= 0) return null;
-    const daysLeft = remaining <= DAY_MS ? 1 : remaining <= 3 * DAY_MS ? 3 : null;
-    if (!daysLeft) return null;
+    // Ventana del aviso (3 días o 1 día): es la que va en la dedupeKey. El asunto lleva los días
+    // reales (a 2,5 días de una prueba extendida dice 3; a 2, dice 2).
+    const notice = remaining <= DAY_MS ? 1 : remaining <= 3 * DAY_MS ? 3 : null;
+    if (!notice) return null;
     return {
       kind: 'trial_ending',
-      occurrence: `${sub.trialEndsAt.getTime()}:${daysLeft}`,
-      daysLeft,
+      occurrence: `${sub.trialEndsAt.getTime()}:${notice}`,
+      daysLeft: Math.min(notice, Math.ceil(remaining / DAY_MS)),
       trialEndsAt: sub.trialEndsAt,
     };
   }
