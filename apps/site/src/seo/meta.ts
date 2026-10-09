@@ -165,7 +165,7 @@ export function withRouteHead(html: string, route: Route): string {
  * Fecha del último cambio de contenido del sitio (`lastmod` del sitemap). Se actualiza a mano al
  * cambiar textos o páginas: no es la fecha del build, que cambiaría en cada deploy sin cambios.
  */
-export const CONTENT_UPDATED = '2026-10-08';
+export const CONTENT_UPDATED = '2026-10-09';
 
 export function sitemapXml(lastmod: string = CONTENT_UPDATED): string {
   const urls = ROUTES.filter(isIndexable)

@@ -34,7 +34,9 @@ const PAGES = [
 ];
 
 // Rutas de TASK-009 que ahora redirigen (nginx 301): ningún link, canonical ni alternate a ellas.
-const OLD_ROUTES = /(href|content)="(https:\/\/ventea\.tech)?\/(en(\/|")|politica-de-privacidad)/;
+// Cubre atributos (`href`, `content`) y las URLs del JSON-LD (`"url"`, `"@id"`, …).
+const OLD_ROUTES =
+  /((href|content)="(https:\/\/ventea\.tech)?|"(url|@id|logo|image|item)":"https:\/\/ventea\.tech)\/(en(\/|"|#)|politica-de-privacidad)/;
 
 const titles = new Set();
 const descriptions = new Set();
