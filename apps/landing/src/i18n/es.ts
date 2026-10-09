@@ -247,6 +247,12 @@ export const es: Messages = {
     },
     locations: (max) =>
       max === null ? 'Sucursales ilimitadas' : max === 1 ? '1 sucursal' : `Hasta ${max} sucursales`,
+    staff: (max) =>
+      max === null
+        ? 'Usuarios ilimitados'
+        : max === 1
+          ? '1 usuario del equipo'
+          : `Hasta ${max} usuarios del equipo`,
     features: {
       ownAddress: 'Pedidos en su dirección propia en ventea.tech',
       board: 'Panel de pedidos con aviso sonoro',

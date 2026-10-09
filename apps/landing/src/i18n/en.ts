@@ -267,6 +267,13 @@ export const en = {
     } as Partial<Record<PlanCode, string>>,
     locations: (max: number | null) =>
       max === null ? 'Unlimited locations' : max === 1 ? '1 location' : `Up to ${max} locations`,
+    /** Dashboard users (active + pending invitations, TASK-022). */
+    staff: (max: number | null) =>
+      max === null
+        ? 'Unlimited team members'
+        : max === 1
+          ? '1 team member'
+          : `Up to ${max} team members`,
     features: {
       ownAddress: 'Orders at your own address on ventea.tech',
       board: 'Order panel with sound alert',
