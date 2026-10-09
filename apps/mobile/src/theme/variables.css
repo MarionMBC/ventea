@@ -1,16 +1,210 @@
-/*
- * Tema base. Los colores de marca NO se hardcodean acá: el build por tenant
- * sobrescribe estas variables desde TenantBranding (ver docs/white-label.md).
- * Cambiar un valor de este archivo cambia TODAS las marcas.
- */
-:root {
-  --ion-color-primary: #e23b2e;
-  --ion-color-primary-rgb: 226, 59, 46;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-shade: #c73429;
-  --ion-color-primary-tint: #e54f43;
+/* ============================================================================
+   Ventea app template — Ionic theme mapping
+   The template is dark-first (neutral surfaces, brand colour on actions): there is no light palette to switch
+   to, so Ionic's dark palettes are NOT imported and these variables are set
+   unconditionally. Ionic internals are styled through variables only — never
+   through shadow-DOM selectors.
+   ========================================================================= */
 
-  --ion-color-secondary: #1f1d1b;
-  --ion-color-secondary-rgb: 31, 29, 27;
-  --ion-color-secondary-contrast: #ffffff;
+:root {
+  /* ── Ionic color roles ─────────────────────────────────────────────────
+     Primary and secondary follow the brand (see src/brand/theme.ts, which
+     also writes the -rgb triplets at runtime). */
+  --ion-color-primary: var(--vt-brand-primary);
+  --ion-color-primary-rgb: var(--vt-brand-primary-rgb);
+  --ion-color-primary-contrast: var(--vt-on-primary);
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: var(--vt-brand-primary-shade);
+  --ion-color-primary-tint: var(--vt-brand-primary-tint);
+
+  --ion-color-secondary: var(--vt-brand-accent);
+  --ion-color-secondary-rgb: var(--vt-brand-accent-rgb);
+  --ion-color-secondary-contrast: var(--vt-on-accent);
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: var(--vt-brand-accent-shade);
+  --ion-color-secondary-tint: var(--vt-brand-accent);
+
+  --ion-color-tertiary: #faf6f0;
+  --ion-color-tertiary-rgb: 250, 246, 240;
+  --ion-color-tertiary-contrast: #120f0e;
+  --ion-color-tertiary-contrast-rgb: 18, 15, 14;
+  --ion-color-tertiary-shade: #dcd8d3;
+  --ion-color-tertiary-tint: #fbf7f2;
+
+  --ion-color-success: var(--vt-success);
+  --ion-color-success-rgb: 52, 168, 83;
+  --ion-color-success-contrast: #061206;
+  --ion-color-success-contrast-rgb: 6, 18, 6;
+  --ion-color-success-shade: #2e9449;
+  --ion-color-success-tint: #48b164;
+
+  --ion-color-warning: var(--vt-warning);
+  --ion-color-warning-rgb: 240, 162, 2;
+  --ion-color-warning-contrast: #120f0e;
+  --ion-color-warning-contrast-rgb: 18, 15, 14;
+  --ion-color-warning-shade: #d38f02;
+  --ion-color-warning-tint: #f2ab1b;
+
+  --ion-color-danger: var(--vt-danger);
+  --ion-color-danger-rgb: 226, 58, 46;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #c73328;
+  --ion-color-danger-tint: #e54e43;
+
+  --ion-color-medium: var(--vt-text-secondary);
+  --ion-color-medium-rgb: 166, 156, 148;
+  --ion-color-medium-contrast: #120f0e;
+  --ion-color-medium-contrast-rgb: 18, 15, 14;
+  --ion-color-medium-shade: #928982;
+  --ion-color-medium-tint: #afa69f;
+
+  --ion-color-light: var(--vt-surface-muted);
+  --ion-color-light-rgb: 46, 40, 37;
+  --ion-color-light-contrast: #faf6f0;
+  --ion-color-light-contrast-rgb: 250, 246, 240;
+  --ion-color-light-shade: #292321;
+  --ion-color-light-tint: #433e3b;
+
+  --ion-color-dark: var(--vt-surface-chrome);
+  --ion-color-dark-rgb: 11, 9, 8;
+  --ion-color-dark-contrast: #faf6f0;
+  --ion-color-dark-contrast-rgb: 250, 246, 240;
+  --ion-color-dark-shade: #0a0807;
+  --ion-color-dark-tint: #232220;
+
+  /* ── Ionic surfaces ────────────────────────────────────────────────────── */
+  --ion-background-color: var(--vt-surface-primary);
+  --ion-background-color-rgb: 18, 16, 16;
+  --ion-text-color: var(--vt-text-primary);
+  --ion-text-color-rgb: 250, 246, 240;
+
+  --ion-toolbar-background: var(--vt-surface-chrome);
+  --ion-toolbar-color: var(--vt-text-primary);
+  --ion-toolbar-border-color: var(--vt-surface-elevated);
+
+  --ion-tab-bar-background: var(--vt-surface-chrome);
+  --ion-tab-bar-border-color: var(--vt-surface-elevated);
+  --ion-tab-bar-color: var(--vt-text-secondary);
+  --ion-tab-bar-color-selected: var(--vt-primary-text);
+
+  --ion-item-background: var(--vt-surface-secondary);
+  --ion-item-color: var(--vt-text-primary);
+  --ion-item-border-color: var(--vt-border-default);
+  --ion-card-background: var(--vt-surface-secondary);
+  --ion-border-color: var(--vt-border-default);
+  --ion-placeholder-color: var(--vt-text-secondary);
+
+  --ion-overlay-background-color: var(--vt-surface-elevated);
+
+  --ion-font-family: var(--vt-font-body);
+
+  /* Ionic step colors drive dividers, ripples and default component chrome. */
+  --ion-color-step-50: #1a1716;
+  --ion-color-step-100: #201d1b;
+  --ion-color-step-150: #241f1d;
+  --ion-color-step-200: #292421;
+  --ion-color-step-250: #2e2825;
+  --ion-color-step-300: #332c29;
+  --ion-color-step-350: #3a322e;
+  --ion-color-step-400: #413833;
+  --ion-color-step-450: #483e39;
+  --ion-color-step-500: #4b413c;
+  --ion-color-step-550: #5a534f;
+  --ion-color-step-600: #6b615b;
+  --ion-color-step-650: #7c716a;
+  --ion-color-step-700: #8d827a;
+  --ion-color-step-750: #9e928a;
+  --ion-color-step-800: #a69c94;
+  --ion-color-step-850: #c1b8b1;
+  --ion-color-step-900: #d8d1ca;
+  --ion-color-step-950: #ece7e1;
+}
+
+/* ── Ionic component tuning (variables only, no ::part hacks on internals) ── */
+
+ion-content {
+  --background: var(--vt-surface-primary);
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+ion-toolbar {
+  --background: var(--vt-surface-chrome);
+  --color: var(--vt-text-primary);
+  --border-width: 0 0 1px 0;
+  --border-color: var(--vt-surface-elevated);
+  --min-height: 56px;
+  --padding-start: var(--vt-space-2);
+  --padding-end: var(--vt-space-2);
+}
+
+/* ion-tab-bar is `contain: strict`, so its height can never come from its
+   contents: it has to be stated, and the safe-area inset added on top of it. */
+ion-tab-bar {
+  --background: var(--vt-surface-chrome);
+  --border: 1px solid var(--vt-surface-elevated);
+  --color: var(--vt-text-secondary);
+  --color-selected: var(--vt-primary-text);
+  height: calc(62px + var(--vt-safe-bottom));
+  padding-bottom: var(--vt-safe-bottom);
+  padding-top: var(--vt-space-1);
+}
+
+ion-tab-button {
+  --padding-top: 0;
+  --padding-bottom: 0;
+  min-height: 52px;
+  max-height: 100%;
+}
+
+ion-tab-button ion-label {
+  font-family: var(--vt-font-condensed);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: var(--vt-tracking-wider);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+ion-modal {
+  --background: var(--vt-surface-elevated);
+  --border-radius: var(--vt-radius-xl) var(--vt-radius-xl) 0 0;
+  --box-shadow: var(--vt-elevation-3);
+  --backdrop-opacity: 0.6;
+}
+
+ion-modal::part(handle) {
+  background: var(--vt-border-strong);
+}
+
+ion-toast {
+  --background: var(--vt-surface-elevated);
+  --color: var(--vt-text-primary);
+  --border-radius: var(--vt-radius-md);
+  --box-shadow: var(--vt-elevation-2);
+  --button-color: var(--vt-primary-text);
+  font-family: var(--vt-font-body);
+}
+
+ion-alert {
+  --background: var(--vt-surface-elevated);
+}
+
+ion-action-sheet {
+  --background: var(--vt-surface-elevated);
+  --color: var(--vt-text-primary);
+}
+
+ion-loading {
+  --background: var(--vt-surface-elevated);
+  --spinner-color: var(--vt-primary-text);
+}
+
+ion-refresher ion-refresher-content {
+  --color: var(--vt-primary-text);
+}
+
+ion-spinner {
+  color: var(--vt-primary-text);
 }

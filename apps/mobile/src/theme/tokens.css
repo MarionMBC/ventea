@@ -1,0 +1,135 @@
+/* ============================================================================
+   Ventea app template — design tokens
+   Single source of truth. Components must never hardcode a hex, a px spacing
+   step, a radius or a duration: they consume the semantic tokens below.
+   ========================================================================= */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────────────
+     Defaults only. `src/brand/theme.ts` derives every value below from the
+     brand colours (build config, then GET /api/tenant) and writes them on
+     <html>; the `on-*` and `*-text` pairs are picked by computed WCAG
+     contrast, never by hand. */
+  --vt-brand-primary: #2e6fe2;
+  --vt-brand-primary-rgb: 46, 111, 226;
+  --vt-brand-primary-shade: #2862c7;
+  --vt-brand-primary-tint: #437de5;
+  --vt-on-primary: #ffffff;
+  --vt-primary-text: #7fa6ec; /* primary lightened to >= 4.5:1 on surfaces */
+  --vt-brand-accent: #e23b2e;
+  --vt-brand-accent-rgb: 226, 59, 46;
+  --vt-brand-accent-shade: #c73429;
+  --vt-on-accent: #ffffff;
+  --vt-accent-text: #ec8279;
+  --vt-surface-chrome: #0b0908; /* header and tab bar */
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --vt-surface-primary: #121010; /* page background */
+  --vt-surface-secondary: #1a1716; /* cards, list rows, inputs */
+  --vt-surface-elevated: #241f1d; /* sheets, toasts, menus */
+  --vt-surface-muted: #2e2825; /* secondary buttons, inert chips */
+  --vt-surface-inverse: #faf6f0; /* rare: light chips on dark photography */
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --vt-text-primary: #faf6f0; /* 17.4:1 on surface-primary */
+  --vt-text-secondary: #a69c94; /* 7.1:1 on surface-primary */
+  --vt-text-inverse: #120f0e; /* on light surfaces */
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --vt-border-default: #332c29;
+  --vt-border-strong: #4b413c;
+  --vt-border-width: 1px;
+  --vt-border-width-strong: 2px;
+
+  /* ── Feedback ──────────────────────────────────────────────────────────── */
+  --vt-success: #34a853;
+  --vt-success-rgb: 52, 168, 83;
+  --vt-warning: #f0a202;
+  --vt-warning-rgb: 240, 162, 2;
+  --vt-danger: #e23a2e;
+  --vt-danger-rgb: 226, 58, 46;
+  --vt-danger-text: #ef5b50; /* danger as text: >= 4.5:1 on every surface */
+  --vt-info: #4a9fd5;
+  --vt-info-rgb: 74, 159, 213;
+  --vt-disabled: #5a534f;
+
+  /* ── Interaction states — derived, never ad-hoc ────────────────────────── */
+  --vt-state-hover: rgba(var(--vt-brand-primary-rgb), 0.1);
+  --vt-state-pressed: rgba(0, 0, 0, 0.28);
+  --vt-state-selected: rgba(var(--vt-brand-primary-rgb), 0.14);
+  --vt-state-pressed-scale: 0.97;
+  --vt-focus-ring: 0 0 0 2px var(--vt-surface-primary), 0 0 0 4px var(--vt-primary-text);
+  --vt-disabled-opacity: 0.45;
+
+  /* ── Spacing scale (4px base) ──────────────────────────────────────────── */
+  --vt-space-1: 4px;
+  --vt-space-2: 8px;
+  --vt-space-3: 12px;
+  --vt-space-4: 16px; /* page gutter */
+  --vt-space-5: 20px;
+  --vt-space-6: 24px; /* section gap */
+  --vt-space-8: 32px;
+  --vt-space-10: 40px;
+  --vt-space-12: 48px;
+  --vt-space-16: 64px;
+
+  /* ── Radii ─────────────────────────────────────────────────────────────── */
+  --vt-radius-none: 0; /* promo blocks, poster edges */
+  --vt-radius-xs: 4px; /* badges */
+  --vt-radius-sm: 6px;
+  --vt-radius-md: 8px; /* inputs, buttons */
+  --vt-radius-lg: 10px;
+  --vt-radius-xl: 14px; /* cards */
+  --vt-radius-full: 999px; /* chips, pills, avatars */
+
+  /* ── Sizing ────────────────────────────────────────────────────────────── */
+  --vt-touch-min: 44px;
+  --vt-control-sm: 36px;
+  --vt-control-md: 48px;
+  --vt-control-lg: 56px;
+  --vt-field-height: 52px;
+  --vt-icon-xs: 16px;
+  --vt-icon-sm: 20px;
+  --vt-icon-md: 24px;
+  --vt-icon-lg: 32px;
+  --vt-content-max: 720px;
+
+  /* ── Elevation ─────────────────────────────────────────────────────────── */
+  --vt-elevation-0: none;
+  --vt-elevation-1: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --vt-elevation-2: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --vt-elevation-3: 0 -6px 28px rgba(0, 0, 0, 0.7); /* bottom sheets */
+
+  /* ── Motion ────────────────────────────────────────────────────────────── */
+  --vt-duration-press: 90ms;
+  --vt-duration-tab: 180ms;
+  --vt-duration-card: 240ms;
+  --vt-duration-cart: 260ms;
+  --vt-duration-sheet: 320ms;
+  --vt-duration-shimmer: 1200ms;
+  --vt-stagger-card: 40ms;
+  --vt-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --vt-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --vt-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ── Safe areas ────────────────────────────────────────────────────────── */
+  --vt-safe-top: env(safe-area-inset-top, 0px);
+  --vt-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --vt-safe-left: env(safe-area-inset-left, 0px);
+  --vt-safe-right: env(safe-area-inset-right, 0px);
+
+  /* ── Fills ── */
+  /* Product without a photo: a soft wash of the brand colour, never stripes. */
+  --vt-photo-placeholder: radial-gradient(
+      120% 100% at 0% 0%,
+      rgba(var(--vt-brand-primary-rgb), 0.28) 0%,
+      transparent 70%
+    ),
+    var(--vt-surface-elevated);
+  --vt-shimmer: linear-gradient(
+    90deg,
+    var(--vt-surface-secondary) 0%,
+    var(--vt-surface-muted) 50%,
+    var(--vt-surface-secondary) 100%
+  );
+}

@@ -1,0 +1,257 @@
+.vt-btn {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  letter-spacing: var(--vt-tracking-wider);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vt-space-2);
+  border: 0;
+  border-radius: var(--vt-radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  min-width: var(--vt-touch-min);
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────────────── */
+.vt-btn--sm {
+  height: var(--vt-control-sm);
+  min-height: var(--vt-control-sm);
+  padding-inline: var(--vt-space-4);
+  font-size: 13px;
+  border-radius: var(--vt-radius-sm);
+}
+
+.vt-btn--md {
+  height: var(--vt-control-md);
+  min-height: var(--vt-control-md);
+  padding-inline: var(--vt-space-6);
+  font-size: 16px;
+}
+
+.vt-btn--lg {
+  height: var(--vt-control-lg);
+  min-height: var(--vt-control-lg);
+  padding-inline: var(--vt-space-8);
+  font-size: 18px;
+}
+
+.vt-btn--block {
+  width: 100%;
+}
+
+.vt-btn--pill {
+  border-radius: var(--vt-radius-full);
+}
+
+/* A 36px button is visually small but must still clear the 44x44 touch target:
+   the pseudo-element extends the hit area without changing the layout box. */
+.vt-btn--sm {
+  position: relative;
+}
+
+.vt-btn--sm::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+/* ── Variants ──────────────────────────────────────────────────────────── */
+.vt-btn--primary {
+  background: var(--vt-brand-primary);
+  color: var(--vt-on-primary);
+}
+
+.vt-btn--secondary {
+  background: var(--vt-surface-muted);
+  color: var(--vt-text-primary);
+}
+
+.vt-btn--outline {
+  background: transparent;
+  color: var(--vt-primary-text);
+  border: var(--vt-border-width-strong) solid var(--vt-primary-text);
+}
+
+.vt-btn--ghost {
+  background: transparent;
+  color: var(--vt-text-primary);
+  padding-inline: var(--vt-space-4);
+}
+
+.vt-btn--danger {
+  background: var(--vt-brand-accent);
+  color: var(--vt-on-accent);
+}
+
+/* ── States ────────────────────────────────────────────────────────────── */
+@media (hover: hover) {
+  .vt-btn--primary:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--vt-brand-primary-tint);
+  }
+  .vt-btn--secondary:hover:not(:disabled):not([aria-disabled='true']) {
+    background: #3a322e;
+  }
+  .vt-btn--outline:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--vt-state-hover);
+  }
+  .vt-btn--ghost:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--vt-surface-secondary);
+  }
+  .vt-btn--danger:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--vt-danger);
+  }
+}
+
+.vt-btn--primary:active:not(:disabled):not([aria-disabled='true']) {
+  background: var(--vt-brand-primary-shade);
+}
+
+.vt-btn--danger:active:not(:disabled):not([aria-disabled='true']) {
+  background: var(--vt-brand-accent-shade);
+}
+
+.vt-btn:disabled,
+.vt-btn[aria-disabled='true'] {
+  background: var(--vt-disabled);
+  color: var(--vt-text-secondary);
+  border-color: transparent;
+  opacity: var(--vt-disabled-opacity);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.vt-btn--loading {
+  cursor: progress;
+  pointer-events: none;
+}
+
+/* ── Spinner ───────────────────────────────────────────────────────────── */
+.vt-spinner {
+  width: var(--vt-icon-xs);
+  height: var(--vt-icon-xs);
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+  animation: vt-spin 700ms linear infinite;
+  flex: none;
+}
+
+/* Full-width checkout style button with a trailing total. */
+.vt-btn--split {
+  justify-content: space-between;
+  padding-inline: var(--vt-space-6);
+}
+
+.vt-btn__total {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+/* ── Icon button ───────────────────────────────────────────────────────── */
+.vt-icon-btn {
+  width: var(--vt-touch-min);
+  height: var(--vt-touch-min);
+  border-radius: var(--vt-radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  background: var(--vt-surface-secondary);
+  color: var(--vt-text-primary);
+  cursor: pointer;
+  flex: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vt-icon-btn--plain {
+  background: transparent;
+  border-color: transparent;
+}
+
+.vt-icon-btn--accent {
+  background: var(--vt-brand-primary);
+  border-color: transparent;
+  color: var(--vt-on-primary);
+}
+
+.vt-icon-btn--danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--vt-danger-text);
+}
+
+.vt-icon-btn--overlay {
+  background: rgba(11, 9, 8, 0.7);
+  border-color: transparent;
+  border-radius: var(--vt-radius-full);
+  width: 36px;
+  height: 36px;
+}
+
+.vt-icon-btn--round {
+  border-radius: var(--vt-radius-full);
+}
+
+@media (hover: hover) {
+  .vt-icon-btn:hover:not(:disabled) {
+    border-color: var(--vt-border-strong);
+  }
+  .vt-icon-btn--accent:hover:not(:disabled) {
+    background: var(--vt-brand-primary-tint);
+  }
+}
+
+.vt-icon-btn:disabled {
+  opacity: var(--vt-disabled-opacity);
+  pointer-events: none;
+}
+
+.vt-icon-btn__icon {
+  font-size: 22px;
+}
+
+/* ── FAB ───────────────────────────────────────────────────────────────── */
+.vt-fab {
+  width: var(--vt-control-lg);
+  height: var(--vt-control-lg);
+  border-radius: 50%;
+  border: 0;
+  background: var(--vt-brand-primary);
+  color: var(--vt-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--vt-elevation-2);
+  cursor: pointer;
+  flex: none;
+}
+
+.vt-fab__icon {
+  font-size: 26px;
+}
+
+.vt-fab--danger {
+  background: var(--vt-brand-accent);
+  color: var(--vt-on-accent);
+}
+
+/* ── Add to cart ───────────────────────────────────────────────────────── */
+.vt-add-cart {
+  border-radius: var(--vt-radius-full);
+  box-shadow: var(--vt-elevation-2);
+}
+
+.vt-add-cart__price {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0;
+}

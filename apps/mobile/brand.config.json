@@ -1,0 +1,12 @@
+{
+  "tenantSlug": "demo-burgers",
+  "apiUrl": "https://api.ventea.tech",
+  "appName": "Demo Burgers",
+  "bundleId": "app.ventea.template",
+  "colors": { "primary": "#2E6FE2", "secondary": "#1F1D1B", "accent": null },
+  "logoUrl": null,
+  "iconUrl": null,
+  "defaultLanguage": "es",
+  "currency": "CLP",
+  "push": { "enabled": false }
+}

@@ -1,0 +1,31 @@
+.vt-logo {
+  width: var(--vt-logo-size, 40px);
+  height: var(--vt-logo-size, 40px);
+  /* `contain` keeps any logo shape intact at any container size. */
+  object-fit: contain;
+  flex: none;
+  display: block;
+}
+
+/* Documented clear space: 25% of the badge diameter on every side. */
+.vt-logo--clear {
+  padding: calc(var(--vt-logo-size, 40px) * 0.25);
+  box-sizing: content-box;
+}
+
+/* Monogram for brands without a logo: initials on the primary colour, with
+   the contrasting text colour computed by the theme. */
+.vt-logo--monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--vt-brand-primary);
+  color: var(--vt-on-primary);
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: calc(var(--vt-logo-size, 40px) * 0.42);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  user-select: none;
+}
