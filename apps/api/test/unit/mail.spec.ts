@@ -1,3 +1,5 @@
+import { hasLinkLike, signupSchema, TERMS_VERSION } from '@ventea/shared';
+
 import { redactSensitive } from '@/common/logging/redact';
 import {
   headerText,
@@ -7,6 +9,7 @@ import {
 } from '@/modules/mail/mail-address';
 import { escapeHtml, isSafeLink, renderEmail } from '@/modules/mail/mail-templates';
 import { createMailTransport, NoopMailTransport } from '@/modules/mail/mail-transport';
+import { maskEmails } from '@/modules/mail/mail.service';
 import { lifecycleEmailDue } from '@/modules/notifications/lifecycle-rules';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -70,9 +73,14 @@ describe('direcciones y headers del correo', () => {
   });
 });
 
+/** Dominios a los que pueden apuntar los links de un correo (TENANT_BASE_DOMAIN en tests). */
+const LINKS = { hosts: ['ventea.tech'] };
+const render = (kind: string, lang: 'es' | 'en', payload: unknown) =>
+  renderEmail(kind, lang, payload, LINKS);
+
 describe('plantillas', () => {
   it('escapa los datos de la marca en el HTML y no deja etiquetas crudas', () => {
-    const mail = renderEmail('welcome', 'es', welcome(HOSTILE, HOSTILE));
+    const mail = render('welcome', 'es', welcome(HOSTILE, HOSTILE));
     expect(mail.html).not.toContain('<script>');
     expect(mail.html).toContain(
       '&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;Pollos&quot; &#39;Ñandú&#39;',
@@ -81,20 +89,57 @@ describe('plantillas', () => {
     expect(mail.text).toContain(HOSTILE);
   });
 
-  it('el nombre con saltos de línea no llega al asunto', () => {
-    const mail = renderEmail('welcome', 'es', welcome('Pollos\r\nBcc: x@evil.com'));
-    expect(mail.subject).toBe('Bienvenido a Ventea, Pollos Bcc: x@evil.com');
+  it('bienvenida (anti-phishing): asunto genérico, sin el nombre de la marca ni del dueño', () => {
+    const es = render('welcome', 'es', welcome('Cuenta suspendida, entra a evil.com', 'Soporte'));
+    const en = render('welcome', 'en', welcome('Pollos Ana', 'Ana'));
+    expect(es.subject).toBe('Tu cuenta de Ventea está lista');
+    expect(en.subject).toBe('Your Ventea account is ready');
+    expect(es.subject).not.toMatch(/evil|Soporte/);
+  });
+
+  it('nombres en el cuerpo: sin URLs ni dominios que un cliente de correo convierta en link', () => {
+    const mail = render(
+      'welcome',
+      'es',
+      welcome(
+        'Cuenta suspendida https://evil.example/login www.evil.com evil.com.hn',
+        'Entra a soporte-ventea.co',
+      ),
+    );
+    for (const body of [mail.text, mail.html]) {
+      expect(body).not.toMatch(/https?:\/\/evil|www\.evil|evil\.com|evil\.example|ventea\.co\b/);
+    }
+    // Los links del correo son solo los de Ventea (un único <a>: el botón).
+    expect(mail.html.match(/<a /g)).toHaveLength(1);
+    // Lo legítimo sigue intacto.
+    expect(mail.text).toContain('https://pollos.ventea.tech/admin');
+  });
+
+  it('nombres truncados a 60 caracteres en el cuerpo', () => {
+    const long = `Pollos ${'a'.repeat(100)}`;
+    const mail = render('welcome', 'es', welcome(long, 'Ana'));
+    expect(mail.text).not.toContain(long.slice(0, 61));
+    expect(mail.text).toContain(`${long.slice(0, 59)}…`);
+  });
+
+  it('el nombre con saltos de línea no llega al asunto ni arma párrafos', () => {
+    const mail = render('trial_ending', 'es', {
+      tenantName: 'Pollos\r\nBcc: x@evil.com',
+      daysLeft: 3,
+      trialEndsAt: NOW.toISOString(),
+      billingUrl: 'https://pollos.ventea.tech/admin/facturacion',
+      supportEmail: 'hola@ventea.tech',
+    });
     expect(mail.subject).not.toMatch(/[\r\n]/);
+    expect(mail.subject).toContain('Pollos Bcc:');
   });
 
   it('idioma de la marca: ES y EN, con pie que explica por qué llega', () => {
-    const es = renderEmail('welcome', 'es', welcome());
-    const en = renderEmail('welcome', 'en', welcome());
-    expect(es.subject).toBe('Bienvenido a Ventea, Pollos Ana');
+    const es = render('welcome', 'es', welcome());
+    const en = render('welcome', 'en', welcome());
     expect(es.html).toContain('<html lang="es">');
     expect(es.text).toContain('Recibes este correo porque creaste la cuenta de Pollos Ana');
     expect(es.text).toContain('no publicidad');
-    expect(en.subject).toBe('Welcome to Ventea, Pollos Ana');
     expect(en.html).toContain('<html lang="en">');
     expect(en.text).toContain('You are receiving this email because');
     // Fecha en la zona de la marca y el idioma.
@@ -102,8 +147,26 @@ describe('plantillas', () => {
     expect(en.text).toContain('October 23, 2026');
   });
 
+  it('prueba por vencer: el asunto dice los días reales', () => {
+    const data = (daysLeft: number) => ({
+      tenantName: 'Pollos Ana',
+      daysLeft,
+      trialEndsAt: NOW.toISOString(),
+      billingUrl: 'https://pollos.ventea.tech/admin/facturacion',
+      supportEmail: 'hola@ventea.tech',
+    });
+    expect(render('trial_ending', 'es', data(2)).subject).toBe(
+      'Tu prueba de Ventea termina en 2 días · Pollos Ana',
+    );
+    expect(render('trial_ending', 'en', data(2)).subject).toBe(
+      'Your Ventea trial ends in 2 days · Pollos Ana',
+    );
+    expect(render('trial_ending', 'es', data(1)).subject).toContain('termina mañana');
+    expect(render('trial_ending', 'es', data(3)).subject).toContain('termina en 3 días');
+  });
+
   it('la solicitud de app va siempre en español (aviso interno)', () => {
-    const mail = renderEmail('app_request', 'en', {
+    const mail = render('app_request', 'en', {
       tenantName: 'Pollos Ana',
       slug: 'pollos',
       planName: 'Pro',
@@ -124,36 +187,98 @@ describe('plantillas', () => {
       billingUrl: 'https://pollos.ventea.tech/admin/facturacion',
       supportEmail: 'hola@ventea.tech',
     };
-    const grace = renderEmail('past_due', 'es', { ...base, graceEndsAt: at(7).toISOString() });
+    const grace = render('past_due', 'es', { ...base, graceEndsAt: at(7).toISOString() });
     expect(grace.text).toContain('siguen funcionando hasta el 16 de octubre de 2026');
     expect(grace.text).toContain('no se cobra solo');
-    const trial = renderEmail('past_due', 'es', { ...base, graceEndsAt: null });
+    const trial = render('past_due', 'es', { ...base, graceEndsAt: null });
     expect(trial.subject).toBe('Tu prueba de Ventea terminó · Pollos Ana');
     expect(trial.text).toContain('dejó de recibir pedidos');
   });
 
   it('datos inválidos o tipo desconocido tiran (error permanente)', () => {
-    expect(() => renderEmail('nope', 'es', {})).toThrow('desconocido');
+    expect(() => render('nope', 'es', {})).toThrow('desconocido');
     expect(() =>
-      renderEmail('welcome', 'es', { ...welcome(), panelUrl: 'javascript:alert(1)' }),
+      render('welcome', 'es', { ...welcome(), panelUrl: 'javascript:alert(1)' }),
     ).toThrow('Datos inválidos');
-    expect(() =>
-      renderEmail('welcome', 'es', { ...welcome(), menuUrl: 'http://evil.com' }),
-    ).toThrow();
+    expect(() => render('welcome', 'es', { ...welcome(), menuUrl: 'http://evil.com' })).toThrow();
   });
 
-  it('links seguros: https, o http solo a localhost', () => {
-    expect(isSafeLink('https://pollos.ventea.tech/admin')).toBe(true);
-    expect(isSafeLink('http://localhost:5173/admin')).toBe(true);
-    expect(isSafeLink('http://pollos.ventea.tech')).toBe(false);
-    expect(isSafeLink('javascript:alert(1)')).toBe(false);
-    expect(isSafeLink('https://u:p@pollos.ventea.tech')).toBe(false);
+  it('links solo al dominio de la plataforma', () => {
+    expect(() =>
+      render('welcome', 'es', { ...welcome(), panelUrl: 'https://evil.com/admin' }),
+    ).toThrow('link no permitido');
+    expect(() =>
+      render('welcome', 'es', { ...welcome(), panelUrl: 'https://ventea.tech.evil.com/admin' }),
+    ).toThrow('link no permitido');
+    expect(() =>
+      render('welcome', 'es', { ...welcome(), panelUrl: 'https://evilventea.tech/admin' }),
+    ).toThrow('link no permitido');
+    expect(() =>
+      renderEmail('welcome', 'es', welcome(), { hosts: ['ventea.tech', 'panel.example.com'] }),
+    ).not.toThrow();
+    expect(() =>
+      renderEmail(
+        'welcome',
+        'es',
+        { ...welcome(), panelUrl: 'https://panel.example.com/admin' },
+        { hosts: ['ventea.tech', 'panel.example.com'] },
+      ),
+    ).not.toThrow();
+  });
+
+  it('links seguros: https, o http solo a localhost; host dentro del dominio base', () => {
+    const hosts = ['ventea.tech'];
+    expect(isSafeLink('https://pollos.ventea.tech/admin', hosts)).toBe(true);
+    expect(isSafeLink('https://ventea.tech/', hosts)).toBe(true);
+    expect(isSafeLink('http://localhost:5173/admin', ['localhost'])).toBe(true);
+    expect(isSafeLink('http://localhost:5173/admin', hosts)).toBe(false);
+    expect(isSafeLink('http://pollos.ventea.tech', hosts)).toBe(false);
+    expect(isSafeLink('https://evil.com', hosts)).toBe(false);
+    expect(isSafeLink('javascript:alert(1)', hosts)).toBe(false);
+    expect(isSafeLink('https://u:p@pollos.ventea.tech', hosts)).toBe(false);
   });
 
   it('escapeHtml cubre los 5 caracteres', () => {
     expect(escapeHtml(`<a href="x" title='y'>&</a>`)).toBe(
       '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;',
     );
+  });
+});
+
+describe('nombres con links (anti-phishing)', () => {
+  it('detecta URLs, www. y dominios con TLD; no confunde iniciales ni siglas', () => {
+    for (const bad of [
+      'https://evil.com',
+      've a http://x',
+      'www.evil',
+      'evil.com',
+      'Pollos Juan.co',
+      'soporte-ventea.com.hn',
+      'ftp://x',
+    ]) {
+      expect(hasLinkLike(bad)).toBe(true);
+    }
+    for (const ok of ['Pollos Juan', 'Juan P. Pérez', 'Pollos S.A.', 'Café 1.5', 'Ñandú & Co']) {
+      expect(hasLinkLike(ok)).toBe(false);
+    }
+  });
+
+  it('el signup rechaza nombre de marca o de dueño con un link', () => {
+    const body = {
+      restaurantName: 'Pollos Juan',
+      slug: 'pollos-juan',
+      ownerName: 'Juan Pérez',
+      ownerEmail: 'juan@example.com',
+      ownerPassword: 'una-clave-larga-123',
+      planCode: 'pro',
+      interval: 'month',
+      acceptedTermsVersion: TERMS_VERSION,
+    };
+    expect(signupSchema.safeParse(body).success).toBe(true);
+    expect(signupSchema.safeParse({ ...body, restaurantName: 'Entra a evil.com' }).success).toBe(
+      false,
+    );
+    expect(signupSchema.safeParse({ ...body, ownerName: 'https://evil.com' }).success).toBe(false);
   });
 });
 
@@ -166,6 +291,20 @@ describe('transporte', () => {
     expect(createMailTransport('smtps://u:p@smtp.example.com:465').configured).toBe(true);
   });
 
+  it('SMTP_URL con parámetros (requireTLS, ignoreTLS, debug…) se rechaza: no pisan TLS ni el log', () => {
+    for (const query of [
+      '?requireTLS=false',
+      '?ignoreTLS=true',
+      '?debug=true&logger=true',
+      '?x=1',
+    ]) {
+      expect(() => createMailTransport(`smtp://u:p@smtp.example.com:587${query}`)).toThrow(
+        'SMTP_URL',
+      );
+    }
+    expect(() => createMailTransport('smtps://u:p@smtp.example.com:465#frag')).toThrow('SMTP_URL');
+  });
+
   it('el log nunca muestra la clave de SMTP_URL', () => {
     const line = redactSensitive(
       'SMTP_URL=smtps://avisos%40ventea.tech:S3cr3t-Pass@smtp.zoho.com:465',
@@ -174,6 +313,12 @@ describe('transporte', () => {
     const err = redactSensitive('connect fail smtps://avisos:S3cr3t@smtp.zoho.com:465 timeout');
     expect(err).toBe('connect fail smtps://avisos:[REDACTED]@smtp.zoho.com:465 timeout');
     expect(redactSensitive(JSON.stringify({ smtpUrl: 'smtp://x:y@h' }))).not.toContain('x:y');
+  });
+
+  it('enmascara direcciones en los logs', () => {
+    expect(maskEmails('550 <ana@example.com>: no existe; copia a b.c@x.org')).toBe(
+      '550 <[email]>: no existe; copia a [email]',
+    );
   });
 });
 
@@ -187,7 +332,13 @@ describe('correos de ciclo de vida (reglas)', () => {
   it('prueba por vencer: 3 días, 1 día y nada fuera de esas ventanas', () => {
     expect(lifecycleEmailDue(trial(5), NOW)).toBeNull();
     expect(lifecycleEmailDue(trial(3), NOW)).toMatchObject({ kind: 'trial_ending', daysLeft: 3 });
-    expect(lifecycleEmailDue(trial(2), NOW)).toMatchObject({ kind: 'trial_ending', daysLeft: 3 });
+    // Días reales en el asunto; la ventana (aviso de 3 o de 1) sigue siendo una sola.
+    expect(lifecycleEmailDue(trial(2), NOW)).toMatchObject({ kind: 'trial_ending', daysLeft: 2 });
+    expect(lifecycleEmailDue(trial(2.5), NOW)).toMatchObject({ daysLeft: 3 });
+    const sameTrial = trial(3);
+    expect(lifecycleEmailDue(sameTrial, NOW)?.occurrence).toBe(
+      lifecycleEmailDue(sameTrial, at(1))?.occurrence,
+    );
     expect(lifecycleEmailDue(trial(1), NOW)).toMatchObject({ kind: 'trial_ending', daysLeft: 1 });
     expect(lifecycleEmailDue(trial(0.2), NOW)).toMatchObject({ daysLeft: 1 });
     expect(lifecycleEmailDue(trial(-0.1), NOW)).toBeNull();

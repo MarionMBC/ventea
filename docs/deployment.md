@@ -48,14 +48,22 @@ encola un job idempotente (cada `LIFECYCLE_EMAILS_INTERVAL_MINUTES`, con un advi
 Postgres: con varias réplicas corre una). Ningún correo lleva datos de pedidos ni de clientes
 finales; el pie dice por qué llega.
 
-| Variable                            | Default                      | Qué hace                                                                                                                                                        |
-| ----------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SMTP_URL`                          | vacía = no se envía nada     | `smtps://usuario:clave@host:465` (TLS directo) o `smtp://usuario:clave@host:587` (STARTTLS obligatorio). Lleva la clave: gestor de secretos; los logs la tachan |
-| `MAIL_FROM`                         | `Ventea <hola@ventea.tech>`  | remitente (`Nombre <correo>` o `correo`); el dominio tiene que estar autorizado en SPF/DKIM                                                                     |
-| `PLATFORM_ALERT_EMAILS`             | vacía = admins de plataforma | lista separada por comas para los avisos a la plataforma                                                                                                        |
-| `MAIL_RATE_LIMIT_PER_MINUTE`        | `30`                         | envíos SMTP por minuto y proceso; el resto espera en la cola                                                                                                    |
-| `LIFECYCLE_EMAILS_INTERVAL_MINUTES` | `60`                         | cada cuánto corre el job de prueba por vencer / pago pendiente                                                                                                  |
-| `MAIL_SCHEDULER_ENABLED`            | `true`                       | `false` apaga el despacho periódico y el job (tests)                                                                                                            |
+**Anti-phishing:** la bienvenida sale hacia un correo que todavía no se verificó, así que su
+asunto es genérico («Tu cuenta de Ventea está lista»). Los nombres de marca y de dueño se
+rechazan en el registro si traen un link o un dominio, y en todos los correos van sin links y
+recortados a 60 caracteres. Los links de un correo solo pueden apuntar a `TENANT_BASE_DOMAIN`
+(o sus subdominios) o al host de `PUBLIC_ORIGIN`. Un envío que se corta a mitad (el proceso
+murió) cuenta como intento. Pendiente antes de abrir el registro al público: verificar el
+correo del dueño.
+
+| Variable                            | Default                      | Qué hace                                                                                                                                                                                          |
+| ----------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SMTP_URL`                          | vacía = no se envía nada     | `smtps://usuario:clave@host:465` (TLS directo) o `smtp://usuario:clave@host:587` (STARTTLS obligatorio), sin parámetros (`?…` se rechaza). Lleva la clave: gestor de secretos; los logs la tachan |
+| `MAIL_FROM`                         | `Ventea <hola@ventea.tech>`  | remitente (`Nombre <correo>` o `correo`); el dominio tiene que estar autorizado en SPF/DKIM                                                                                                       |
+| `PLATFORM_ALERT_EMAILS`             | vacía = admins de plataforma | lista separada por comas para los avisos a la plataforma                                                                                                                                          |
+| `MAIL_RATE_LIMIT_PER_MINUTE`        | `30`                         | envíos SMTP por minuto y proceso; el resto espera en la cola                                                                                                                                      |
+| `LIFECYCLE_EMAILS_INTERVAL_MINUTES` | `60`                         | cada cuánto corre el job de prueba por vencer / pago pendiente                                                                                                                                    |
+| `MAIL_SCHEDULER_ENABLED`            | `true`                       | `false` apaga el despacho periódico y el job (tests)                                                                                                                                              |
 
 Un valor mal formado (`SMTP_URL` que no es `smtp(s)://`, una dirección inválida) hace que la API
 no arranque, en vez de fallar en silencio. Con `SMTP_URL` vacía la API arranca igual y cada correo

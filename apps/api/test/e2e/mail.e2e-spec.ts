@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
+import { jest } from '@jest/globals';
 import type { PrismaClient } from '@prisma/client';
 import { TERMS_VERSION, type PlatformEmail, type PlatformEmailList } from '@ventea/shared';
 import request from 'supertest';
@@ -128,7 +129,8 @@ describe('Correos transaccionales (TASK-021)', () => {
       expect(fake.sent).toHaveLength(1);
       const [welcome] = fake.sent;
       expect(welcome?.to).toBe('ana@pollosana.com');
-      expect(welcome?.subject).toBe(`Bienvenido a Ventea, ${HOSTILE}`);
+      // Anti-phishing: el asunto no lleva texto elegido por quien se registra.
+      expect(welcome?.subject).toBe('Tu cuenta de Ventea está lista');
       expect(welcome?.html).toContain('<html lang="es">');
       expect(welcome?.html).not.toMatch(/<b>|<i>/);
       expect(welcome?.html).toContain('Ana &lt;i&gt;Pérez&lt;/i&gt;');
@@ -141,6 +143,31 @@ describe('Correos transaccionales (TASK-021)', () => {
       await mail.drain();
       expect(fake.sent).toHaveLength(1);
       expect(await outbox(tenant.id, 'welcome')).toHaveLength(1);
+    });
+
+    it('el signup rechaza nombres con links o dominios: no hay alta ni correo', async () => {
+      const base = {
+        ownerEmail: 'victima@example.com',
+        ownerPassword: 'una-clave-larga-123',
+        planCode: 'pro',
+        interval: 'month',
+        acceptedTermsVersion: TERMS_VERSION,
+      };
+      const cases = [
+        { restaurantName: 'Cuenta suspendida: entra a evil.com', ownerName: 'Soporte' },
+        { restaurantName: 'Pollos Ana', ownerName: 'https://evil.example/login' },
+        { restaurantName: 'www.evil', ownerName: 'Ana' },
+      ];
+      for (const names of cases) {
+        const slug = `mail-${randomUUID().slice(0, 8)}`;
+        await request(app.getHttpServer())
+          .post('/api/platform/signup')
+          .send({ ...base, ...names, slug })
+          .expect(400);
+        expect(await prisma.tenant.findUnique({ where: { slug } })).toBeNull();
+      }
+      await mail.drain();
+      expect(fake.sent).toHaveLength(0);
     });
   });
 
@@ -331,6 +358,50 @@ describe('Correos transaccionales (TASK-021)', () => {
         .set('Authorization', `Bearer ${owner}`)
         .expect(401);
       await listEmails('?status=nope').expect(400);
+    });
+
+    it('un envío atascado en sending vuelve a la cola sumando el intento, y respeta MAX_ATTEMPTS', async () => {
+      const stuck = async (key: string, attempts: number) => {
+        await enqueueWelcome(key);
+        await mail.drain(); // falla (failNext); lo dejamos «colgado» a mano
+        const row = await prisma.emailMessage.findUniqueOrThrow({ where: { dedupeKey: key } });
+        await prisma.$executeRaw`UPDATE email_messages SET status = 'sending', "sentAt" = NULL,
+          attempts = ${attempts}, "updatedAt" = now() - interval '11 minutes' WHERE id = ${row.id}`;
+        return row.id;
+      };
+      fake.failNext = 100; // ningún envío real sale durante la prueba
+      const retry = await stuck(`test:stuck:retry:${tenant.id}`, 1);
+      const last = await stuck(`test:stuck:last:${tenant.id}`, MAX_ATTEMPTS - 1);
+      fake.reset();
+      fake.failNext = 100;
+
+      await mail.dispatchPending(new Date());
+
+      const retried = await prisma.emailMessage.findUniqueOrThrow({ where: { id: retry } });
+      // El intento interrumpido cuenta (2); queda esperando el reintento, no se manda ya.
+      expect(retried).toMatchObject({ status: 'pending', attempts: 2 });
+      expect(retried.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
+      const exhausted = await prisma.emailMessage.findUniqueOrThrow({ where: { id: last } });
+      expect(exhausted).toMatchObject({ status: 'failed', attempts: MAX_ATTEMPTS });
+      expect(exhausted.error).toContain('interrumpido');
+      expect(fake.sent).toHaveLength(0);
+      fake.reset();
+    });
+
+    it('un error al encolar no deja direcciones en el log', async () => {
+      const spy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        mail.enqueueInBackground('prueba', () =>
+          Promise.reject(new Error('Invalid invocation: { to: "victima@example.com" }')),
+        );
+        await mail.drain();
+        const logged = spy.mock.calls.map((call) => String(call[0])).join('\n');
+        expect(logged).toContain('No se pudo encolar el correo prueba');
+        expect(logged).not.toContain('victima@example.com');
+        expect(logged).toContain('[email]');
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('rechaza destinatarios con CR/LF o inválidos sin escribir nada', async () => {
