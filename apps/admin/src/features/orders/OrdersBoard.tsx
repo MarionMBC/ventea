@@ -63,7 +63,8 @@ export function OrdersBoard() {
     unlockSound,
     changeStatus,
   } = useOrdersContext();
-  const { t, clock, ago } = useI18n();
+  const i18n = useI18n();
+  const { t, clock, ago } = i18n;
   const pendingIds = usePendingOrderIds();
   const now = useNow(15_000);
   const [mobileColumn, setMobileColumn] = useState<BoardStatus>('confirmed');
@@ -78,7 +79,7 @@ export function OrdersBoard() {
           <IconAlert size={28} />
         </span>
         <h2>{t('board.errorTitle')}</h2>
-        <p>{describeError(error, t)}</p>
+        <p>{describeError(error, i18n)}</p>
         <button type="button" className="btn btn--primary" onClick={() => void refetch()}>
           {t('board.retry')}
         </button>

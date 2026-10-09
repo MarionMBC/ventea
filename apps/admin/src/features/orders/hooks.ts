@@ -10,7 +10,7 @@ import type { OrderStatus, StaffOrder } from '@ventea/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useApi } from '@/app/services';
-import { describeError, useT } from '@/i18n';
+import { describeError, useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
 import {
@@ -112,7 +112,8 @@ export interface StatusChange {
 export function useUpdateOrderStatus(notify: (tone: Notice['tone'], text: string) => void) {
   const client = useApi();
   const queryClient = useQueryClient();
-  const t = useT();
+  const i18n = useI18n();
+  const { t } = i18n;
 
   return useMutation({
     mutationKey: UPDATE_STATUS_KEY,
@@ -148,7 +149,10 @@ export function useUpdateOrderStatus(notify: (tone: Notice['tone'], text: string
       if (error instanceof ApiError && error.status === 409) {
         notify('warning', t('notice.conflict', { code: order.code }));
       } else {
-        notify('error', t('notice.failed', { code: order.code, message: describeError(error, t) }));
+        notify(
+          'error',
+          t('notice.failed', { code: order.code, message: describeError(error, i18n) }),
+        );
       }
     },
     onSettled: () => {

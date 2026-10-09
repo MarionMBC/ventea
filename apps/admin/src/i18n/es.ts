@@ -50,6 +50,11 @@ export const es: Messages = {
   'errors.sessionExpired': 'Tu sesión expiró. Vuelve a iniciar sesión.',
   'errors.server': 'El servidor no respondió bien ({status}). Intenta de nuevo.',
   'errors.http': 'La petición falló ({status}).',
+  'errors.badRequest': 'No se pudo procesar la petición. Revisa los datos e intenta de nuevo.',
+  'errors.forbidden': 'No tienes acceso a esta acción o tu plan no la incluye.',
+  'errors.notFound': 'No encontramos lo que buscabas. Recarga e intenta de nuevo.',
+  'errors.conflict':
+    'Ahora no se puede hacer (por ejemplo, un límite del plan o un cambio hecho mientras tanto). Recarga e intenta de nuevo.',
   'errors.tooMany': 'Demasiados intentos. Espera un momento e intenta de nuevo.',
   'errors.unexpected': 'Pasó algo inesperado. Intenta de nuevo.',
 

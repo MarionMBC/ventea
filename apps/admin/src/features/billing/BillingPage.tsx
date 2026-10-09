@@ -11,7 +11,6 @@ import { Navigate } from 'react-router-dom';
 
 import { useApi, useSession } from '@/app/services';
 import { ConfirmDialog } from '@/features/platform/ConfirmDialog';
-import { formatUsdCents } from '@/features/platform/labels';
 import { describeError, useI18n, type I18n } from '@/i18n';
 import { panelBillingOverviewSchema, type PanelBillingOverview } from '@/lib/billing-schemas';
 import { IconAlert, IconBilling, IconHistory, IconStar } from '@/ui/icons';
@@ -61,7 +60,8 @@ export function BillingPage() {
   const session = useSession();
   const client = useApi();
   const queryClient = useQueryClient();
-  const { t, rich, day, dateTime } = useI18n();
+  const i18n = useI18n();
+  const { t, rich, day, dateTime, money } = i18n;
   const [dialog, setDialog] = useState<Action | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
@@ -90,7 +90,7 @@ export function BillingPage() {
           <IconAlert size={28} />
         </span>
         <h1>{t('billing.errorTitle')}</h1>
-        <p>{describeError(billing.error, t)}</p>
+        <p>{describeError(billing.error, i18n)}</p>
       </div>
     );
   }
@@ -130,7 +130,7 @@ export function BillingPage() {
     );
   const periodEnd = day(data.currentPeriodEnd);
   const per = data.interval === 'year' ? t('billing.perYear') : t('billing.perMonth');
-  const actionError = action.error ? describeError(action.error, t) : undefined;
+  const actionError = action.error ? describeError(action.error, i18n) : undefined;
   const dialogLabels = {
     cancelLabel: t('billing.dialogBack'),
     pendingLabel: t('billing.applying'),
@@ -169,7 +169,7 @@ export function BillingPage() {
               {data.planName} {t(`interval.${data.interval}`)}
             </Fact>
             <Fact label={t('billing.price')}>
-              {formatUsdCents(data.price.amountCents)} {data.price.currency} / {per}
+              {money(data.price.amountCents, data.price.currency)} {data.price.currency} / {per}
             </Fact>
             <Fact label={t('billing.status')}>
               <SubscriptionBadge status={data.status} />
@@ -262,7 +262,9 @@ export function BillingPage() {
                     {/* La descripción la escribe el servidor (hoy, en español). */}
                     <td>{event.description}</td>
                     <td className="num">
-                      {event.amountCents === null ? '—' : formatUsdCents(event.amountCents)}
+                      {event.amountCents === null
+                        ? '—'
+                        : money(event.amountCents, data.price.currency)}
                     </td>
                   </tr>
                 ))}
@@ -338,7 +340,7 @@ function ChangePlanDialog({
   onConfirm: (planCode: PlanCode, interval: BillingInterval) => void;
 }) {
   const client = useApi();
-  const { t } = useI18n();
+  const { t, money } = useI18n();
   const plans = useQuery({
     queryKey: ['billing', 'plans'],
     queryFn: ({ signal }) =>
@@ -392,8 +394,11 @@ function ChangePlanDialog({
         <p>
           {t('billing.newPrice')}{' '}
           <strong>
-            {formatUsdCents(interval === 'year' ? price.priceYearlyCents : price.priceMonthlyCents)}{' '}
-            USD / {interval === 'year' ? t('billing.perYear') : t('billing.perMonth')}
+            {money(
+              interval === 'year' ? price.priceYearlyCents : price.priceMonthlyCents,
+              price.currency,
+            )}{' '}
+            {price.currency} / {interval === 'year' ? t('billing.perYear') : t('billing.perMonth')}
           </strong>
         </p>
       )}

@@ -52,6 +52,11 @@ export const en = {
   'errors.sessionExpired': 'Your session expired. Please sign in again.',
   'errors.server': 'The server didn’t respond correctly ({status}). Please try again.',
   'errors.http': 'The request failed ({status}).',
+  'errors.badRequest': 'The request couldn’t be processed. Check the details and try again.',
+  'errors.forbidden': 'You don’t have access to this action, or your plan doesn’t include it.',
+  'errors.notFound': 'We couldn’t find what you were looking for. Refresh and try again.',
+  'errors.conflict':
+    'This can’t be done right now (for example, a plan limit or a change made in the meantime). Refresh and try again.',
   'errors.tooMany': 'Too many attempts. Wait a moment and try again.',
   'errors.unexpected': 'Something unexpected happened. Please try again.',
 

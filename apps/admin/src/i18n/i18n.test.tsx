@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { en } from './en';
 import { es } from './es';
 import { createI18n, I18nProvider, initialLang, LANG_STORAGE_KEY, useI18n } from './I18nProvider';
+import { ApiError } from '@/lib/api';
+
+import { describeError } from './errors';
 import { slotsOf, translate, translateRich } from './translate';
 
 describe('dictionaries', () => {
@@ -116,5 +119,45 @@ describe('language selection', () => {
     } finally {
       Object.defineProperty(window, 'localStorage', original);
     }
+  });
+});
+
+describe('describeError', () => {
+  const en = createI18n('en');
+  const es = createI18n('es');
+  const api = (status: number, message: string) => new ApiError(status, message);
+
+  it('en inglés, un mensaje escrito por la API (en español) se traduce por status', () => {
+    expect(describeError(api(400, 'El campo es obligatorio'), en)).toBe(en.t('errors.badRequest'));
+    expect(describeError(api(403, 'Tu rol no permite esta acción'), en)).toBe(
+      en.t('errors.forbidden'),
+    );
+    expect(describeError(api(404, 'Pedido no encontrado'), en)).toBe(en.t('errors.notFound'));
+    expect(describeError(api(409, 'El plan Básico permite 1'), en)).toBe(en.t('errors.conflict'));
+    expect(describeError(api(429, 'Demasiados intentos'), en)).toBe(en.t('errors.tooMany'));
+    expect(describeError(api(503, 'Servicio no disponible'), en)).toBe(
+      'The server didn’t respond correctly (503). Please try again.',
+    );
+  });
+
+  it('en español se muestra el motivo exacto de la API', () => {
+    expect(describeError(api(409, 'El plan Básico permite 1 sucursal'), es)).toBe(
+      'El plan Básico permite 1 sucursal',
+    );
+  });
+
+  it('un status sin clave cae al mensaje del servidor', () => {
+    expect(describeError(api(402, 'Pago requerido'), en)).toBe('Pago requerido');
+  });
+
+  it('errores propios del panel y errores que no son de la API', () => {
+    expect(describeError(new ApiError(0, 'x', 'network'), es)).toBe(es.t('errors.network'));
+    expect(describeError(new ApiError(401, 'x', 'session'), en)).toBe(
+      en.t('errors.sessionExpired'),
+    );
+    expect(describeError(new ApiError(418, 'x', 'fallback'), en)).toBe(
+      en.t('errors.http', { status: 418 }),
+    );
+    expect(describeError(new Error('boom'), en)).toBe(en.t('errors.unexpected'));
   });
 });

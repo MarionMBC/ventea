@@ -20,7 +20,8 @@ export function LoginPage() {
   const { client, session } = useServices();
   const current = useSession();
   const { data: tenant } = useTenant();
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as FromState | null)?.from ?? '/orders';
@@ -58,7 +59,7 @@ export function LoginPage() {
     login.error &&
     (login.error instanceof ApiError && login.error.status === 401 && !login.error.kind
       ? t('login.invalid')
-      : describeError(login.error, t));
+      : describeError(login.error, i18n));
 
   return (
     <main className="auth" style={brandStyle(tenant)}>

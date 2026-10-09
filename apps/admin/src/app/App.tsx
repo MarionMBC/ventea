@@ -8,7 +8,7 @@ import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
 import { OrdersHistory } from '@/features/orders/OrdersHistory';
 import { OrdersSection } from '@/features/orders/OrdersSection';
-import { isPlatformHost, PlatformElsewhere } from '@/features/platform/host';
+import { isPlatformHost, isPlatformPath, PlatformElsewhere } from '@/features/platform/host';
 import { PlatformLayout } from '@/features/platform/PlatformLayout';
 import { PlatformLogin } from '@/features/platform/PlatformLogin';
 import {
@@ -83,8 +83,14 @@ export function App({
 }) {
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
   const [platform] = useState(() => providedPlatform ?? createDefaultPlatformServices());
+  // El panel de plataforma es solo en español: también su <html lang> y su pantalla de error.
+  const [forcedLang] = useState(() =>
+    isPlatformHost(hostname) && isPlatformPath(window.location.pathname, basename)
+      ? ('es' as const)
+      : undefined,
+  );
   return (
-    <I18nProvider>
+    <I18nProvider lang={forcedLang}>
       <ErrorBoundary>
         <ServicesProvider services={services}>
           <PlatformProvider services={platform}>

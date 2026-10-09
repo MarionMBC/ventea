@@ -26,7 +26,8 @@ function HistorySkeleton({ label }: { label: string }) {
 /** Entregados y cancelados de hoy (día del dispositivo). Solo lectura. */
 export function OrdersHistory() {
   const { currency } = useOrdersContext();
-  const { t, money, clock, customerName } = useI18n();
+  const i18n = useI18n();
+  const { t, money, clock, customerName } = i18n;
   // «Hoy» se recalcula con el reloj: pasada la medianoche cambia la clave de la
   // consulta y la vista carga el día nuevo sola.
   const now = useNow(60_000);
@@ -42,7 +43,7 @@ export function OrdersHistory() {
           <IconAlert size={28} />
         </span>
         <h2>{t('history.errorTitle')}</h2>
-        <p>{describeError(error, t)}</p>
+        <p>{describeError(error, i18n)}</p>
         <button type="button" className="btn btn--primary" onClick={() => void refetch()}>
           {t('board.retry')}
         </button>

@@ -217,9 +217,10 @@ describe('Facturación del dueño', () => {
     });
     fireEvent.change(within(dialog).getByLabelText('Plan'), { target: { value: 'basic' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Schedule change' }));
-    expect((await within(dialog).findByRole('alert')).textContent).toContain(
-      'plan Básico permite 1',
-    );
+    // Panel en inglés: el motivo (escrito por la API en español) se traduce por status.
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert.textContent).toContain('a plan limit');
+    expect(alert.textContent).not.toContain('permite');
   });
 
   it('un movimiento de tipo nuevo se muestra con la descripción del servidor', async () => {

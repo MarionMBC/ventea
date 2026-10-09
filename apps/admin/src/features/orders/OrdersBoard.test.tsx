@@ -137,7 +137,12 @@ describe('Tablero de pedidos', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
-    expect(await screen.findByText('Couldn’t update order CHC-3000. Error interno')).toBeTruthy();
+    // En inglés, el mensaje de la API (en español) se reemplaza por uno propio, traducido.
+    expect(
+      await screen.findByText(
+        'Couldn’t update order CHC-3000. The server didn’t respond correctly (500). Please try again.',
+      ),
+    ).toBeTruthy();
     expect(within(column('New')).getByText('CHC-3000')).toBeTruthy();
     expect(within(column('In the kitchen')).queryByText('CHC-3000')).toBeNull();
   });
@@ -248,7 +253,10 @@ describe('Tablero de pedidos', () => {
     });
 
     expect(await screen.findByText('We couldn’t load orders')).toBeTruthy();
-    expect(screen.getByText('Servicio no disponible')).toBeTruthy();
+    expect(
+      screen.getByText('The server didn’t respond correctly (503). Please try again.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Servicio no disponible')).toBeNull();
     fail = false;
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('CHC-7000')).toBeTruthy();
