@@ -161,7 +161,13 @@ export function withRouteHead(html: string, route: Route): string {
   return out.replace(/<html lang="[^"]*"/, `<html lang="${route.locale}"`);
 }
 
-export function sitemapXml(lastmod: string): string {
+/**
+ * Fecha del último cambio de contenido del sitio (`lastmod` del sitemap). Se actualiza a mano al
+ * cambiar textos o páginas: no es la fecha del build, que cambiaría en cada deploy sin cambios.
+ */
+export const CONTENT_UPDATED = '2026-10-08';
+
+export function sitemapXml(lastmod: string = CONTENT_UPDATED): string {
   const urls = ROUTES.filter(isIndexable)
     .map((route) => {
       const links = alternates(route)

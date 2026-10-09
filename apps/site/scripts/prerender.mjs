@@ -50,8 +50,8 @@ for (const route of server.ROUTES) {
   console.log(`prerender ${route.path} → ${path.relative(dist, file)} (${html.length} B)`);
 }
 
-const today = new Date().toISOString().slice(0, 10);
-writeFileSync(path.join(dist, 'sitemap.xml'), server.sitemapXml(today));
+// lastmod = CONTENT_UPDATED (src/seo/meta.ts): estable entre builds, no la fecha del build.
+writeFileSync(path.join(dist, 'sitemap.xml'), server.sitemapXml());
 writeFileSync(path.join(dist, 'robots.txt'), server.robotsTxt());
 
 // og.png: plantilla + logo oficial blanco anidado tal cual (mismo archivo de public/brand/).

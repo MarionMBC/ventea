@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveRoute } from '../routes';
-import { headHtml, organizationJsonLd, robotsTxt, sitemapXml, withRouteHead } from './meta';
+import {
+  CONTENT_UPDATED,
+  headHtml,
+  organizationJsonLd,
+  robotsTxt,
+  sitemapXml,
+  withRouteHead,
+} from './meta';
 
 describe('SEO por idioma', () => {
   it('home ES: canonical, hreflang es/en/x-default, og:locale y JSON-LD', () => {
@@ -67,7 +74,12 @@ describe('SEO por idioma', () => {
   });
 
   it('sitemap con 4 urls y sus alternates; robots apunta al sitemap', () => {
-    const sitemap = sitemapXml('2026-10-08');
+    const sitemap = sitemapXml();
+    // lastmod estable: fecha del último cambio de contenido, no la del build.
+    expect(CONTENT_UPDATED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(sitemap.match(/<lastmod>([^<]+)<\/lastmod>/g)).toEqual(
+      Array(4).fill(`<lastmod>${CONTENT_UPDATED}</lastmod>`),
+    );
     expect(sitemap.match(/<url>/g)).toHaveLength(4);
     expect(sitemap.match(/<xhtml:link /g)).toHaveLength(12);
     expect(sitemap).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');

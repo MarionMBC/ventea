@@ -25,6 +25,9 @@ describe('rutas', () => {
     expect(resolveRoute('/nada')).toMatchObject({ page: 'notFound', locale: 'es' });
     expect(resolveRoute('/en/nothing')).toMatchObject({ page: 'notFound', locale: 'en' });
     expect(resolveRoute('/english')).toMatchObject({ page: 'notFound', locale: 'es' });
+    // El archivo de la 404 en inglés pedido directo hidrata como 404 en inglés.
+    expect(resolveRoute('/en/404.html')).toMatchObject({ page: 'notFound', locale: 'en' });
+    expect(resolveRoute('/404.html')).toMatchObject({ page: 'notFound', locale: 'es' });
   });
 
   it('la misma página en el otro idioma', () => {
