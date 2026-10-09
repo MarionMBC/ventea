@@ -27,6 +27,10 @@ describe('menú móvil', () => {
     expect(document.activeElement).toBe(within(menu()).getAllByRole('link')[0]);
     expect(document.getElementById('main')!.hasAttribute('inert')).toBe(true);
     expect(document.querySelector('.footer')!.hasAttribute('inert')).toBe(true);
+    // Logo, selector de idioma y CTA del header tampoco son alcanzables (ni en modo virtual).
+    for (const selector of ['.brand', '.header__lang', '.header__cta']) {
+      expect(document.querySelector(selector)!.hasAttribute('inert')).toBe(true);
+    }
 
     fireEvent.click(button);
     expect(menu().hidden).toBe(true);

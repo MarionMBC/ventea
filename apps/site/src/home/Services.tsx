@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import type { Dict, ServiceId } from '@/i18n';
 import { sectionHref } from '@/links';
 
-import { selectProjectType } from './projectTypeEvent';
+import { useHydrated } from '@/useHydrated';
+
+import { OPEN_SERVICE_EVENT, selectProjectType } from './projectTypeEvent';
 
 /** En pantallas anchas siempre hay un panel abierto (maestro-detalle); en angostas es acordeón. */
 const WIDE_QUERY = '(min-width: 900px)';
@@ -76,8 +78,21 @@ function ServiceGlyph({ id }: { id: ServiceId }) {
  */
 export function Services({ t }: { t: Dict }) {
   const [open, setOpen] = useState(0);
+  // Falso en el HTML prerenderizado: sin JS se ven los cinco servicios completos (lista estática);
+  // al hidratar pasa a maestro-detalle/acordeón. Mismo valor en servidor y primer render cliente.
+  const ready = useHydrated();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const items = t.services.items;
+
+  // El índice del hero abre el servicio elegido.
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const index = items.findIndex((item) => item.id === (event as CustomEvent<string>).detail);
+      if (index >= 0) setOpen(index);
+    };
+    document.addEventListener(OPEN_SERVICE_EVENT, onOpen);
+    return () => document.removeEventListener(OPEN_SERVICE_EVENT, onOpen);
+  }, [items]);
 
   // Si se pasa a ancho con todo cerrado (acordeón), el maestro-detalle muestra el primero.
   useEffect(() => {
@@ -128,9 +143,9 @@ export function Services({ t }: { t: Dict }) {
           </h2>
           <p className="section-lead">{t.services.lead}</p>
         </header>
-        <div className="svc" data-reveal>
+        <div className="svc" data-reveal data-static={ready ? undefined : ''}>
           {items.map((service, index) => {
-            const expanded = open === index;
+            const expanded = ready ? open === index : true;
             const num = String(index + 1).padStart(2, '0');
             return (
               <div key={service.id} className="svc__item" data-open={expanded ? '' : undefined}>

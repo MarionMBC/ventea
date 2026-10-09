@@ -1,9 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { en } from '@/i18n/en';
 import { es } from '@/i18n/es';
 
+import { openService } from './projectTypeEvent';
 import { Services } from './Services';
 
 function mockWide(wide: boolean) {
@@ -20,6 +22,24 @@ function mockWide(wide: boolean) {
 
 const buttons = () =>
   screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-controls'));
+
+describe('Servicios sin JS (HTML prerenderizado)', () => {
+  it('los cinco contenidos visibles: ningún panel hidden y lista estática', () => {
+    const html = renderToString(<Services t={es} />);
+    const panels = html.match(/<div[^>]*id="svc-panel-[^"]+"[^>]*>/g) ?? [];
+    expect(panels).toHaveLength(5);
+    for (const panel of panels) expect(panel).not.toContain('hidden');
+    expect(html).toMatch(/class="svc"[^>]*data-static=""/);
+    for (const service of es.services.items) expect(html).toContain(service.body);
+  });
+
+  it('al hidratar pasa a maestro-detalle/acordeón: solo el primero abierto', () => {
+    render(<Services t={es} />);
+    expect(document.querySelector('.svc')!.hasAttribute('data-static')).toBe(false);
+    const hidden = [...document.querySelectorAll<HTMLElement>('.svc__panel')].map((p) => p.hidden);
+    expect(hidden).toEqual([false, true, true, true, true]);
+  });
+});
 
 describe('Servicios (maestro-detalle / acordeón)', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -91,6 +111,15 @@ describe('Servicios (maestro-detalle / acordeón)', () => {
     const first = buttons()[0]!;
     fireEvent.click(first);
     expect(first.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('el índice del hero abre su servicio (evento del documento)', () => {
+    render(<Services t={es} />);
+    act(() => openService('saas'));
+    const saas = document.getElementById('svc-btn-saas')!;
+    expect(saas.getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById('svc-panel-saas')!.hidden).toBe(false);
+    expect(document.getElementById('svc-panel-software')!.hidden).toBe(true);
   });
 
   it('el CTA del servicio lleva al contacto de su idioma', () => {

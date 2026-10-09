@@ -9,10 +9,13 @@ export function Logo({
   variant,
   height = 26,
   className,
+  lazy = false,
 }: {
   variant: 'color' | 'white';
   height?: number;
   className?: string;
+  /** Para la variante que arranca oculta: sin precarga ni descarga hasta que se muestra. */
+  lazy?: boolean;
 }) {
   const src = variant === 'white' ? '/brand/logo-white.svg' : '/brand/logo-horizontal.svg';
   return (
@@ -23,6 +26,7 @@ export function Logo({
       width={Math.round(height * RATIO)}
       height={height}
       decoding="async"
+      loading={lazy ? 'lazy' : undefined}
     />
   );
 }

@@ -2,6 +2,7 @@ import type { Dict } from '@/i18n';
 import { sectionHref } from '@/links';
 
 import { HeroArt } from './HeroArt';
+import { openService } from './projectTypeEvent';
 
 /**
  * Hero: texto y CTAs en el HTML prerenderizado (son el LCP y funcionan sin JS); la composición
@@ -48,7 +49,7 @@ export function Hero({ t }: { t: Dict }) {
         <ol className="hero__index">
           {t.services.items.map((service, index) => (
             <li key={service.id}>
-              <a href={sectionHref(t.locale, 'services')}>
+              <a href={sectionHref(t.locale, 'services')} onClick={() => openService(service.id)}>
                 <span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 {service.title}
               </a>

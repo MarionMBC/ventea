@@ -58,7 +58,13 @@ export function Header({ route }: { route: Route }) {
   // Con el menú abierto: el resto de la página inerte, sin scroll de fondo, foco al primer link.
   useEffect(() => {
     if (!open) return;
-    const outside = [document.getElementById('main'), document.querySelector('.footer')];
+    // Fuera del diálogo: la página, el pie y lo que queda del header (logo, idioma, CTA). Solo el
+    // botón del menú y el menú quedan alcanzables, también para lectores de pantalla.
+    const outside = [
+      document.getElementById('main'),
+      document.querySelector('.footer'),
+      ...(headerRef.current?.querySelectorAll('.brand, .header__lang, .header__cta') ?? []),
+    ];
     for (const element of outside) element?.setAttribute('inert', '');
     document.documentElement.classList.add('menu-open');
     menuRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
@@ -110,8 +116,16 @@ export function Header({ route }: { route: Route }) {
         </a>
         <div className="container header__inner">
           <a className="brand" href={home} aria-label={t.a11y.home}>
-            <Logo variant="white" className="brand__logo brand__logo--white" />
-            <Logo variant="color" className="brand__logo brand__logo--color" />
+            <Logo
+              variant="white"
+              className="brand__logo brand__logo--white"
+              lazy={tone === 'light'}
+            />
+            <Logo
+              variant="color"
+              className="brand__logo brand__logo--color"
+              lazy={tone === 'dark'}
+            />
           </a>
           <nav className="nav" aria-label={t.a11y.mainNav}>
             <ul>
