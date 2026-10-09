@@ -201,13 +201,54 @@ async function main() {
     await expectRedirect(A, '/registro?a=1', 301, 'https://app.ventea.tech/registro?a=1');
     await expectRedirect(A, '/terminos', 301, 'https://app.ventea.tech/terminos');
     await expectRedirect(A, '/privacidad', 301, 'https://app.ventea.tech/privacidad');
-    await expectRedirect(A, '/precios', 301, 'https://app.ventea.tech/#precios');
+    await expectRedirect(A, '/precios', 301, 'https://app.ventea.tech/es/#precios');
+    await expectRedirect(A, '/precios/?plan=pro', 301, 'https://app.ventea.tech/es/?plan=pro#precios');
     await expectRedirect(A, '/admin', 301, 'https://app.ventea.tech/admin/plataforma');
     await expectRedirect(A, '/plataforma/x', 301, 'https://app.ventea.tech/admin/plataforma');
     await expectRedirect(A, '/api/health', 308, 'https://app.ventea.tech/api/health');
     await expectRedirect('www.ventea.tech', '/es/?q=1', 301, 'https://ventea.tech/es/?q=1');
-    await expectPage('app.ventea.tech', '/', 200);
-    await expectPage('app.ventea.tech', '/registro', 200);
+    // ── app.ventea.tech: landing EN en /, ES en /es/; lo desconocido bajo /es/ → home ES ──────
+    const P = 'app.ventea.tech';
+    await expectPage(P, '/', 200, 'en');
+    await expectPage(P, '/es/', 200, 'es');
+    await expectPage(P, '/es', 200, 'es');
+    await expectPage(P, '/signup', 200);
+    await expectPage(P, '/registro', 200);
+    await expectPage(P, '/terminos', 200);
+    await expectPage(P, '/privacidad', 200);
+    for (const path of ['/es/nada', '/es/precios/x']) {
+      const r = await expectPage(P, path, 200, 'es');
+      check(`${P}${path} canonical → /es/`, r.body.includes('href="https://app.ventea.tech/es/"'));
+    }
+    await expectPage(P, '/nada', 200, 'en');
+    for (const path of ['/', '/es/', '/es/nada']) {
+      const h = (await raw(P, path)).headers;
+      check(
+        `${P}${path} headers de seguridad + no-cache`,
+        (h['content-security-policy'] ?? '').includes("script-src 'self'") &&
+          h['x-frame-options'] === 'DENY' &&
+          h['x-content-type-options'] === 'nosniff' &&
+          Boolean(h['strict-transport-security']) &&
+          h['cache-control'] === 'no-cache',
+        JSON.stringify(h['cache-control']),
+      );
+    }
+
+    // ── Sourcemaps del panel: no se publican (ni en app. ni en una marca) ──────────────────
+    // Se busca el bundle real del panel y se pide su .map (y uno inventado).
+    const adminHtml = (await raw('carolina.ventea.tech', '/admin/')).body;
+    const bundle = /\/admin\/assets\/[^"]+\.js/.exec(adminHtml)?.[0];
+    check('panel /admin/ referencia su bundle', Boolean(bundle), String(bundle));
+    for (const host of ['carolina.ventea.tech', P]) {
+      for (const map of [`${bundle}.map`, '/admin/assets/x.js.map', '/admin/index.js.map']) {
+        const r = await raw(host, map);
+        check(`${host}${map} → 404 (sin sourcemap)`, r.status === 404 && !r.body.includes('"mappings"'), `got ${r.status}`);
+      }
+    }
+    if (bundle) {
+      const js = await raw('carolina.ventea.tech', bundle);
+      check('bundle del panel sin sourceMappingURL', js.status === 200 && !js.body.includes('sourceMappingURL='), `got ${js.status}`);
+    }
     await expectPage('carolina.ventea.tech', '/', 200);
     await expectRedirect('carolina.ventea.tech', '/admin/plataforma', 301, 'https://app.ventea.tech/admin/plataforma');
 
