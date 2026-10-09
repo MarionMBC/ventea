@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tone": {
+      "types": "./dist/utils/tone.d.ts",
+      "default": "./dist/utils/tone.js"
     }
   },
   "scripts": {
