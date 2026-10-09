@@ -28,9 +28,10 @@ services:
   api:
     image: ${IMAGE_API}
     restart: unless-stopped
-    # El apagado espera hasta 35 s la corrida de cobro en curso (BillingScheduler): sin esto,
+    # El apagado espera, en serie, hasta 35 s la corrida de cobro (BillingScheduler) y hasta 30 s
+    # el envío de correo en curso (MailService, TASK-021): sin esto,
     # Docker mata el proceso a los 10 s y el cobro en vuelo queda para conciliar a mano.
-    stop_grace_period: 40s
+    stop_grace_period: 75s
     # Techo de memoria (TASK-016): el procesamiento de imágenes (sharp) pide RAM fuera del heap
     # de Node; con el tope, un abuso reinicia la API en vez de tumbar la VPS compartida.
     mem_limit: 768m

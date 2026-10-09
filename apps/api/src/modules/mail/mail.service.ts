@@ -51,8 +51,10 @@ const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
 const STALE_SENDING_MS = 10 * 60_000;
 const STALE_ERROR = 'Envío interrumpido: el proceso se cortó a mitad del envío';
 /**
- * Cuánto espera el apagado a los envíos en curso: un SMTP lento tarda hasta ~40 s (10+10+20 de
- * timeouts); 30 s entra en el `stop_grace_period` de 40 s de los compose.
+ * Cuánto espera el apagado al envío en curso (un SMTP lento tarda hasta ~40 s: 10+10+20 de
+ * timeouts). Nest corre los `beforeApplicationShutdown` en serie: cobro (35 s) + correo (30 s)
+ * = 65 s, dentro del `stop_grace_period: 75s` de los compose. Si se corta igual, la fila queda
+ * `sending` y vuelve a la cola como intento interrumpido.
  */
 export const SHUTDOWN_WAIT_MS = 30_000;
 const BATCH_SIZE = 20;
@@ -78,6 +80,8 @@ export class MailService implements BeforeApplicationShutdown {
   private readonly inFlight = new Set<Promise<unknown>>();
   private dispatching?: Promise<void>;
   private dispatchAgain = false;
+  /** Apagándose: no se toman correos nuevos (el envío en curso termina). */
+  private stopping = false;
   private readonly sentAt: number[] = [];
   private rateTimer?: NodeJS.Timeout;
 
@@ -139,6 +143,7 @@ export class MailService implements BeforeApplicationShutdown {
 
   /** Despacha lo pendiente sin esperar. Si ya hay una vuelta en curso, la repite al terminar. */
   kick(): void {
+    if (this.stopping) return;
     if (this.dispatching) {
       this.dispatchAgain = true;
       return;
@@ -168,7 +173,7 @@ export class MailService implements BeforeApplicationShutdown {
     await this.reclaimStale(now);
 
     let processed = 0;
-    for (;;) {
+    while (!this.stopping) {
       const budget = this.transport.configured ? this.remainingBudget() : BATCH_SIZE;
       if (budget <= 0) {
         this.scheduleAfterRateWindow();
@@ -182,6 +187,7 @@ export class MailService implements BeforeApplicationShutdown {
       });
       if (due.length === 0) break;
       for (const { id } of due) {
+        if (this.stopping) break;
         const { count } = await this.prisma.emailMessage.updateMany({
           where: { id, status: 'pending' },
           data: { status: 'sending' },
@@ -270,6 +276,7 @@ export class MailService implements BeforeApplicationShutdown {
 
   /** Antes de que se cierre Prisma: termina (con tope) lo que está en vuelo. */
   async beforeApplicationShutdown(): Promise<void> {
+    this.stopping = true;
     if (this.rateTimer) clearTimeout(this.rateTimer);
     await Promise.race([
       this.drain(),
