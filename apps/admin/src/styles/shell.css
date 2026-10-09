@@ -241,35 +241,6 @@ a.nav-item.active svg {
   white-space: nowrap;
 }
 
-/* «Próximamente»: texto, no enlace; sin hover ni puntero. */
-.nav-item--soon,
-.nav-item--soon:hover {
-  background: transparent;
-  color: var(--text-subtle);
-  cursor: default;
-}
-
-.nav-item__tag {
-  margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--surface-3);
-  color: var(--text-muted);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.nav-soon__title {
-  padding: 0 12px 6px;
-  color: var(--text-subtle);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .sidebar__foot {
   display: grid;
   gap: 4px;
@@ -414,7 +385,6 @@ a.nav-item.active svg {
     white-space: nowrap;
   }
 
-  .app--collapsed .nav-soon,
   .app--collapsed .powered {
     display: none;
   }
@@ -454,10 +424,6 @@ a.nav-item.active svg {
 
   .sidebar__nav {
     gap: 0.75rem;
-  }
-
-  .nav-item--soon {
-    min-height: 34px;
   }
 
   .sidebar__foot {
