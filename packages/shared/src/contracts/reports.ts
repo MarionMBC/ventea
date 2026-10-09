@@ -18,10 +18,22 @@ export const REPORT_MAX_DAYS = 366;
 export const REPORT_DEFAULT_DAYS = 30;
 export const REPORT_TOP_PRODUCTS = 10;
 
-/** Fecha local `AAAA-MM-DD` que existe en el calendario. */
+/**
+ * Años admitidos en un reporte. Acotados a propósito: con años extremos (9999, 0001) la
+ * aritmética de fechas produce strings como `+010000-01-01` y un bucle por períodos podría no
+ * terminar nunca (review TASK-023).
+ */
+export const REPORT_MIN_YEAR = 2000;
+export const REPORT_MAX_YEAR = 2100;
+
+/** Fecha local `AAAA-MM-DD` que existe en el calendario, entre 2000 y 2100. */
 export const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD')
+  .refine((value) => {
+    const year = Number(value.slice(0, 4));
+    return year >= REPORT_MIN_YEAR && year <= REPORT_MAX_YEAR;
+  }, `Año entre ${REPORT_MIN_YEAR} y ${REPORT_MAX_YEAR}`)
   .refine((value) => {
     const date = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);

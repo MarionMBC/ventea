@@ -67,7 +67,11 @@ function nextPeriod(period: string, granularity: ReportGranularity): string {
   return next.toISOString().slice(0, 10);
 }
 
-/** Todos los períodos del rango (también los vacíos), con lo que trajo la consulta. */
+/**
+ * Todos los períodos del rango (también los vacíos), con lo que trajo la consulta. El bucle
+ * tiene tope numérico (`REPORT_MAX_DAYS + 1` períodos) además de la comparación de fechas:
+ * ningún dato raro puede dejarlo girando y bloquear la API (review TASK-023).
+ */
 export function fillSeries(
   from: string,
   to: string,
@@ -76,7 +80,9 @@ export function fillSeries(
 ): SalesReport['series'] {
   const byPeriod = new Map(rows.map((row) => [row.period, row]));
   const series: SalesReport['series'] = [];
-  for (let period = periodStart(from, granularity); period <= to;) {
+  const end = Date.parse(`${to}T00:00:00Z`);
+  let period = periodStart(from, granularity);
+  for (let i = 0; i <= REPORT_MAX_DAYS && Date.parse(`${period}T00:00:00Z`) <= end; i++) {
     const row = byPeriod.get(period);
     series.push({ period, orders: row?.orders ?? 0, salesCents: row?.salesCents ?? 0 });
     period = nextPeriod(period, granularity);

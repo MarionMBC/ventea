@@ -1,4 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import { isoDateSchema, REPORT_MAX_DAYS } from '@ventea/shared';
+
+import { shiftDay } from '@/modules/platform/funnel-report';
 
 import {
   fillHours,
@@ -78,6 +81,27 @@ describe('fillSeries', () => {
       '2027-01-01',
       '2027-02-01',
     ]);
+  });
+});
+
+describe('fechas extremas (review TASK-023: DoS)', () => {
+  it('fillSeries termina siempre: tope de REPORT_MAX_DAYS + 1 períodos', () => {
+    expect(fillSeries('2000-01-01', '2100-12-31', 'day', [])).toHaveLength(REPORT_MAX_DAYS + 1);
+    expect(fillSeries('2026-01-02', '2026-01-01', 'day', [])).toEqual([]);
+  });
+
+  it('shiftDay rechaza salir de los años 0000–9999 en vez de devolver «+010000-…»', () => {
+    expect(() => shiftDay('9999-12-31', 1)).toThrow(RangeError);
+    expect(() => shiftDay('0000-01-01', -1)).toThrow(RangeError);
+    expect(shiftDay('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('el esquema de fecha acota el año', () => {
+    for (const day of ['9999-12-31', '0001-01-01', '1999-12-31', '2101-01-01']) {
+      expect(isoDateSchema.safeParse(day).success).toBe(false);
+    }
+    expect(isoDateSchema.safeParse('2000-01-01').success).toBe(true);
+    expect(isoDateSchema.safeParse('2100-12-31').success).toBe(true);
   });
 });
 

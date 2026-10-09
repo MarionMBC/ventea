@@ -302,6 +302,10 @@ describe('Reportes de ventas (TASK-023)', () => {
 
   it('valida el rango', async () => {
     await get('/api/staff/reports/sales?from=2026-02-30', owner).expect(400);
+    // Años extremos: antes colgaban la API en un bucle infinito (review TASK-023).
+    await get('/api/staff/reports/sales?from=9999-12-31&to=9999-12-31', owner).expect(400);
+    await get('/api/staff/reports/sales?from=0001-01-01&to=0001-01-01', owner).expect(400);
+    await get('/api/staff/reports/sales?to=9999-12-31', owner).expect(400);
     await get('/api/staff/reports/sales?from=2026-03-07&to=2026-03-01', owner).expect(400);
     await get('/api/staff/reports/sales?from=2025-01-01&to=2026-03-01', owner).expect(400);
     await get(`${RANGE}&granularity=year`, owner).expect(400);

@@ -15,9 +15,16 @@ export function dayIn(now: Date, timeZone = FUNNEL_TIMEZONE): string {
   }).format(now);
 }
 
-/** `YYYY-MM-DD` corrido `delta` días (aritmética de calendario, sin zona). */
+/**
+ * `YYYY-MM-DD` corrido `delta` días (aritmética de calendario, sin zona). Fuera de los años
+ * 0000–9999 `toISOString` da `+010000-…`, que compara mal como string: se rechaza (RangeError)
+ * en vez de devolver una fecha que rompa los bucles de quien llama.
+ */
 export function shiftDay(day: string, delta: number): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + delta * DAY_MS).toISOString().slice(0, 10);
+  const time = Date.parse(`${day}T00:00:00Z`) + delta * DAY_MS;
+  const iso = Number.isFinite(time) ? new Date(time).toISOString().slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new RangeError(`Fecha fuera de rango: ${day}`);
+  return iso;
 }
 
 function zeros(): Record<FunnelEvent, number> {
