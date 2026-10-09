@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PlatformAuthGuard } from '@/common/guards/platform-auth.guard';
 import { BillingModule } from '@/modules/billing/billing.module';
+import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { SubscriptionsModule } from '@/modules/subscriptions/subscriptions.module';
 
 import { PlatformAnalyticsController } from './analytics.controller';
@@ -24,7 +25,7 @@ import { TenantReadyService } from './tenant-ready.service';
  * marcas y embudo de registro de la landing. Sus rutas (`/api/platform/*`) quedan fuera del TenantMiddleware.
  */
 @Module({
-  imports: [SubscriptionsModule, BillingModule],
+  imports: [SubscriptionsModule, BillingModule, NotificationsModule],
   controllers: [
     PlatformPublicController,
     PlatformAuthController,

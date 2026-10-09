@@ -46,9 +46,10 @@ services:
   api:
     image: ${IMAGE_API}
     restart: unless-stopped
-    # El apagado espera hasta 35 s la corrida de cobro en curso (BillingScheduler): sin esto,
+    # El apagado espera, en serie, hasta 35 s la corrida de cobro (BillingScheduler) y hasta 30 s
+    # el envío de correo en curso (MailService, TASK-021): sin esto,
     # Docker mata el proceso a los 10 s y el cobro en vuelo queda para conciliar a mano.
-    stop_grace_period: 40s
+    stop_grace_period: 75s
     # Techo de memoria (TASK-016): sharp pide RAM fuera del heap de Node.
     mem_limit: 768m
     environment:
@@ -70,6 +71,12 @@ services:
       MEDIA_PROCESSING_CONCURRENCY: ${MEDIA_PROCESSING_CONCURRENCY:-}
       MEDIA_PROCESSING_WAIT_MS: ${MEDIA_PROCESSING_WAIT_MS:-}
       PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+      # Correos (TASK-021). SMTP_URL vacía = no se envía nada (outbox `skipped`).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      PLATFORM_ALERT_EMAILS: ${PLATFORM_ALERT_EMAILS:-}
+      MAIL_RATE_LIMIT_PER_MINUTE: ${MAIL_RATE_LIMIT_PER_MINUTE:-}
+      LIFECYCLE_EMAILS_INTERVAL_MINUTES: ${LIFECYCLE_EMAILS_INTERVAL_MINUTES:-}
     volumes:
       - media:/data/media
     depends_on:

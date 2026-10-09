@@ -441,7 +441,9 @@ export const en = {
     trialEnds: 'Your free trial ends',
     errors: {
       name: 'Enter your restaurant’s name.',
+      nameLink: 'Remove the web address, “@” or “/” from the restaurant name.',
       owner: 'Enter your name.',
+      ownerLink: 'Remove the web address, “@” or “/” from your name.',
       email: 'Enter a valid email, for example name@email.com.',
       password: (min: number) => `Your password needs at least ${min} characters.`,
       terms: 'To create your restaurant you need to accept the terms and the privacy policy.',

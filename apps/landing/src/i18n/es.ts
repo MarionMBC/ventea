@@ -419,7 +419,9 @@ export const es: Messages = {
     trialEnds: 'Tu prueba gratis termina',
     errors: {
       name: 'Escribe el nombre de tu restaurante.',
+      nameLink: 'Quita la dirección web, la «@» o la «/» del nombre del restaurante.',
       owner: 'Escribe tu nombre.',
+      ownerLink: 'Quita la dirección web, la «@» o la «/» de tu nombre.',
       email: 'Escribe un correo válido, por ejemplo nombre@correo.com.',
       password: (min) => `La contraseña necesita al menos ${min} caracteres.`,
       terms:

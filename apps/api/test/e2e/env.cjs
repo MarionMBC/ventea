@@ -35,6 +35,14 @@ Object.assign(process.env, {
   // Push (TASK-016): clave aleatoria de 32 bytes por corrida (nada literal que parezca un
   // secreto). Cifra y descifra en el mismo proceso; el transporte es FakePushTransport.
   PUSH_CREDENTIALS_KEY: require('node:crypto').randomBytes(32).toString('hex'),
+  // Correo (TASK-021): sin SMTP (no-op) salvo que el test inyecte FakeMailTransport; los
+  // schedulers apagados (los tests despachan con kick/dispatchPending y su propio reloj).
+  SMTP_URL: '',
+  MAIL_FROM: '',
+  PLATFORM_ALERT_EMAILS: '',
+  MAIL_RATE_LIMIT_PER_MINUTE: '',
+  MAIL_SCHEDULER_ENABLED: 'false',
+  LIFECYCLE_EMAILS_INTERVAL_MINUTES: '',
 });
 
 module.exports = { E2E_DATABASE_URL };
