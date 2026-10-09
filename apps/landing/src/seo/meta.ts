@@ -17,9 +17,9 @@ export interface RouteMeta {
 export const ROUTES: readonly RouteMeta[] = [
   {
     path: '/',
-    title: 'Ventea · Tu restaurante con app propia, pedidos y puntos, sin comisiones',
+    title: 'Ventea · App propia, pedidos y puntos para restaurantes',
     description:
-      'Pedidos en línea y app con la marca de tu restaurante, panel de cocina en tiempo real y puntos de lealtad. 0% de comisión por pedido. Prueba 14 días gratis, sin tarjeta.',
+      'Software para restaurantes en Honduras: app con su marca, pedidos directos y programa de puntos para fidelizar clientes. 0% de comisión por pedido. 14 días gratis.',
     priority: 1,
   },
   {
@@ -47,7 +47,7 @@ export const ROUTES: readonly RouteMeta[] = [
 
 export const OG_IMAGE = { path: '/og.png', width: 1200, height: 630 } as const;
 export const OG_IMAGE_ALT =
-  'Ventea: tu restaurante con app propia, pedidos y puntos, sin comisiones. Prueba 14 días gratis.';
+  'Ventea: su restaurante con app propia, pedidos y puntos, sin comisiones. Prueba 14 días gratis.';
 
 /** Metadatos de una ruta; cualquier otra cosa es la landing. */
 export function routeMeta(pathname: string): RouteMeta {

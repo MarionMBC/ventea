@@ -42,9 +42,9 @@ export function DemoRequest({
   const [showErrors, setShowErrors] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const nameError = data.name.trim().length < 2 ? 'Escribe tu nombre.' : undefined;
+  const nameError = data.name.trim().length < 2 ? 'Escriba su nombre.' : undefined;
   const restaurantError =
-    data.restaurant.trim().length < 2 ? 'Escribe el nombre de tu restaurante.' : undefined;
+    data.restaurant.trim().length < 2 ? 'Escriba el nombre de su restaurante.' : undefined;
 
   const set = (key: keyof DemoRequestData) => (value: string) =>
     setData((current) => ({ ...current, [key]: value }));
@@ -60,22 +60,27 @@ export function DemoRequest({
   };
 
   return (
-    <section className="section section--tint" id="pedir-demo" aria-labelledby="pedir-demo-title">
+    <section
+      className="section section--tint demo-request-section"
+      id="pedir-demo"
+      aria-labelledby="pedir-demo-title"
+    >
       <div className="container demo-request">
-        <header className="section__head demo-request__head">
-          <p className="eyebrow">Contacto</p>
+        <header className="section__head demo-request__head" data-reveal>
+          <p className="eyebrow">Demostración</p>
           <h2 className="section__title" id="pedir-demo-title">
-            ¿Prefieres que te la mostremos?
+            ¿Prefiere que se la mostremos?
           </h2>
           <p className="section__lead">
-            Cuéntanos de tu restaurante y te enseñamos Ventea con tu menú en una llamada corta.
+            Cuéntenos de su restaurante y le mostramos Ventea en una llamada corta, con sus
+            preguntas.
           </p>
         </header>
 
         <form className="demo-request__form" onSubmit={onSubmit} noValidate>
           <Field
             id="demo-name"
-            label="Tu nombre"
+            label="Su nombre"
             autoComplete="name"
             value={data.name}
             onChange={set('name')}
@@ -106,7 +111,7 @@ export function DemoRequest({
           />
           <div className="field demo-request__wide">
             <label className="field__label" htmlFor="demo-message">
-              ¿Algo que quieras contarnos? (opcional)
+              ¿Algo que quiera contarnos? (opcional)
             </label>
             <textarea
               id="demo-message"
@@ -122,12 +127,12 @@ export function DemoRequest({
               Pedir una demo
             </button>
             <p className="field__hint">
-              Se abre tu correo con el mensaje listo para enviar a {CONTACT_EMAIL}.
+              Se abre su correo con el mensaje listo para enviar a {CONTACT_EMAIL}.
             </p>
           </div>
           {sent && (
             <p className="demo-request__wide notice notice--ok" role="status">
-              Si tu correo no se abrió, escríbenos directo a{' '}
+              Si su correo no se abrió, escríbanos directo a{' '}
               <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
           )}

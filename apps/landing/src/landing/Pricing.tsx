@@ -7,6 +7,7 @@ import type { PlansState } from '@/lib/usePlans';
 
 import { IntervalToggle } from './IntervalToggle';
 
+/** Link al registro con el plan y el intervalo elegidos (el registro los lee de la URL). */
 export function signupHref(plan: string, interval: BillingInterval): string {
   return `/registro?plan=${encodeURIComponent(plan)}&intervalo=${interval === 'year' ? 'anual' : 'mensual'}`;
 }
@@ -19,10 +20,12 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: BillingInterval })
 
   return (
     <li className={`plan${featured ? ' plan--featured' : ''}`} aria-labelledby={titleId}>
-      {featured && <p className="plan__badge">Recomendado</p>}
-      <h3 className="plan__name" id={titleId}>
-        {plan.name}
-      </h3>
+      <div className="plan__head">
+        <h3 className="plan__name" id={titleId}>
+          {plan.name}
+        </h3>
+        {featured && <p className="plan__badge">Recomendado</p>}
+      </div>
       <p className="plan__tagline">{planTagline(plan.code)}</p>
       <p className="plan__price" data-testid={`price-${plan.code}`}>
         <span className="plan__amount">{formatUsd(price)}</span>
@@ -30,11 +33,11 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: BillingInterval })
       </p>
       <p className="plan__note">
         {interval === 'year'
-          ? `Equivale a ${formatUsd(Math.round(price / 12))} al mes · ahorras ${formatUsd(savings)}`
+          ? `Equivale a ${formatUsd(Math.round(price / 12))} al mes · ahorra ${formatUsd(savings)}`
           : `O ${formatUsd(plan.priceYearlyCents)} al año, con 2 meses gratis`}
       </p>
       <a
-        className={`btn btn--block ${featured ? 'btn--primary' : 'btn--outline'}`}
+        className={`btn btn--block ${featured ? 'btn--sun' : 'btn--outline'}`}
         href={signupHref(plan.code, interval)}
       >
         Probar {plan.name} gratis
@@ -49,7 +52,7 @@ function PlanCard({ plan, interval }: { plan: Plan; interval: BillingInterval })
   );
 }
 
-/** Precios reales desde la API, con el toggle mensual/anual. */
+/** Precios reales desde la API (`GET /api/platform/plans`), con el selector mensual/anual. */
 export function Pricing({
   plans,
   interval,
@@ -60,16 +63,16 @@ export function Pricing({
   onIntervalChange: (interval: BillingInterval) => void;
 }) {
   return (
-    <section className="section section--tint" id="precios" aria-labelledby="precios-title">
+    <section className="section pricing" id="precios" aria-labelledby="precios-title">
       <div className="container">
-        <header className="section__head">
-          <p className="eyebrow">Precios</p>
-          <h2 className="section__title" id="precios-title">
-            Un precio fijo. Cero comisión por pedido.
+        <header className="section__head pricing__head" data-reveal>
+          <p className="eyebrow">Precios y planes</p>
+          <h2 className="display section__title" id="precios-title">
+            Una tarifa fija. Cero comisión por pedido.
           </h2>
           <p className="section__lead">
-            Todos los planes empiezan con {TRIAL_DAYS} días gratis, sin tarjeta. Cambia de plan
-            cuando lo necesites.
+            Todos los planes empiezan con {TRIAL_DAYS} días gratis, sin tarjeta. Cambie de plan
+            cuando lo necesite.
           </p>
         </header>
 
@@ -101,7 +104,8 @@ export function Pricing({
         )}
 
         <p className="fine-print">
-          Precios en dólares estadounidenses. Sin costo de instalación ni permanencia.
+          Precios en dólares estadounidenses (USD). Sin costo de instalación ni permanencia. El pago
+          del plan se coordina con nuestro equipo al terminar la prueba.
         </p>
       </div>
     </section>
