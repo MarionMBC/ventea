@@ -150,7 +150,8 @@ export function ContactForm({
           aria-describedby={describedBy('message', 'contact-message-hint')}
         />
         <p className="field__hint" id="contact-message-hint">
-          The problem you want to solve, the systems involved and any deadline.
+          The problem you want to solve, the systems involved and any deadline. Up to{' '}
+          {LIMITS.message} characters ({fields.message.length}/{LIMITS.message}).
         </p>
         {error('message')}
       </div>

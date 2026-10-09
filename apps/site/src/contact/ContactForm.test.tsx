@@ -51,3 +51,11 @@ describe('ContactForm', () => {
     expect(screen.getByRole('status').textContent).toMatch(/hola@ventea\.tech/);
   });
 });
+
+describe('límite del mensaje', () => {
+  it('el hint anuncia el máximo de caracteres y el conteo actual', () => {
+    render(<ContactForm />);
+    const hint = document.getElementById('contact-message-hint');
+    expect(hint?.textContent).toContain('Up to 1000 characters (0/1000)');
+  });
+});
