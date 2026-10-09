@@ -167,3 +167,61 @@ export const IconBell = make(
     <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
   </>,
 );
+export const IconPlus = make(<path d="M12 5v14M5 12h14" />);
+export const IconEdit = make(
+  <>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+    <path d="m13.5 6.5 4 4" />
+  </>,
+);
+export const IconTrash = make(
+  <>
+    <path d="M4 7h16M10 11v6M14 11v6" />
+    <path d="M6 7l1 13h10l1-13M9 7V4h6v3" />
+  </>,
+);
+export const IconGrip = make(
+  <>
+    <circle cx="9" cy="6" r="1" />
+    <circle cx="15" cy="6" r="1" />
+    <circle cx="9" cy="12" r="1" />
+    <circle cx="15" cy="12" r="1" />
+    <circle cx="9" cy="18" r="1" />
+    <circle cx="15" cy="18" r="1" />
+  </>,
+);
+export const IconArrowUp = make(<path d="M12 19V5M6 11l6-6 6 6" />);
+export const IconArrowDown = make(<path d="M12 5v14M6 13l6 6 6-6" />);
+export const IconSearch = make(
+  <>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </>,
+);
+export const IconImage = make(
+  <>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="m21 16-5-5-9 9" />
+  </>,
+);
+export const IconPalette = make(
+  <>
+    <path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A4.6 4.6 0 0 0 21 9.8C21 6 17 3 12 3z" />
+    <circle cx="7.5" cy="11" r="1" />
+    <circle cx="10" cy="7" r="1" />
+    <circle cx="15" cy="7" r="1" />
+  </>,
+);
+export const IconSmartphone = make(
+  <>
+    <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </>,
+);
+export const IconLayers = make(
+  <>
+    <path d="m12 3 9 5-9 5-9-5z" />
+    <path d="m3 13 9 5 9-5" />
+  </>,
+);

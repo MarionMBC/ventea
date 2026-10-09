@@ -1,5 +1,6 @@
 export { describeError } from './errors';
 export {
+  browserLang,
   createI18n,
   I18nProvider,
   initialLang,

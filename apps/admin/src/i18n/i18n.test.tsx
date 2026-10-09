@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { en } from './en';
 import { es } from './es';
-import { createI18n, I18nProvider, initialLang, LANG_STORAGE_KEY, useI18n } from './I18nProvider';
+import {
+  browserLang,
+  createI18n,
+  I18nProvider,
+  initialLang,
+  LANG_STORAGE_KEY,
+  useI18n,
+} from './I18nProvider';
 import { ApiError } from '@/lib/api';
 
 import { describeError } from './errors';
@@ -95,6 +102,18 @@ describe('translate', () => {
 });
 
 describe('language selection', () => {
+  it('first visit: the browser language (es-*) picks Spanish, without storing it', () => {
+    expect(browserLang(['es-HN', 'en'])).toBe('es');
+    expect(browserLang(['fr-FR', 'en-US'])).toBe('en');
+    expect(browserLang(['fr-FR'])).toBeNull();
+    expect(initialLang('', ['es-419'])).toBe('es');
+    expect(window.localStorage.getItem(LANG_STORAGE_KEY)).toBeNull();
+    expect(initialLang('', ['de-DE'])).toBe('en');
+    // A saved choice wins over the browser.
+    window.localStorage.setItem(LANG_STORAGE_KEY, 'en');
+    expect(initialLang('', ['es-HN'])).toBe('en');
+  });
+
   it('defaults to English; ?lang=es wins and is remembered', () => {
     expect(initialLang('')).toBe('en');
     expect(initialLang('?lang=es')).toBe('es');
@@ -166,7 +185,52 @@ describe('describeError', () => {
   });
 
   it('un status sin clave cae al mensaje del servidor', () => {
-    expect(describeError(api(402, 'Pago requerido'), en)).toBe('Pago requerido');
+    expect(describeError(api(418, 'Soy una tetera'), en)).toBe('Soy una tetera');
+  });
+
+  it('402 (suscripción suspendida): texto propio del panel en los dos idiomas', () => {
+    expect(describeError(api(402, 'Servicio suspendido'), en)).toBe(en.t('errors.paymentRequired'));
+    expect(describeError(api(402, 'Servicio suspendido'), es)).toBe(es.t('errors.paymentRequired'));
+    expect(en.t('errors.paymentRequired')).toMatch(/suspended/);
+  });
+
+  it('un 401 explicado por la API no es «sesión expirada»', () => {
+    expect(describeError(api(401, 'Token de cliente en ruta de staff'), en)).toBe(
+      en.t('errors.unauthorized'),
+    );
+    expect(describeError(api(401, 'Token de cliente en ruta de staff'), en)).not.toBe(
+      en.t('errors.sessionExpired'),
+    );
+    expect(describeError(api(401, 'Motivo propio'), es)).toBe('Motivo propio');
+  });
+
+  it('plan_limit: traducido con el plan y el tope, no el texto genérico', () => {
+    const locations = new ApiError(
+      403,
+      'El plan Básico permite hasta 1 sucursal activa',
+      undefined,
+      'plan_limit',
+      {
+        resource: 'locations',
+        plan: 'basic',
+        planName: 'Básico',
+        max: 1,
+      },
+    );
+    expect(describeError(locations, en)).toBe(
+      'Your Basic plan allows 1 active location. Upgrade your plan to add more.',
+    );
+    expect(describeError(locations, es)).toBe(
+      'Tu plan Básico permite 1 sucursal activa. Sube de plan para agregar más.',
+    );
+    const app = new ApiError(403, 'x', undefined, 'plan_limit', {
+      resource: 'branded_app',
+      plan: 'basic',
+      planName: 'Básico',
+      max: null,
+    });
+    expect(describeError(app, en)).toMatch(/Basic plan doesn’t include your own app/);
+    expect(describeError(app, es)).toMatch(/Tu plan Básico no incluye app propia/);
   });
 
   it('errores propios del panel y errores que no son de la API', () => {

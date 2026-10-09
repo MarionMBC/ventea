@@ -61,14 +61,35 @@ function storeLang(lang: Lang): void {
   }
 }
 
-/** `?lang=es` wins (and is remembered), then the saved choice, then English. */
-export function initialLang(search = typeof window === 'undefined' ? '' : window.location.search) {
+/** First browser language we speak (`es-HN` → es), if any. Not stored: it is not a choice. */
+export function browserLang(
+  languages: readonly string[] = typeof navigator === 'undefined'
+    ? []
+    : navigator.languages?.length
+      ? navigator.languages
+      : [navigator.language],
+): Lang | null {
+  for (const tag of languages) {
+    const base = tag?.toLowerCase().split('-')[0];
+    if (isLang(base)) return base;
+  }
+  return null;
+}
+
+/**
+ * `?lang=es` wins (and is remembered), then the saved choice, then the browser's language
+ * (first visit), then English.
+ */
+export function initialLang(
+  search = typeof window === 'undefined' ? '' : window.location.search,
+  languages?: readonly string[],
+) {
   const fromUrl = new URLSearchParams(search).get('lang');
   if (isLang(fromUrl)) {
     storeLang(fromUrl);
     return fromUrl;
   }
-  return readStoredLang() ?? DEFAULT_LANG;
+  return readStoredLang() ?? browserLang(languages) ?? DEFAULT_LANG;
 }
 
 export function createI18n(lang: Lang, setLang: (lang: Lang) => void = () => {}): I18n {

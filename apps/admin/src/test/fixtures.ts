@@ -105,7 +105,8 @@ export function createFakeApi(initial: StaffOrder[] = []) {
       path: url.pathname,
       query: url.searchParams,
       headers: (init?.headers ?? {}) as Record<string, string>,
-      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      // Las subidas mandan FormData: se entrega tal cual.
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : (init?.body ?? undefined),
     };
     calls.push(request);
 
