@@ -46,7 +46,7 @@ export function PlatformLogin() {
   };
 
   return (
-    <main className="login login--platform">
+    <main className="login login--platform" lang="es">
       <form className="login__card" onSubmit={onSubmit}>
         <p className="login__brand">Ventea</p>
         <h1 className="login__title">Plataforma</h1>

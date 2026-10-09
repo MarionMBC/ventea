@@ -8,7 +8,8 @@ import { createSessionStore } from '@/lib/session';
 import { apiError, json } from '@/test/fixtures';
 
 import { createPlatformClient } from './client';
-import { isPlatformHost } from './host';
+import { isPlatformHost, isPlatformPath } from './host';
+import { formatUsdCents } from './labels';
 import { createPlatformSessionStore, PLATFORM_SESSION_KEY, type PlatformSession } from './session';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -605,5 +606,27 @@ describe('embudo de registro (TASK-007 AC4)', () => {
     const summary = screen.getByLabelText('Totales de 30 días');
     expect(summary.textContent).toContain('Conversión visita → registro5%');
     expect(summary.textContent).toContain('Abren el registro → completan24%');
+  });
+});
+
+describe('Plataforma en español', () => {
+  it('isPlatformPath: solo /admin/plataforma y lo que cuelga de ahí', () => {
+    expect(isPlatformPath('/admin/plataforma', '/admin')).toBe(true);
+    expect(isPlatformPath('/admin/plataforma/marcas/x', '/admin/')).toBe(true);
+    expect(isPlatformPath('/admin/plataformas', '/admin')).toBe(false);
+    expect(isPlatformPath('/admin/orders', '/admin')).toBe(false);
+  });
+
+  it('en la plataforma el panel queda en español aunque el idioma guardado sea inglés', async () => {
+    window.localStorage.setItem('ventea.admin.lang', 'en');
+    renderPlatform('/admin/plataforma/login', { loggedIn: false });
+    expect(await screen.findByRole('heading', { level: 1 })).toBeTruthy();
+    expect(document.documentElement.lang).toBe('es');
+  });
+
+  it('formatUsdCents respeta el locale', () => {
+    expect(formatUsdCents(123456)).toBe('$1,234.56');
+    expect(formatUsdCents(123456, 'en-US')).toBe('$1,234.56');
+    expect(formatUsdCents(123456, 'de-DE')).toBe('1.234,56 $');
   });
 });

@@ -1,8 +1,9 @@
 import type { StaffOrder } from '@ventea/shared';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
+import { NavLink, Outlet, useMatch, useOutletContext } from 'react-router-dom';
 
 import { useTenant } from '@/app/tenant';
+import { useI18n } from '@/i18n';
 import {
   getSoundStatus,
   playChime,
@@ -12,12 +13,11 @@ import {
   writeSoundEnabled,
   type SoundStatus,
 } from '@/lib/preferences';
+import { IconClose } from '@/ui/icons';
 
 import { createArrivalTracker } from './arrivals';
 import { useActiveOrders, useNotices, useUpdateOrderStatus, type Notice } from './hooks';
 import type { StatusAction } from './transitions';
-
-const DEFAULT_TITLE = 'Ventea · Panel';
 
 const noSubscribe = () => () => {};
 const soundOff = (): SoundStatus => 'unsupported';
@@ -46,6 +46,8 @@ export function useOrdersContext(): OrdersContext {
  */
 export function OrdersSection() {
   const { data: tenant } = useTenant();
+  const { t } = useI18n();
+  const isHistory = useMatch('/orders/history') !== null;
   const activeOrders = useActiveOrders();
   const { notices, push, dismiss } = useNotices();
   const updateStatus = useUpdateOrderStatus(push);
@@ -61,10 +63,13 @@ export function OrdersSection() {
   }, [activeOrders.data, tracker, soundEnabled]);
 
   useEffect(() => {
-    const base = `Pedidos · ${tenant?.name ?? 'Ventea'}`;
-    document.title = fresh.size > 0 ? `(${fresh.size}) ${base}` : base;
-  }, [fresh, tenant?.name]);
-  useEffect(() => () => void (document.title = DEFAULT_TITLE), []);
+    const brand = tenant?.name ?? 'Ventea';
+    document.title =
+      fresh.size > 0
+        ? t('orders.pageTitleFresh', { count: fresh.size, brand })
+        : t('orders.pageTitle', { brand });
+    return () => void (document.title = t('app.defaultTitle'));
+  }, [fresh, tenant?.name, t]);
 
   // El AudioContext solo existe con el sonido activado (sin gesto, Chrome avisa en consola).
   const soundStatus = useSyncExternalStore(
@@ -104,30 +109,31 @@ export function OrdersSection() {
   const activeCount = activeOrders.data?.length;
 
   return (
-    <div className="orders">
-      <div className="orders__bar">
-        <nav className="tabs" aria-label="Vistas de pedidos">
-          <NavLink to="/orders" end className="tabs__tab">
-            Activos
+    <div className={`orders${isHistory ? ' orders--history' : ' orders--board'}`}>
+      <header className="page-head">
+        <h1 className="page-head__title">
+          {isHistory ? t('orders.historyHeading') : t('orders.heading')}
+        </h1>
+        <nav className="segmented" aria-label={t('orders.views')}>
+          <NavLink to="/orders" end className="segmented__item">
+            {t('orders.active')}
             {activeCount !== undefined && (
               <>
-                <span className="tabs__count" aria-hidden="true">
+                <span className="segmented__count" aria-hidden="true">
                   {activeCount}
                 </span>
-                <span className="sr-only">, {activeCount} pedidos</span>
+                <span className="sr-only">, {t('orders.count', { count: activeCount })}</span>
               </>
             )}
           </NavLink>
-          <NavLink to="/orders/history" className="tabs__tab">
-            Historial de hoy
+          <NavLink to="/orders/history" className="segmented__item">
+            {t('orders.history')}
           </NavLink>
         </nav>
-      </div>
+      </header>
       {/* Lectores de pantalla: anuncia los pedidos nuevos sin mover el foco. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {fresh.size > 0
-          ? `${fresh.size} ${fresh.size === 1 ? 'pedido nuevo' : 'pedidos nuevos'}`
-          : ''}
+        {fresh.size > 0 ? t('orders.fresh', { count: fresh.size }) : ''}
       </p>
       <Outlet context={context} />
       <NoticeList notices={notices} onDismiss={dismiss} />
@@ -142,6 +148,7 @@ function NoticeList({
   notices: Notice[];
   onDismiss: (id: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="notices" role="status" aria-live="polite">
       {notices.map((notice) => (
@@ -151,9 +158,9 @@ function NoticeList({
             type="button"
             className="notice__close"
             onClick={() => onDismiss(notice.id)}
-            aria-label="Cerrar aviso"
+            aria-label={t('notice.dismiss')}
           >
-            ×
+            <IconClose size={20} />
           </button>
         </div>
       ))}

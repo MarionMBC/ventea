@@ -8,8 +8,11 @@ export const config = {
   siteUrl: 'https://ventea.tech',
   /** Destino del formulario de contacto (`mailto:`). */
   contactEmail: 'hola@ventea.tech',
-  /** Producto propio: Ventea para restaurantes (SaaS, en español). */
-  restaurantsUrl: 'https://app.ventea.tech',
+  /**
+   * Producto propio: Ventea para restaurantes (SaaS). Su landing es bilingüe con inglés en la
+   * raíz y español en /es/: cada versión del sitio enlaza la de su idioma.
+   */
+  restaurantsUrl: { en: 'https://app.ventea.tech/', es: 'https://app.ventea.tech/es/' },
   restaurantsPrivacyUrl: 'https://app.ventea.tech/privacidad',
   /** Producto propio: Ventea Marketing (en español). */
   marketingUrl: 'https://marketing.ventea.tech',

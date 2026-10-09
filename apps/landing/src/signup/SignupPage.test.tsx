@@ -1,10 +1,15 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TERMS_VERSION } from '@/config';
+import { es } from '@/i18n';
 import { beaconEvents, callsTo, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs } from '@/test/render';
 
-import { READY_MESSAGE, readInitialChoice, SignupPage } from './SignupPage';
+import { readInitialChoice, SignupPage } from './SignupPage';
+
+const READY_MESSAGE = es.signup.ready;
+const render = (ui: Parameters<typeof renderEs>[0]) => renderEs(ui, '/registro');
 
 afterEach(() => {
   vi.unstubAllGlobals();

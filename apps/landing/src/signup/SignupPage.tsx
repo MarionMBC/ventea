@@ -2,38 +2,34 @@ import type { BillingInterval, PlanCode, SignupResponse } from '@ventea/shared';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import { BASE_DOMAIN, CONTACT_EMAIL, TERMS_VERSION, TRIAL_DAYS } from '@/config';
-import { Brand } from '@/landing/Brand';
+import { useIntlLocale, useT, type Messages } from '@/i18n';
 import { IntervalToggle } from '@/landing/IntervalToggle';
-import { ApiError, NETWORK_ERROR_MESSAGE, signup } from '@/lib/api';
+import { ApiError, signup } from '@/lib/api';
 import { formatDate, formatUsd, MIN_PASSWORD_LENGTH, priceFor, slugify } from '@/lib/format';
-import { locationsLabel } from '@/lib/plans';
+import { locationsLabel, planName } from '@/lib/plans';
 import { trackOnce } from '@/lib/track';
 import { FEATURED_PLAN, usePlans } from '@/lib/usePlans';
+import { PlainHeader } from '@/site/PlainHeader';
 
 import { PasswordField } from './PasswordField';
-import { SLUG_MESSAGE, useSlugCheck } from './useSlugCheck';
-import { useTenantReady, type TenantReadyStatus } from './useTenantReady';
+import { useSlugCheck } from './useSlugCheck';
+import { useTenantReady } from './useTenantReady';
 
 type Step = 1 | 2 | 3;
 
-const STEP_TITLES: Record<Step, string> = {
-  1: 'Elige tu plan',
-  2: 'Tu restaurante',
-  3: 'Tu cuenta',
-};
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const TERMS_ERROR =
-  'Para crear tu restaurante tienes que aceptar los términos y la política de privacidad.';
-
-/** `?plan=pro&intervalo=anual` desde la sección de precios. */
+/**
+ * Plan e intervalo de la URL. El contrato de siempre es `/registro?plan=pro&intervalo=anual`
+ * (enlaces existentes y redirects del apex); en inglés, `/signup?plan=pro&interval=annual`. Se
+ * aceptan los dos nombres y los dos idiomas en cualquiera de las dos rutas.
+ */
 export function readInitialChoice(search: string): { plan: string; interval: BillingInterval } {
   const params = new URLSearchParams(search);
-  const interval = params.get('intervalo') ?? params.get('interval');
+  const interval = (params.get('intervalo') ?? params.get('interval') ?? '').toLowerCase();
   return {
     plan: params.get('plan') ?? FEATURED_PLAN,
-    interval: interval === 'anual' || interval === 'year' ? 'year' : 'month',
+    interval: ['anual', 'annual', 'year', 'yearly'].includes(interval) ? 'year' : 'month',
   };
 }
 
@@ -44,6 +40,9 @@ type SubmitError =
   | { kind: 'maybe-created'; adminUrl: string };
 
 export function SignupPage({ search = window.location.search }: { search?: string }) {
+  const t = useT();
+  const s = t.signup;
+  const intl = useIntlLocale();
   const initial = readInitialChoice(search);
   const plans = usePlans();
 
@@ -86,21 +85,16 @@ export function SignupPage({ search = window.location.search }: { search?: strin
   const availablePlans = plans.status === 'ready' ? plans.plans : [];
   const selectedPlan = availablePlans.find((p) => p.code === planCode) ?? availablePlans[0];
 
-  const nameError =
-    restaurantName.trim().length < 2 ? 'Escribe el nombre de tu restaurante.' : undefined;
+  const nameError = restaurantName.trim().length < 2 ? s.errors.name : undefined;
   const slugBlocking = ['empty', 'checking', 'taken', 'reserved', 'invalid'].includes(
     slugCheck.status,
   );
-  const ownerNameError = ownerName.trim().length < 2 ? 'Escribe tu nombre.' : undefined;
-  const emailError = EMAIL_RE.test(ownerEmail.trim())
-    ? undefined
-    : 'Escribe un correo válido, por ejemplo nombre@correo.com.';
+  const ownerNameError = ownerName.trim().length < 2 ? s.errors.owner : undefined;
+  const emailError = EMAIL_RE.test(ownerEmail.trim()) ? undefined : s.errors.email;
   const passwordError =
-    ownerPassword.length < MIN_PASSWORD_LENGTH
-      ? `La contraseña necesita al menos ${MIN_PASSWORD_LENGTH} caracteres.`
-      : undefined;
+    ownerPassword.length < MIN_PASSWORD_LENGTH ? s.errors.password(MIN_PASSWORD_LENGTH) : undefined;
 
-  const termsError = acceptedTerms ? undefined : TERMS_ERROR;
+  const termsError = acceptedTerms ? undefined : s.errors.terms;
 
   const goTo = (next: Step) => {
     setShowErrors(false);
@@ -158,7 +152,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
         return;
       }
       unansweredSlug.current = status === 0 ? slug : null;
-      setSubmitError(describeError(error));
+      setSubmitError(describeError(error, t));
       if (status === 409) {
         slugCheck.markTaken();
         goTo(2);
@@ -170,16 +164,11 @@ export function SignupPage({ search = window.location.search }: { search?: strin
     }
   };
 
+  const mail = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
+
   return (
     <div className="signup-page">
-      <header className="topbar topbar--plain">
-        <div className="container topbar__inner">
-          <Brand />
-          <a className="topbar__back" href="/">
-            Volver al inicio
-          </a>
-        </div>
-      </header>
+      <PlainHeader search={search} />
 
       <main className="signup" id="contenido">
         {done ? (
@@ -196,8 +185,8 @@ export function SignupPage({ search = window.location.search }: { search?: strin
             noValidate
             aria-labelledby="signup-title"
           >
-            <p className="signup__kicker">Prueba {TRIAL_DAYS} días gratis · sin tarjeta</p>
-            <ol className="stepper" aria-label="Pasos del registro">
+            <p className="signup__kicker">{s.kicker(TRIAL_DAYS)}</p>
+            <ol className="stepper" aria-label={s.stepperLabel}>
               {([1, 2, 3] as Step[]).map((n) => (
                 <li
                   key={n}
@@ -207,32 +196,33 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                   <span className="stepper__num" aria-hidden="true">
                     {n}
                   </span>
-                  <span className="stepper__label">{STEP_TITLES[n]}</span>
+                  <span className="stepper__label">{s.stepTitles[n - 1]}</span>
                 </li>
               ))}
             </ol>
             <h1 className="signup__title" id="signup-title" ref={headingRef} tabIndex={-1}>
-              <span className="sr-only">Paso {step} de 3: </span>
-              {STEP_TITLES[step]}
+              <span className="sr-only">{s.stepOf(step)}</span>
+              {s.stepTitles[step - 1]}
             </h1>
 
             {submitError?.kind === 'closed' && (
               <div className="notice notice--warn" role="alert">
                 <p>
-                  <strong>Registro temporalmente cerrado, escríbenos.</strong> Recibimos muchas
-                  altas hoy. Escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> y
-                  te abrimos tu cuenta.
+                  <strong>{s.closedStrong}</strong>
+                  {s.closedBefore}
+                  {mail}
+                  {s.closedAfter}
                 </p>
               </div>
             )}
             {submitError?.kind === 'maybe-created' && (
               <div className="notice notice--warn" role="alert">
                 <p>
-                  <strong>Puede que tu restaurante ya se haya creado.</strong> El envío anterior se
-                  cortó antes de recibir respuesta. Intenta entrar a{' '}
-                  <a href={submitError.adminUrl}>{submitError.adminUrl}</a> con tu correo y la
-                  contraseña que elegiste. Si no funciona, escríbenos a{' '}
-                  <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+                  <strong>{s.maybeCreatedStrong}</strong>
+                  {s.maybeCreatedBefore}
+                  <a href={submitError.adminUrl}>{submitError.adminUrl}</a>
+                  {s.maybeCreatedMiddle}
+                  {mail}.
                 </p>
               </div>
             )}
@@ -256,7 +246,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
               <div className="signup__fields">
                 <div className="field">
                   <label className="field__label" htmlFor="restaurantName">
-                    Nombre del restaurante
+                    {s.restaurantName}
                   </label>
                   <input
                     id="restaurantName"
@@ -278,7 +268,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
 
                 <div className="field">
                   <label className="field__label" htmlFor="slug">
-                    Dirección web
+                    {s.slugLabel}
                   </label>
                   <div className="slug">
                     <span className="slug__prefix" aria-hidden="true">
@@ -314,17 +304,17 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                     className={`slug__status slug__status--${slugCheck.status}`}
                     aria-live="polite"
                   >
-                    {SLUG_MESSAGE[slugCheck.status]}
+                    {s.slug[slugCheck.status]}
                   </p>
                   <p id="slug-preview" className="field__hint">
-                    Tus clientes van a pedir en{' '}
+                    {s.slugPreviewBefore}
                     <strong className="slug__preview">
-                      {slug || 'tu-restaurante'}.{BASE_DOMAIN}
+                      {slug || s.slugPlaceholder}.{BASE_DOMAIN}
                     </strong>
                   </p>
                   {showErrors && slugBlocking && slugCheck.status === 'checking' && (
                     <p className="field__error" role="alert">
-                      Espera un segundo: estamos revisando la dirección.
+                      {s.slugChecking}
                     </p>
                   )}
                 </div>
@@ -335,7 +325,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
               <div className="signup__fields">
                 <div className="field">
                   <label className="field__label" htmlFor="ownerName">
-                    Tu nombre
+                    {s.ownerName}
                   </label>
                   <input
                     id="ownerName"
@@ -356,7 +346,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                 </div>
                 <div className="field">
                   <label className="field__label" htmlFor="ownerEmail">
-                    Correo
+                    {s.email}
                   </label>
                   <input
                     id="ownerEmail"
@@ -372,7 +362,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                     onChange={(event) => setOwnerEmail(event.target.value)}
                   />
                   <p className="field__hint" id="ownerEmail-hint">
-                    Con este correo entras al panel de tu restaurante.
+                    {s.emailHint}
                   </p>
                   {showErrors && emailError && (
                     <p className="field__error" role="alert">
@@ -399,19 +389,19 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                       onChange={(event) => setAcceptedTerms(event.target.checked)}
                     />
                     <label htmlFor="acceptTerms" className="terms__label">
-                      Acepto los términos y la política de privacidad
+                      {s.acceptTerms}
                     </label>
                   </div>
                   <p className="field__hint terms__links">
-                    Léelos antes:{' '}
-                    <a href="/terminos" target="_blank" rel="noopener">
-                      Términos del servicio
-                      <span className="sr-only"> (se abre en otra pestaña)</span>
+                    {s.readFirst}
+                    <a href="/terminos" target="_blank" rel="noopener" hrefLang="es">
+                      {s.termsLink}
+                      <span className="sr-only">{s.newTab}</span>
                     </a>{' '}
                     ·{' '}
-                    <a href="/privacidad" target="_blank" rel="noopener">
-                      Política de privacidad
-                      <span className="sr-only"> (se abre en otra pestaña)</span>
+                    <a href="/privacidad" target="_blank" rel="noopener" hrefLang="es">
+                      {s.privacyLink}
+                      <span className="sr-only">{s.newTab}</span>
                     </a>
                   </p>
                   {showErrors && termsError && (
@@ -423,7 +413,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
 
                 {/* Honeypot: una persona no lo ve ni llega con el teclado; un bot lo llena. */}
                 <div className="hp" aria-hidden="true">
-                  <label htmlFor="hp-ref">No completar</label>
+                  <label htmlFor="hp-ref">{s.honeypot}</label>
                   <input
                     id="hp-ref"
                     name="hp_ref_9x"
@@ -437,10 +427,9 @@ export function SignupPage({ search = window.location.search }: { search?: strin
 
                 {selectedPlan && (
                   <p className="signup__summary">
-                    Plan <strong>{selectedPlan.name}</strong>{' '}
-                    {interval === 'year' ? 'anual' : 'mensual'}:{' '}
-                    {formatUsd(priceFor(selectedPlan, interval))} USD al terminar la prueba. Hoy no
-                    pagas nada.
+                    {s.summaryBefore}
+                    <strong>{planName(selectedPlan, t)}</strong>
+                    {s.summaryAfter(interval, formatUsd(priceFor(selectedPlan, interval), intl))}
                   </p>
                 )}
               </div>
@@ -454,7 +443,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                   onClick={() => goTo((step - 1) as Step)}
                   disabled={submitting}
                 >
-                  Atrás
+                  {s.back}
                 </button>
               )}
               <button
@@ -462,11 +451,7 @@ export function SignupPage({ search = window.location.search }: { search?: strin
                 className="btn btn--primary"
                 disabled={submitting || (step === 1 && !selectedPlan)}
               >
-                {step < 3
-                  ? 'Continuar'
-                  : submitting
-                    ? 'Creando tu restaurante…'
-                    : 'Crear mi restaurante'}
+                {step < 3 ? s.continue : submitting ? s.creating : s.create}
               </button>
             </div>
           </form>
@@ -489,15 +474,20 @@ function PlanStep({
   onPlan: (code: string) => void;
   onInterval: (interval: BillingInterval) => void;
 }) {
+  const t = useT();
+  const s = t.signup;
+  const intl = useIntlLocale();
   if (plans.status === 'loading') {
-    return <p className="signup__loading">Cargando planes…</p>;
+    return <p className="signup__loading">{s.loadingPlans}</p>;
   }
   if (plans.status === 'error') {
     return (
       <div className="notice notice--error" role="alert">
-        <p>No pudimos cargar los planes. {plans.message}</p>
+        <p>
+          {s.plansError} {t.common.apiDetail(plans.message, plans.httpStatus)}
+        </p>
         <button type="button" className="btn btn--outline" onClick={plans.retry}>
-          Reintentar
+          {t.common.retry}
         </button>
       </div>
     );
@@ -506,7 +496,7 @@ function PlanStep({
     <>
       <IntervalToggle value={interval} onChange={onInterval} />
       <fieldset className="plan-pick">
-        <legend className="sr-only">Plan</legend>
+        <legend className="sr-only">{s.planLegend}</legend>
         {plans.plans.map((plan) => (
           <label
             key={plan.code}
@@ -520,16 +510,18 @@ function PlanStep({
               onChange={() => onPlan(plan.code)}
             />
             <span className="plan-pick__name">
-              {plan.name}
-              {plan.code === 'pro' && <span className="plan-pick__tag">Recomendado</span>}
+              {planName(plan, t)}
+              {plan.code === 'pro' && (
+                <span className="plan-pick__tag">{t.pricing.recommended}</span>
+              )}
             </span>
             <span className="plan-pick__meta">
-              {locationsLabel(plan.maxLocations)}
-              {plan.features.brandedApp ? ' · app con tu marca' : ''}
+              {locationsLabel(plan.maxLocations, t)}
+              {plan.features.brandedApp ? s.brandedApp : ''}
             </span>
             <span className="plan-pick__price">
-              {formatUsd(priceFor(plan, interval))}
-              <small> / {interval === 'year' ? 'año' : 'mes'}</small>
+              {formatUsd(priceFor(plan, interval), intl)}
+              <small> / {s.per[interval]}</small>
             </span>
           </label>
         ))}
@@ -537,12 +529,6 @@ function PlanStep({
     </>
   );
 }
-
-export const READY_MESSAGE: Record<TenantReadyStatus, string> = {
-  checking: 'Preparando tu dirección segura… (puede tardar hasta 2 minutos)',
-  ready: '¡Tu dirección ya está lista! Ya puedes entrar a tu panel.',
-  slow: 'Está tardando más de lo normal. Intenta entrar en unos minutos con el botón de abajo.',
-};
 
 function Success({
   response,
@@ -555,6 +541,8 @@ function Success({
   email: string;
   headingRef: RefObject<HTMLHeadingElement | null>;
 }) {
+  const s = useT().signup;
+  const intl = useIntlLocale();
   const ready = useTenantReady(response.tenant.slug);
   const pageHost = response.tenant.url.replace(/^https?:\/\//, '');
   return (
@@ -563,15 +551,14 @@ function Success({
         ✓
       </div>
       <h1 className="signup__title" id="done-title" ref={headingRef} tabIndex={-1}>
-        ¡Listo! {restaurantName} ya está en Ventea
+        {s.doneTitle(restaurantName)}
       </h1>
       <p className={`done__notice done__notice--${ready}`} role="status">
-        {READY_MESSAGE[ready]}
+        {s.ready[ready]}
         {ready === 'slow' && (
           <>
-            {' '}
-            Si sigue sin abrir, escríbenos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
-            .
+            {s.slowBefore}
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
           </>
         )}
       </p>
@@ -583,26 +570,26 @@ function Success({
           aria-disabled="true"
         >
           <span className="spinner" aria-hidden="true" />
-          Entrar a mi panel
+          {s.enterPanel}
         </a>
       ) : (
         <a className="btn btn--primary btn--lg btn--block" href={response.tenant.adminUrl}>
-          Entrar a mi panel
+          {s.enterPanel}
         </a>
       )}
       <p className="done__url">{response.tenant.adminUrl}</p>
       <dl className="done__facts">
         <div>
-          <dt>Tu página de pedidos</dt>
+          <dt>{s.pageLabel}</dt>
           <dd>{ready === 'checking' ? pageHost : <a href={response.tenant.url}>{pageHost}</a>}</dd>
         </div>
         <div>
-          <dt>Usuario del panel</dt>
+          <dt>{s.userLabel}</dt>
           <dd>{email}</dd>
         </div>
         <div>
-          <dt>Tu prueba gratis termina</dt>
-          <dd>{formatDate(response.trialEndsAt)}</dd>
+          <dt>{s.trialEnds}</dt>
+          <dd>{formatDate(response.trialEndsAt, intl)}</dd>
         </div>
       </dl>
     </section>
@@ -618,46 +605,38 @@ function isSlugError(error: ApiError): boolean {
   );
 }
 
-function describeError(error: unknown): SubmitError {
+/**
+ * Error del registro en el idioma de la vista. Los mensajes de la API vienen en español: en
+ * español se muestran tal cual (como antes); en inglés, uno propio.
+ */
+function describeError(error: unknown, t: Messages): SubmitError {
+  const e = t.signup.errors;
   if (!(error instanceof ApiError)) {
-    return { kind: 'message', message: NETWORK_ERROR_MESSAGE, step: 3 };
+    return { kind: 'message', message: t.common.networkError, step: 3 };
   }
   switch (error.status) {
     case 429:
       return { kind: 'closed' };
     case 409:
-      return {
-        kind: 'message',
-        message: 'Esa dirección ya la tomó otro restaurante. Elige otra para continuar.',
-        step: 2,
-      };
+      return { kind: 'message', message: e.taken, step: 2 };
     case 400:
       return isSlugError(error)
         ? {
             kind: 'message',
-            message:
-              error.message === 'Datos inválidos'
-                ? 'Revisa el nombre y la dirección: alguno no tiene el formato correcto.'
-                : `${error.message.replace(/\.$/, '')}. Elige otra dirección.`,
+            message: error.message === 'Datos inválidos' ? e.slugInvalid : e.slugApi(error.message),
             step: 2,
           }
         : {
             kind: 'message',
-            message:
-              error.message === 'Datos inválidos'
-                ? 'Revisa tus datos: algún campo no tiene el formato correcto.'
-                : `Revisa tus datos: ${error.message}`,
+            message: error.message === 'Datos inválidos' ? e.dataInvalid : e.dataApi(error.message),
             step: 3,
           };
     case 0:
-      return { kind: 'message', message: NETWORK_ERROR_MESSAGE, step: 3 };
+      return { kind: 'message', message: t.common.networkError, step: 3 };
     default:
       return {
         kind: 'message',
-        message:
-          error.status >= 500
-            ? 'Algo falló de nuestro lado. Intenta de nuevo en unos minutos.'
-            : error.message,
+        message: error.status >= 500 ? e.server : e.other(error.message, error.status),
         step: 3,
       };
   }

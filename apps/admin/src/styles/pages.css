@@ -1,0 +1,228 @@
+/* Páginas de contenido del panel de la marca (Facturación): tarjetas, datos, tablas, avisos. */
+.page {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 1120px;
+  padding: 16px var(--gutter) 32px;
+}
+
+@media (min-width: 1024px) {
+  .page {
+    padding-top: 20px;
+  }
+}
+
+.page-grid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .page-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card__head h2 {
+  font-size: var(--fs-md);
+  font-weight: 750;
+}
+
+.card__icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.card__note a,
+.banner a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.facts {
+  display: grid;
+  margin: 0;
+}
+
+.facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.facts > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.facts dt {
+  color: var(--text-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.btn--danger-text,
+.btn--danger-text:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.flash {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-weight: 700;
+}
+
+.banner {
+  padding: 12px 16px;
+  border: 1px solid;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.banner--warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.banner--danger {
+  border-color: #f4b4ae;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.table-wrap {
+  margin: 0 -20px -20px;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 8px 20px;
+  border-block: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.card--skeleton {
+  min-height: 12rem;
+}
+
+/* Teléfono: cada movimiento es un bloque (descripción y fecha a la izquierda, monto a la
+   derecha) en vez de una tabla con scroll lateral. */
+@media (max-width: 599px) {
+  .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .data-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'event amount'
+      'date amount';
+    gap: 2px 12px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .data-table td:nth-child(1) {
+    grid-area: date;
+    color: var(--text-muted);
+    font-size: var(--fs-xs);
+  }
+
+  .data-table td:nth-child(2) {
+    grid-area: event;
+    font-weight: 600;
+  }
+
+  .data-table td:nth-child(3) {
+    grid-area: amount;
+    align-self: center;
+    font-weight: 700;
+  }
+}

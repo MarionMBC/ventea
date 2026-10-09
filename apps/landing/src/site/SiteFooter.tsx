@@ -1,65 +1,78 @@
 import { CONTACT_EMAIL, LEGAL_NAME } from '@/config';
+import { homeHref, signupHref, useLocale, useT } from '@/i18n';
 import { Brand } from '@/landing/Brand';
 
+import { FooterLanguages } from './LanguageSwitch';
 import { PanelAccess } from './PanelAccess';
 
-/** Pie común de la landing, el registro y las páginas legales. */
+/**
+ * Pie común de la landing, el registro y las páginas legales. Las legales existen solo en
+ * español (el texto vinculante, ley de Honduras): en inglés la etiqueta lo dice.
+ */
 export function SiteFooter() {
+  const t = useT();
+  const f = t.footer;
+  const locale = useLocale();
+  const home = (hash: string) => homeHref(locale, hash);
   return (
     <footer className="footer">
       <div className="container footer__inner">
         <div className="footer__about">
           <Brand tone="dark" />
-          <p className="footer__text">
-            App propia, pedidos directos y puntos de lealtad para restaurantes. Sin comisión por
-            pedido.
-          </p>
+          <p className="footer__text">{f.about}</p>
           <PanelAccess />
         </div>
-        <nav aria-label="Producto">
-          <h2 className="footer__title">Producto</h2>
+        <nav aria-label={f.productTitle}>
+          <h2 className="footer__title">{f.productTitle}</h2>
           <ul className="footer__links">
             <li>
-              <a href="/#experiencia">Experiencia del cliente</a>
+              <a href={home('#experiencia')}>{f.links.experience}</a>
             </li>
             <li>
-              <a href="/#pedidos">Pedidos directos</a>
+              <a href={home('#pedidos')}>{f.links.orders}</a>
             </li>
             <li>
-              <a href="/#puntos">Programa de puntos</a>
+              <a href={home('#puntos')}>{f.links.points}</a>
             </li>
             <li>
-              <a href="/#precios">Precios</a>
+              <a href={home('#precios')}>{f.links.pricing}</a>
             </li>
             <li>
-              <a href="/#preguntas">Preguntas frecuentes</a>
+              <a href={home('#preguntas')}>{f.links.faq}</a>
             </li>
             <li>
-              <a href="/registro">Registrar mi restaurante</a>
+              <a href={signupHref(locale)}>{f.links.signup}</a>
             </li>
           </ul>
         </nav>
         <div>
-          <h2 className="footer__title">Contacto</h2>
+          <h2 className="footer__title">{f.contactTitle}</h2>
           <p className="footer__text">
-            ¿Dudas o quiere una demostración? Escríbanos a{' '}
+            {f.contactBefore}
             <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
           </p>
         </div>
-        <nav aria-label="Legal">
-          <h2 className="footer__title">Legal</h2>
-          <ul className="footer__links">
-            <li>
-              <a href="/terminos">Términos del servicio</a>
-            </li>
-            <li>
-              <a href="/privacidad">Política de privacidad</a>
-            </li>
-          </ul>
-        </nav>
+        <div className="footer__stack">
+          <nav aria-label="Legal">
+            <h2 className="footer__title">{f.legalTitle}</h2>
+            <ul className="footer__links">
+              <li>
+                <a href="/terminos" hrefLang="es">
+                  {f.terms}
+                </a>
+              </li>
+              <li>
+                <a href="/privacidad" hrefLang="es">
+                  {f.privacy}
+                </a>
+              </li>
+            </ul>
+          </nav>
+          <FooterLanguages />
+        </div>
         <p className="footer__legal">
-          © {new Date().getFullYear()} {LEGAL_NAME} · Un producto de{' '}
-          <a href="https://ventea.tech">Ventea, software y arquitectura</a>
+          © {new Date().getFullYear()} {LEGAL_NAME} · {f.madeBy}{' '}
+          <a href="https://ventea.tech">{f.corporate}</a>
         </p>
       </div>
     </footer>

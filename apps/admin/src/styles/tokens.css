@@ -1,65 +1,80 @@
 /*
- * Tokens del panel. Paleta neutra; el color de la marca llega en runtime desde
- * GET /api/tenant (`--brand` / `--on-brand`, ver app/tenant.ts). Todos los pares
- * texto/fondo cumplen contraste AA (≥ 4.5:1) sobre --surface y sus fondos de estado.
+ * Tokens del panel. Base neutra (superficies claras, texto casi negro); el color de la marca
+ * llega en runtime desde GET /api/tenant (`--brand` / `--on-brand`, ver app/tenant.ts, que
+ * lo oscurece hasta AA si hace falta) y se usa solo como acento. Todos los pares texto/fondo
+ * cumplen contraste AA (≥ 4.5:1) sobre --surface, --bg y sus fondos de estado.
  */
 :root {
   --font-sans:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+    sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
 
-  /* Tipografía: pensada para leerse a un brazo de distancia en una tablet de mostrador. */
-  --fs-xs: 0.875rem;
-  --fs-sm: 1rem;
-  --fs-md: 1.125rem;
-  --fs-lg: 1.375rem;
-  --fs-xl: 1.75rem;
-  --fs-code: 1.875rem;
+  /* Tipografía: se lee a un brazo de distancia en una tablet de mostrador. */
+  --fs-2xs: 0.75rem;
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.625rem;
+  --fs-code: 1.375rem;
   --lh: 1.45;
 
-  /* Superficies y texto */
-  --bg: #f3f1ed;
+  /* Superficies y texto (neutros fríos) */
+  --bg: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #f8f7f4;
-  --border: #d9d4cc;
-  --border-strong: #b9b2a7;
-  --text: #1c1a17;
-  --text-muted: #5a544b;
+  --surface-2: #f8f9fb;
+  --surface-3: #eef0f3;
+  --border: #e3e6eb;
+  --border-strong: #c3c9d2;
+  --text: #111827;
+  --text-muted: #4b5563; /* 7.6:1 sobre blanco, 6.9:1 sobre --bg */
+  --text-subtle: #5f6876; /* 5.6:1 sobre blanco */
 
   /* Marca (se sobrescribe por tenant) */
-  --brand: #2f2c28;
+  --brand: #1f2937;
   --on-brand: #ffffff;
 
-  /* Estados del pedido: color de texto/acento y fondo suave */
+  /* Estados del pedido: texto/acento y fondo suave */
   --st-confirmed: #1d4ed8;
-  --st-confirmed-bg: #e9efff;
+  --st-confirmed-bg: #eaf0ff;
   --st-preparing: #a64b05;
-  --st-preparing-bg: #fdf1e2;
+  --st-preparing-bg: #fff3e4;
   --st-ready: #157a3a;
-  --st-ready-bg: #e5f5ea;
-  --st-completed: #3f3b35;
-  --st-completed-bg: #ece9e4;
+  --st-ready-bg: #e6f6ec;
+  --st-completed: #374151;
+  --st-completed-bg: #eef0f3;
   --st-cancelled: #b42318;
   --st-cancelled-bg: #fdecea;
 
   --accent: #6d28d9;
   --accent-bg: #f1eafe;
   --danger: #b42318;
-  --warning-text: #6b4300;
-  --warning-bg: #fff3cd;
+  --danger-bg: #fdecea;
+  --warning-text: #7a4a00;
+  --warning-bg: #fff4d6;
+  --warning-border: #f2c94c;
+  --success: #157a3a;
+  --success-bg: #e6f6ec;
 
-  --focus: #1d4ed8;
-  --focus-ring: 0 0 0 3px #ffffff, 0 0 0 6px var(--focus);
+  --focus: #2563eb;
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 5px var(--focus);
 
   /* Medidas */
-  --tap: 48px; /* objetivo táctil mínimo (≥ 44 px) */
+  --tap: 48px; /* objetivo táctil (≥ 44 px) */
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
   --gap: 1rem;
   --gutter: 16px;
-  --shadow: 0 1px 2px rgb(28 26 23 / 0.08), 0 2px 8px rgb(28 26 23 / 0.06);
-  --shadow-lg: 0 8px 24px rgb(28 26 23 / 0.16);
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 60px;
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
+  --shadow-md: 0 4px 12px rgb(16 24 40 / 0.08), 0 2px 4px rgb(16 24 40 / 0.04);
+  --shadow-lg: 0 16px 40px rgb(16 24 40 / 0.16);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (min-width: 1024px) {

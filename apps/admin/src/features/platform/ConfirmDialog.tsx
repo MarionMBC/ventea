@@ -15,6 +15,8 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  cancelLabel = 'Cancelar',
+  pendingLabel = 'Aplicando…',
   danger = false,
   pending = false,
   error,
@@ -24,6 +26,9 @@ export function ConfirmDialog({
   title: string;
   children?: ReactNode;
   confirmLabel: string;
+  /** Textos de los botones: por defecto en español (plataforma); el panel de la marca los traduce. */
+  cancelLabel?: string;
+  pendingLabel?: string;
   danger?: boolean;
   pending?: boolean;
   error?: string;
@@ -91,7 +96,7 @@ export function ConfirmDialog({
         )}
         <div className="pf-dialog__actions">
           <button type="button" className="btn btn--ghost" onClick={onCancel} disabled={pending}>
-            Cancelar
+            {cancelLabel}
           </button>
           <button
             type="submit"
@@ -99,7 +104,7 @@ export function ConfirmDialog({
             className={`btn ${danger ? 'btn--danger' : 'btn--primary'}`}
             disabled={pending}
           >
-            {pending ? 'Aplicando…' : confirmLabel}
+            {pending ? pendingLabel : confirmLabel}
           </button>
         </div>
       </form>

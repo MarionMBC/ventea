@@ -168,7 +168,7 @@ export function Products({ t }: { t: Dict }) {
               ))}
             </ul>
             <div className="product__actions">
-              <External className="btn btn--primary" href={config.restaurantsUrl} t={t}>
+              <External className="btn btn--primary" href={config.restaurantsUrl[t.locale]} t={t}>
                 {r.cta}
               </External>
             </div>
