@@ -312,6 +312,14 @@ describe('Reportes de ventas (TASK-023)', () => {
     await get(`${RANGE}&locationId=nope`, owner).expect(400);
   });
 
+  it('zona horaria que Postgres no conoce: UTC en vez de 500 (review)', async () => {
+    const odd = await seedTenant(prisma, 'reports-tz');
+    await prisma.tenant.update({ where: { id: odd.id }, data: { timezone: 'US/Pacific-New' } });
+    const token = (await loginStaff(app, odd)).accessToken;
+    const report = (await get(RANGE, token, odd.slug).expect(200)).body as SalesReport;
+    expect(report.timezone).toBe('UTC');
+  });
+
   it('respeta el plan: Básico y Pro no incluyen reportes (403 plan_limit)', async () => {
     for (const code of ['basic', 'pro'] as const) {
       const plan = await prisma.plan.findUniqueOrThrow({ where: { code } });

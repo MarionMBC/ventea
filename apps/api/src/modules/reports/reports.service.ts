@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   ORDER_STATUS,
@@ -28,7 +28,30 @@ const num = (value: Num): number => Number(value ?? 0);
  */
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+  /** Zonas ya validadas contra Postgres (por proceso; son pocas y no cambian). */
+  private readonly zones = new Map<string, string>();
+
   constructor(@Inject(PRISMA) private readonly prisma: PrismaClientExtended) {}
+
+  /**
+   * Zona de la marca que Postgres conozca: Intl y la base de zonas de Postgres no coinciden
+   * siempre (p. ej. `US/Pacific-New`), y una zona que PG no conoce era un 500. Si no la
+   * conoce, UTC y un aviso en el log para corregir el dato.
+   */
+  private async pgTimeZone(timeZone: string): Promise<string> {
+    const cached = this.zones.get(timeZone);
+    if (cached) return cached;
+    const candidate = safeTimeZone(timeZone);
+    const known = await this.prisma.$queryRaw<unknown[]>`
+      SELECT 1 FROM pg_timezone_names WHERE name = ${candidate} LIMIT 1`;
+    const zone = known.length > 0 ? candidate : 'UTC';
+    if (zone !== timeZone) {
+      this.logger.warn(`Zona horaria «${timeZone}» desconocida: los reportes usan UTC`);
+    }
+    this.zones.set(timeZone, zone);
+    return zone;
+  }
 
   /** 403 `plan_limit` si el plan no incluye reportes. Sin suscripción no hay plan que limite. */
   private async assertPlanIncludesReports(tenantId: string): Promise<void> {
@@ -71,7 +94,7 @@ export class ReportsService {
       throw new NotFoundException('Sucursal no encontrada');
     }
 
-    const tz = safeTimeZone(tenant.timezone);
+    const tz = await this.pgTimeZone(tenant.timezone);
     const { from, to } = resolveRange(query, tz, now);
     const granularity = query.granularity;
 

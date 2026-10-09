@@ -358,4 +358,17 @@ describe('Puntos desde el panel (TASK-023)', () => {
       (replay.body as RewardCustomerDetail).entries.filter((e) => e.reason === 'redemption'),
     ).toHaveLength(1);
   });
+
+  it('el autor del asiento sobrevive al borrado del staff (review)', async () => {
+    const email = await createStaffMember(prisma, tenant, 'owner');
+    const token = await loginStaffAs(app, tenant, email);
+    const customer = (await registerCustomer(app, tenant.slug)).customer.id;
+    await as(token)
+      .post(`/api/staff/rewards/customers/${customer}/adjustments`, { points: 5, reason: 'Regalo' })
+      .expect(201);
+    await prisma.staffMember.deleteMany({ where: { tenantId: tenant.id, email } });
+    const detail = (await as(owner).get(`/api/staff/rewards/customers/${customer}`).expect(200))
+      .body as RewardCustomerDetail;
+    expect(detail.entries[0]).toMatchObject({ staffNote: 'Regalo', staffName: 'owner' });
+  });
 });

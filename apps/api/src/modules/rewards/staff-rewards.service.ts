@@ -311,6 +311,7 @@ export class StaffRewardsService {
           reason: true,
           note: true,
           staffNote: true,
+          staffName: true,
           createdAt: true,
           order: { select: { code: true } },
           staff: { select: { name: true } },
@@ -336,7 +337,8 @@ export class StaffRewardsService {
         rewardName:
           entry.reward?.name ?? (entry.reason === 'redemption' && !entry.order ? entry.note : null),
         staffNote: entry.staffNote,
-        staffName: entry.staff?.name ?? null,
+        // El nombre de ese momento; si es un asiento viejo sin copia, el actual.
+        staffName: entry.staffName ?? entry.staff?.name ?? null,
         createdAt: entry.createdAt,
       })),
     };
@@ -422,7 +424,7 @@ export class StaffRewardsService {
       if (replay) {
         return { detail: await this.customerDetail(tenantId, customerId, tx), created: false };
       }
-      await this.assertStaff(tx, actor);
+      const staffName = await this.assertStaff(tx, actor);
       if (input.points < 0) {
         const balance = await this.rewards.balance(tx, tenantId, customerId);
         if (balance + input.points < 0) {
@@ -437,6 +439,7 @@ export class StaffRewardsService {
         points: input.points,
         reason: 'manual_adjustment',
         staffId,
+        staffName,
         staffNote: input.reason,
         idempotencyKey: idempotencyKey ?? null,
       });
@@ -464,7 +467,7 @@ export class StaffRewardsService {
       if (replay) {
         return { detail: await this.customerDetail(tenantId, customerId, tx), created: false };
       }
-      await this.assertStaff(tx, actor);
+      const staffName = await this.assertStaff(tx, actor);
       const program = await this.rewards.program(tx, tenantId);
       if (!program?.isEnabled) throw new BadRequestException('El programa de puntos está apagado');
 
@@ -490,6 +493,7 @@ export class StaffRewardsService {
         reason: 'redemption',
         rewardId: reward.id,
         staffId,
+        staffName,
         // El nombre queda en el asiento: sobrevive a que la recompensa se edite o se borre.
         note: reward.name,
         idempotencyKey: idempotencyKey ?? null,
@@ -498,12 +502,13 @@ export class StaffRewardsService {
     });
   }
 
-  /** El staff del token sigue existiendo y activo: su id va a la auditoría (FK). */
-  private async assertStaff(tx: PrismaDb, actor: RewardsActor): Promise<void> {
+  /** El staff del token sigue existiendo y activo: su id y su nombre van a la auditoría. */
+  private async assertStaff(tx: PrismaDb, actor: RewardsActor): Promise<string> {
     const staff = await tx.staffMember.findFirst({
       where: { tenantId: actor.tenantId, id: actor.staffId, isActive: true },
-      select: { id: true },
+      select: { name: true },
     });
     if (!staff) throw new UnauthorizedException('Sesión inválida o expirada');
+    return staff.name;
   }
 }

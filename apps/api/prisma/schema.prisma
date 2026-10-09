@@ -736,6 +736,9 @@ model RewardLedgerEntry {
   /// Auditoría (TASK-023): quién del staff hizo el ajuste o el canje desde el panel. Null en
   /// asientos automáticos (pedido, bono de registro, devolución de canje).
   staffId   String?
+  /// Nombre del staff al momento del asiento: la auditoría conserva el autor aunque la persona
+  /// se borre después (`staffId` pasa a null).
+  staffName String?
   /// Motivo interno del ajuste. Nunca sale a la app del cliente (`/api/rewards/ledger`).
   staffNote String?
   /// Recompensa del catálogo canjeada en el local (asiento `redemption` sin pedido).
