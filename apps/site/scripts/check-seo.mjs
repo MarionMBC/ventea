@@ -41,9 +41,15 @@ check(titles.size === Object.keys(routes).length, 'títulos repetidos entre ruta
 const notFound = readFileSync(path.join(dist, '404.html'), 'utf8');
 check(notFound.includes('<meta name="robots" content="noindex" />'), '404.html: noindex');
 check(!notFound.includes('rel="canonical"'), '404.html: sin canonical');
+check(
+  notFound.includes(`<meta property="og:url" content="${SITE}/" />`),
+  '404.html: og:url portada',
+);
 
 const png = readFileSync(path.join(dist, 'og.png'));
 check(png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630, 'og.png no es 1200×630');
+const logo = readFileSync(path.join(dist, 'logo.png'));
+check(logo.readUInt32BE(16) === 512 && logo.readUInt32BE(20) === 512, 'logo.png no es 512×512');
 
 const sitemap = readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
 check((sitemap.match(/<url>/g) ?? []).length === 2, 'sitemap.xml: 2 urls');
@@ -56,4 +62,6 @@ if (errors.length > 0) {
   console.error(`SEO del build incompleto:\n- ${errors.join('\n- ')}`);
   process.exit(1);
 }
-console.log('SEO del build OK: 2 rutas + 404, JSON-LD, og.png 1200×630, sitemap y robots.');
+console.log(
+  'SEO del build OK: 2 rutas + 404, JSON-LD, og.png 1200×630, logo.png, sitemap y robots.',
+);

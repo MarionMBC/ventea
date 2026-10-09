@@ -38,6 +38,18 @@ describe('buildMailto', () => {
     expect(url.match(/&/g)).toHaveLength(1);
   });
 
+  it('keeps the subject on one line even if a field carries CR/LF', () => {
+    const url = buildMailto('hola@ventea.tech', {
+      ...FILLED,
+      name: 'Ana\r\nBcc: x@evil.test',
+      company: 'Acme\nCo',
+    });
+    const subject = query(url).get('subject') ?? '';
+    expect(subject).toBe('SaaS platform project — Ana Bcc: x@evil.test, Acme Co');
+    expect(subject).not.toMatch(/[\r\n]/);
+    expect(url.split('&body=')[0]).not.toMatch(/%0D|%0A/i);
+  });
+
   it('omits the company from the subject when it is empty', () => {
     const url = buildMailto('hola@ventea.tech', { ...FILLED, company: '' });
     expect(query(url).get('subject')).toBe('SaaS platform project — Ana López');

@@ -58,6 +58,12 @@ describe('home page', () => {
     expect(text).not.toMatch(/\+\s?\d+|\d+\+|testimonial|our clients|trusted by|award|certified/i);
   });
 
+  it('does not promise a fixed cadence or deadline', () => {
+    render(<App path="/" />);
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/every (day|week|month)|weekly|monthly|\d+\s*(days?|weeks?|months?)/i);
+  });
+
   it('footer links to the product, the email and the privacy notice', () => {
     render(<App path="/" />);
     const footer = screen.getByRole('contentinfo');
@@ -94,6 +100,9 @@ describe('other routes', () => {
     render(<App path="/privacy" />);
     expect(screen.getByRole('heading', { level: 1, name: /privacy notice/i })).toBeTruthy();
     expect(document.body.textContent).toMatch(/does not set cookies/);
+    // El correo pasa por los proveedores de correo: no se promete "nadie más lo ve".
+    expect(document.body.textContent).toMatch(/provider that hosts our mailbox/);
+    expect(document.body.textContent).not.toMatch(/share them with third parties/);
   });
 
   it('unknown paths render the 404 page', () => {

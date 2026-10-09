@@ -108,7 +108,7 @@ export const PROCESS: readonly Step[] = [
   },
   {
     title: 'Iterative build',
-    text: 'Short cycles with working software you can try. You see progress every week, not at the end.',
+    text: 'Short cycles with working software you can try. You see working software early and often, not only at the end.',
   },
   {
     title: 'Go-live',
@@ -179,11 +179,11 @@ export const FAQ: readonly FaqItem[] = [
   },
   {
     q: 'How long does a project take?',
-    a: 'It depends on the size. An integration or a focused first version usually takes weeks; a full platform is planned in stages of a few months, each one delivering usable software. You get a dated plan before we start.',
+    a: 'It depends on the scope. A focused integration or first version is much shorter than a full platform, which we plan in stages that each deliver usable software. After discovery you get a dated plan for your scope before we start.',
   },
   {
     q: 'What happens after delivery?',
-    a: 'We can keep maintaining and improving the system under a monthly agreement, or hand it over to your team with the documentation and a walkthrough.',
+    a: 'We can keep maintaining and improving the system under an ongoing support agreement, or hand it over to your team with the documentation and a walkthrough.',
   },
   {
     q: 'Who owns the code?',

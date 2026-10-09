@@ -43,6 +43,8 @@ export const ROUTES: readonly RouteMeta[] = [
 ];
 
 export const OG_IMAGE = { path: '/og.png', width: 1200, height: 630 } as const;
+/** Logo PNG para el JSON-LD (Google no acepta SVG): lo rasteriza el build desde el favicon. */
+export const LOGO_IMAGE = { path: '/logo.png', size: 512 } as const;
 export const OG_IMAGE_ALT = 'Ventea: we design and build software your business can run and scale.';
 
 /** Metadatos de una ruta; cualquier ruta desconocida es la 404. */
@@ -56,8 +58,8 @@ export function canonicalUrl(route: RouteMeta): string {
 }
 
 /**
- * `Organization` + `ProfessionalService` en un `@graph`. Sin dirección física, teléfono,
- * reseñas ni ratings: no hay datos reales que publicar.
+ * `Organization` (con un `Offer` por servicio) + `ProfessionalService` en un `@graph`. Sin
+ * dirección física, teléfono, área atendida, reseñas ni ratings: nada de eso está confirmado.
  */
 export function organizationJsonLd() {
   const url = `${config.siteUrl}/`;
@@ -70,14 +72,12 @@ export function organizationJsonLd() {
         '@id': orgId,
         name: config.companyName,
         url,
-        logo: `${config.siteUrl}/favicon.svg`,
+        logo: `${config.siteUrl}${LOGO_IMAGE.path}`,
         email: config.contactEmail,
-        owns: {
-          '@type': 'SoftwareApplication',
-          name: 'Ventea for restaurants',
-          url: `${config.productUrl}/`,
-          applicationCategory: 'BusinessApplication',
-        },
+        makesOffer: SERVICES.map((service) => ({
+          '@type': 'Offer',
+          itemOffered: { '@type': 'Service', name: service.title, description: service.summary },
+        })),
       },
       {
         '@type': 'ProfessionalService',
@@ -87,8 +87,6 @@ export function organizationJsonLd() {
         email: config.contactEmail,
         image: `${config.siteUrl}${OG_IMAGE.path}`,
         description: ROUTES[0]!.description,
-        areaServed: ['Honduras', 'Latin America', 'United States'],
-        availableLanguage: ['en', 'es'],
         parentOrganization: { '@id': orgId },
         knowsAbout: SERVICES.map((service) => service.title),
       },
@@ -129,7 +127,8 @@ export function headHtml(route: RouteMeta): string {
     `<meta property="og:type" content="website" />`,
     `<meta property="og:site_name" content="${config.companyName}" />`,
     `<meta property="og:locale" content="en_US" />`,
-    `<meta property="og:url" content="${url}" />`,
+    // La 404 no tiene URL propia: su og:url es la portada.
+    `<meta property="og:url" content="${route.priority === null ? `${config.siteUrl}/` : url}" />`,
     `<meta property="og:title" content="${escapeAttr(route.title)}" />`,
     `<meta property="og:description" content="${escapeAttr(route.description)}" />`,
     `<meta property="og:image" content="${image}" />`,

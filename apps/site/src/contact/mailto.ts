@@ -24,7 +24,8 @@ export const EMPTY_CONTACT: ContactFields = {
 /** Lo justo para detectar un correo mal escrito; el cliente de correo valida el resto. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const LIMITS = { name: 100, company: 100, email: 254, message: 2000 } as const;
+/** `message` corto: algunos clientes de correo (Outlook clásico) cortan URLs mailto largas. */
+export const LIMITS = { name: 100, company: 100, email: 254, message: 1000 } as const;
 
 export function validateContact(fields: ContactFields): ContactErrors {
   const errors: ContactErrors = {};
@@ -45,7 +46,10 @@ export function validateContact(fields: ContactFields): ContactErrors {
 export function buildMailto(to: string, fields: ContactFields): string {
   const name = fields.name.trim();
   const company = fields.company.trim();
-  const subject = `${fields.projectType} project — ${company ? `${name}, ${company}` : name}`;
+  // El asunto es una sola línea: CR/LF pegados en un campo no pueden partirlo.
+  const oneLine = (value: string) => value.replace(/[\r\n]+/g, ' ').trim();
+  const who = company ? `${oneLine(name)}, ${oneLine(company)}` : oneLine(name);
+  const subject = `${oneLine(fields.projectType)} project — ${who}`;
   const body = [
     `Name: ${name}`,
     `Company: ${company || '—'}`,

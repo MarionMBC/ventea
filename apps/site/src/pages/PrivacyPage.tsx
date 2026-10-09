@@ -24,9 +24,11 @@ export function PrivacyPage() {
         </p>
         <h2>What we do with your email</h2>
         <p>
-          We use the messages you send us only to reply and to discuss your project. We do not sell
-          them or share them with third parties. You can ask us to delete your messages at any time
-          by writing to <a href={`mailto:${config.contactEmail}`}>{config.contactEmail}</a>.
+          Your message travels like any other email: it is handled by your email provider and by the
+          provider that hosts our mailbox, {config.contactEmail}. We use the messages you send us
+          only to reply and to discuss your project, and we do not sell them or use them for
+          advertising. You can ask us to delete your messages at any time by writing to{' '}
+          <a href={`mailto:${config.contactEmail}`}>{config.contactEmail}</a>.
         </p>
         <h2>Server logs</h2>
         <p>

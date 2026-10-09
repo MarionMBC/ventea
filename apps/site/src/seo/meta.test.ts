@@ -26,14 +26,23 @@ describe('seo meta', () => {
       'ProfessionalService',
     ]);
     const json = JSON.stringify(data);
-    expect(json).not.toMatch(/address|aggregateRating|review|telephone/i);
+    // Nada sin confirmar: ni dirección, teléfono, área atendida, idiomas ni reseñas.
+    expect(json).not.toMatch(
+      /"(address|aggregateRating|review|telephone|areaServed|availableLanguage|owns)"/,
+    );
     expect(json).toContain('hola@ventea.tech');
+    const org = data['@graph'][0] as { logo: string; makesOffer: { itemOffered: object }[] };
+    expect(org.logo).toBe('https://ventea.tech/logo.png');
+    expect(org.makesOffer).toHaveLength(6);
+    expect(org.makesOffer[0]!.itemOffered).toMatchObject({ '@type': 'Service' });
   });
 
-  it('404 is noindex, without canonical and out of the sitemap', () => {
+  it('404 is noindex, without canonical and out of the sitemap; og:url is the home', () => {
     const head = headHtml(routeMeta('/whatever'));
     expect(head).toContain('noindex');
     expect(head).not.toContain('canonical');
+    expect(head).toContain('<meta property="og:url" content="https://ventea.tech/" />');
+    expect(head).not.toContain('/404');
     const sitemap = sitemapXml('2026-10-08');
     expect(sitemap).toContain('<loc>https://ventea.tech/</loc>');
     expect(sitemap).toContain('<loc>https://ventea.tech/privacy</loc>');
