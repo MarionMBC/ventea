@@ -44,8 +44,9 @@ Regla para toda pantalla de `apps/admin` (TASK-020). La verifican `src/styles/la
 
 ## Test en el navegador (`npm run test:layout`)
 
-Recorre login, Pedidos, Historial, Menú (árbol, editor de ítem, modificadores, editor de grupo,
-confirmación de borrado), Mi marca, Facturación, el cajón de navegación y la plataforma (marcas,
+Recorre login, enlace de invitación, Pedidos, Historial, Menú (árbol, editor de ítem,
+modificadores, editor de grupo, confirmación de borrado), Mi marca, Sucursales (y su editor),
+Equipo (e invitar), Facturación, el cajón de navegación y la plataforma (marcas,
 apps, embudo, detalle de marca y de app) en 1280×800, 1440×900, 768×1024 y 390×844, en ES y
 EN. Falla si hay desborde horizontal, más de un scroll vertical principal, un scroll anidado, un
 diálogo que deja scrollear el fondo o un último campo tapado.

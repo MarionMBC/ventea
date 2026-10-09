@@ -298,6 +298,10 @@ async function main() {
       await page.goto(`${BASE}/login`);
       await settle(page);
       await record('login', await page.evaluate(measure));
+      // Enlace de invitación sin token válido (TASK-022): el aviso, con el marco del login.
+      await page.goto(`${BASE}/join`);
+      await settle(page);
+      await record('unirse', await page.evaluate(measure));
       if (platform && lang === LANGS[0]) {
         await page.goto(`${BASE}/plataforma/login`);
         await settle(page);
@@ -312,6 +316,8 @@ async function main() {
         ['historial', '/orders/history'],
         ['menu', '/menu'],
         ['mi-marca', '/brand'],
+        ['sucursales', '/locations'],
+        ['equipo', '/team'],
         ['facturacion', '/facturacion'],
       ]) {
         await page.goto(`${BASE}${route}`);
@@ -342,6 +348,20 @@ async function main() {
       await page.locator('.menu-cat__actions .icon-btn--danger').first().click();
       await settle(page);
       await record('menu-confirmar-borrado', await page.evaluate(measureDialog));
+      await page.keyboard.press('Escape');
+
+      // Sucursales y Equipo (TASK-022): editor de sucursal e invitación (se cancelan).
+      await page.goto(`${BASE}/locations`);
+      await settle(page);
+      await page.locator('.loc-card .card__actions button').first().click();
+      await settle(page);
+      await record('sucursales-editor', await page.evaluate(measureDialog));
+      await page.keyboard.press('Escape');
+      await page.goto(`${BASE}/team`);
+      await settle(page);
+      await page.locator('.page-head__actions .btn').first().click();
+      await settle(page);
+      await record('equipo-invitar', await page.evaluate(measureDialog));
       await page.keyboard.press('Escape');
 
       // Cajón de navegación (menos de 1024 px).
