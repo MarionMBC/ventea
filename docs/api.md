@@ -2,7 +2,8 @@
 
 Todas las rutas van bajo `/api` y pasan por `TenantMiddleware`: la marca sale del subdominio
 (`<slug>.ventea.tech`) o del header `X-Tenant-Slug`, que es lo que usan las apps nativas.
-Las excepciones son `/api/health` y `/api/platform/*` (ver [Plataforma](#plataforma-saas)).
+Las excepciones son `/api/health`, `/api/platform/*` (ver [Plataforma](#plataforma-saas)) y
+`GET /api/media/*` (archivos públicos de imágenes, ver [Medios](#medios-imágenes-de-la-marca)).
 
 **Marca suspendida → `402 {statusCode: 402, message: "Servicio suspendido", error: "Payment Required"}`**
 en toda ruta de la marca salvo:
@@ -10,7 +11,8 @@ en toda ruta de la marca salvo:
 - `/api/staff/*`, `/api/tenant`, `/api/auth/refresh` y `/api/billing/*`: el dueño sigue
   entrando al panel a pagar;
 - `GET /api/orders`, `GET /api/orders/:id` y `GET /api/me`: el cliente sigue viendo su cuenta y
-  sus pedidos en curso. Crear o cancelar pedidos, el menú, registro y login dan 402.
+  sus pedidos en curso, y `DELETE /api/devices/:id` (baja del push al cerrar sesión). Crear o
+  cancelar pedidos, el menú, registro y login dan 402.
 
 Pasa con la suscripción `suspended`, `canceled` o en prueba vencida. Una prueba vencida pasa a
 `past_due` con el primer request de la marca, también en las rutas abiertas, y sigue en 402.
@@ -46,6 +48,16 @@ No hay revocación del lado del servidor: cerrar sesión es descartar los tokens
 | GET    | `/api/tenant`           | nombre, moneda, branding y programa de puntos                      |
 | GET    | `/api/locations`        | sucursales activas                                                 |
 | GET    | `/api/menu?locationId=` | menú publicado. Incluye los ítems agotados con `isAvailable=false` |
+
+- **`/api/tenant` → `branding`** (TASK-016): `primaryColor`, `secondaryColor`, `accentColor`
+  (null si no hay), `appDisplayName`, `logoUrl` e `iconUrl`. Las URLs de imágenes subidas a
+  Ventea salen **absolutas** (`https://<host del request>/api/media/<tenantId>/<hash>.webp`, o
+  `MEDIA_PUBLIC_BASE_URL` si está definida): sirven igual en el web, la app nativa y el generador
+  de apps. El host del request se usa solo si es de la plataforma (`TENANT_BASE_DOMAIN` y sus
+  subdominios, o el de `PUBLIC_ORIGIN`); con otro Host las URLs salen **relativas**
+  (`/api/media/…`). Una URL heredada de antes de TASK-016 sale tal cual.
+- **`/api/menu`** no muestra ítems ni categorías borrados desde el panel; `imageUrl` absoluta como
+  arriba.
 
 ## Pedidos
 
@@ -203,29 +215,136 @@ Cada paso deja su `BillingEvent` (`payment_succeeded`, `payment_failed`, `paymen
 `past_due`, `suspended`, `canceled`…) y avisa por `BillingNotifier` (hoy, log; el email se
 enchufa ahí).
 
+## Menú desde el panel (`/api/staff/menu`, TASK-016)
+
+Lee cualquier staff de la marca; escriben **owner y manager** (staff → `403`). Contratos en
+`packages/shared/src/contracts/menu-admin.ts`. Bodies estrictos (campo desconocido → `400`),
+centavos enteros ≥ 0 (las opciones pueden ser negativas), nombres requeridos.
+
+| Método | Ruta                                                  |                                                                                                                                          |
+| ------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/staff/menu`                                     | árbol completo con inactivos y agotados (sin borrados) + grupos                                                                          |
+| GET    | `/api/staff/menu/changes?limit=`                      | auditoría (`MenuChange`: quién, entidad, acción, cambios, cuándo); owner · manager                                                       |
+| POST   | `/api/staff/menu/categories`                          | `{name, isActive?}` → `201 {id}`                                                                                                         |
+| PATCH  | `/api/staff/menu/categories/:id`                      | `{name?, isActive?}` → `204`                                                                                                             |
+| DELETE | `/api/staff/menu/categories/:id`                      | `409` si tiene productos; `204`                                                                                                          |
+| PATCH  | `/api/staff/menu/categories/reorder`                  | `{items: [{id, sortOrder}]}` → `204`                                                                                                     |
+| POST   | `/api/staff/menu/items`                               | `{categoryId, name, basePriceCents, description?, compareAtPriceCents?, tags?, isAvailable?, imageUrl?, modifierGroupIds?}` → `201 {id}` |
+| PATCH  | `/api/staff/menu/items/:id`                           | parcial; `modifierGroupIds` reemplaza la lista; `imageUrl: null` quita la foto                                                           |
+| PATCH  | `/api/staff/menu/items/:id/availability`              | `{isAvailable}` (toggle rápido)                                                                                                          |
+| DELETE | `/api/staff/menu/items/:id`                           | `{deleted: "hard"}`, o `{deleted: "soft"}` si tiene pedidos                                                                              |
+| PATCH  | `/api/staff/menu/items/reorder`                       | `{items: [{id, sortOrder}]}`                                                                                                             |
+| POST   | `/api/staff/menu/modifier-groups`                     | `{name, minSelect, maxSelect, options?: [{name, priceDeltaCents, isAvailable}]}`                                                         |
+| PATCH  | `/api/staff/menu/modifier-groups/:id`                 | `{name?, minSelect?, maxSelect?}` (min ≤ max contra lo guardado)                                                                         |
+| DELETE | `/api/staff/menu/modifier-groups/:id`                 | borra sus opciones y su uso en los ítems                                                                                                 |
+| POST   | `/api/staff/menu/modifier-groups/:id/options`         | `{name, priceDeltaCents?, isAvailable?}`                                                                                                 |
+| PATCH  | `/api/staff/menu/modifier-groups/:id/options/reorder` | `{items: [{id, sortOrder}]}` (solo opciones del grupo)                                                                                   |
+| PATCH  | `/api/staff/menu/modifier-options/:id`                | `{name?, priceDeltaCents?, isAvailable?}`                                                                                                |
+| DELETE | `/api/staff/menu/modifier-options/:id`                | `204`                                                                                                                                    |
+
+- **Referencias del body** (categoría, grupos, `imageUrl`) se verifican contra la marca: de otra
+  marca o inexistentes → `400`. Ids de la ruta de otra marca → `404`.
+- **`compareAtPriceCents`** (precio tachado) tiene que ser mayor que `basePriceCents`.
+- **Borrado:** un ítem con pedidos se marca `deletedAt` (sale del menú y del panel, y no se puede
+  pedir; los pedidos guardan snapshot). Sin pedidos se borra de verdad. Una categoría que solo
+  conserva ítems borrados se marca borrada (la FK desde el ítem es `Restrict`).
+- **Auditoría:** cada escritura deja su `MenuChange` en la misma transacción.
+
+## Medios (imágenes de la marca)
+
+| Método | Ruta                                        | Quién                                                          |
+| ------ | ------------------------------------------- | -------------------------------------------------------------- |
+| POST   | `/api/staff/media`                          | owner · manager · `multipart/form-data`, campo `file`          |
+| GET    | `/api/staff/media`                          | owner · manager · `{items, usedBytes, quotaBytes}`             |
+| DELETE | `/api/staff/media/:hash`                    | owner · manager · `409` si un ítem o la marca la usan          |
+| GET    | `/api/media/<tenantId>/<hash>[.thumb].webp` | público · `Cache-Control: public, max-age=31536000, immutable` |
+
+- **Subida:** solo PNG, JPEG o WebP, ≤ 5 MB (multer corta el stream: `413`), un único campo.
+  El tipo se verifica por magic number y por lo que lee sharp, no por el `Content-Type`: otro →
+  `415`. Se re-codifica a **WebP ≤ 1600 px** de ancho + miniatura de **400 px**, con la
+  orientación aplicada y **sin EXIF/GPS** ni bytes extra (un polyglot sale limpio). El nombre es
+  el sha256 del WebP: la misma imagen no ocupa dos veces. Respuesta `201 {url, thumbUrl, width,
+height}` con URLs absolutas.
+- **Límites por marca:** cuota `MEDIA_QUOTA_MB` (200) → `403` con el motivo; 60 subidas por hora
+  (`MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR`) → `429` + `Retry-After`.
+- **Límites por imagen y por servidor:** más de **24 MP** (se mira la cabecera antes de
+  decodificar) → `413`. sharp procesa como mucho 2 imágenes a la vez por proceso
+  (`MEDIA_PROCESSING_CONCURRENCY`); las demás esperan hasta 20 s (`MEDIA_PROCESSING_WAIT_MS`) y
+  después, o con más de 20 en fila, → `503`.
+- **Servido:** solo nombres con forma de hash bajo un tenantId con forma de UUID (traversal →
+  `404`); `Content-Type: image/webp` fijo, `nosniff`, `Cross-Origin-Resource-Policy:
+cross-origin` (la app nativa y el panel la cargan desde otro origen) y CSP `sandbox`.
+- **Aislamiento:** un ítem o la marca solo pueden referenciar medios subidos por la misma marca
+  (`400` si no). En la base se guarda la ruta `/api/media/…`, nunca el host.
+
+## Mi marca y app propia (`/api/staff/brand`, TASK-016)
+
+Solo el **dueño**. Contratos en `packages/shared/src/contracts/brand.ts`.
+
+| Método | Ruta                           |                                                                                                                                                      |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/staff/brand`             | branding + `warnings` de contraste + estado de la app (solo lectura)                                                                                 |
+| PATCH  | `/api/staff/brand`             | `{appDisplayName?, primaryColor?, secondaryColor?, accentColor?, logoUrl?, iconUrl?, storeShortDescription?, supportEmail?, websiteUrl?, language?}` |
+| POST   | `/api/staff/brand/app-request` | pide la app nativa: `403` sin plan Pro/Cadena (con el motivo), `409` si ya la pidió                                                                  |
+
+- **Colores** `#rrggbb` (se guardan en minúsculas). `warnings[]` (no bloquea): el texto blanco
+  sobre el color no llega a 4.5:1; trae `whiteRatio`, `blackRatio` y `recommendedTextColor`.
+- **Logo e ícono** tienen que ser medios propios. `websiteUrl` solo `https://`. `language`
+  (`es` · `en`) decide el idioma de las notificaciones push. Body estricto: `bundleId` o el
+  estado de la app → `400` (los maneja la plataforma).
+- **Solicitud:** crea la `AppConfig` con `bundleId = app.ventea.<slug sin guiones>` y `publisher`
+  por plan (Pro → `ventea`, Cadena → `client`, [ADR 0008](adr/0008-publicacion-apps-por-marca.md)),
+  estado `requested` y un `AppConfigEvent`.
+
+## Push (`/api/devices`, TASK-016)
+
+| Método | Ruta               | Quién                                                                                                                   |
+| ------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/devices`     | cliente · `{platform: android · ios · web, pushToken}` → `201 {id, platform, createdAt}`; `200` si el token ya era suyo |
+| DELETE | `/api/devices/:id` | cliente · al cerrar sesión; `404` si no es suyo; `204`                                                                  |
+
+- **Upsert por (marca, token):** si el token era de otro cliente de la marca (cambio de cuenta en
+  el mismo teléfono), pasa al actual (`201`). Al cambiar de dueño se descarta el `biometricKeyId`. Máximo 10 dispositivos por cliente (los más viejos se borran) y 30 registros por cliente y hora (`DEVICE_REGISTER_RATE_LIMIT_PER_HOUR`, `429`).
+- **Aviso de estado:** `PATCH /api/staff/orders/:id/status` a `preparing`, `ready`, `completed` o
+  `cancelled` manda un push a los dispositivos del cliente **después** de responder y sin
+  bloquear (un FCM caído no afecta el pedido). Payload FCM: `notification {title, body}`
+  (título = `appDisplayName`, texto ES/EN según `language` de la marca) y `data {type:
+"order_status", orderId, status, code}`; la app abre `/orders/:orderId`. La cancelación del
+  propio cliente no le avisa. Sin credenciales FCM de la marca → no-op con log. Los tokens que FCM
+  da por inválidos se borran del dispositivo.
+- **FCM HTTP v1** con la service account de cada marca (ver Plataforma). **No verificado contra
+  Firebase real**: los tests usan `FakePushTransport`. Cómo configurarlo:
+  [white-label.md](white-label.md#push).
+
 ## Plataforma (SaaS)
 
 Rutas sin tenant (fuera de `TenantMiddleware` y del 402). Contratos en
 `packages/shared/src/contracts/platform.ts`.
 
-| Método | Ruta                                          | Quién                                                                                                               |
-| ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/platform/plans`                         | público · planes activos (precios en centavos USD)                                                                  |
-| GET    | `/api/platform/slug-available?slug=`          | público · `{available, reason?: invalid·reserved·taken}`                                                            |
-| POST   | `/api/platform/signup`                        | público · 5 intentos por IP y hora (`429` + `Retry-After`)                                                          |
-| POST   | `/api/platform/auth/login`                    | público · `PlatformAdmin`; 20 intentos por IP y hora                                                                |
-| GET    | `/api/platform/tenants?page=&pageSize=`       | plataforma · `{items, total, page, pageSize}` (máx 100)                                                             |
-| GET    | `/api/platform/tenants/:slug`                 | plataforma · + sucursales activas y últimos 20 eventos                                                              |
-| POST   | `/api/platform/tenants/:slug/suspend`         | plataforma · `{reason?}`                                                                                            |
-| POST   | `/api/platform/tenants/:slug/reactivate`      | plataforma · abre un período desde hoy (conserva uno ya pagado); `409` con un cobro sin confirmar                   |
-| POST   | `/api/platform/tenants/:slug/change-plan`     | plataforma · `{planCode, interval?}`                                                                                |
-| POST   | `/api/platform/tenants/:slug/extend-trial`    | plataforma · `{days}` (1–90)                                                                                        |
-| POST   | `/api/platform/tenants/:slug/record-payment`  | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período; `409` con un cobro sin confirmar |
-| POST   | `/api/platform/tenants/:slug/resolve-payment` | plataforma · `{orderId, outcome: succeeded·failed, note?}`: cierra un cobro sin confirmar                           |
-| GET    | `/api/platform/billing/summary`               | plataforma · `{currency, mrrCents, byStatus, failuresLast7Days, unresolvedPayments, alertsLast7Days}`               |
-| GET    | `/api/platform/tenant-ready?slug=`            | público · `{ready}`: ¿`https://<slug>.<dominio>` ya responde con HTTPS válido? `404` si no existe; 240/IP/h         |
-| POST   | `/api/platform/analytics/event`               | público · `{event}` del embudo → `204`; sin cookies ni PII; 120/IP/h (`ANALYTICS_RATE_LIMIT_PER_HOUR`)              |
-| GET    | `/api/platform/analytics/funnel?days=`        | plataforma · `{timezone, days: [{day, counts}], totals}` (1–90 días, default 30, más nuevo primero)                 |
+| Método | Ruta                                           | Quién                                                                                                                                          |
+| ------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/platform/plans`                          | público · planes activos (precios en centavos USD)                                                                                             |
+| GET    | `/api/platform/slug-available?slug=`           | público · `{available, reason?: invalid·reserved·taken}`                                                                                       |
+| POST   | `/api/platform/signup`                         | público · 5 intentos por IP y hora (`429` + `Retry-After`)                                                                                     |
+| POST   | `/api/platform/auth/login`                     | público · `PlatformAdmin`; 20 intentos por IP y hora                                                                                           |
+| GET    | `/api/platform/tenants?page=&pageSize=`        | plataforma · `{items, total, page, pageSize}` (máx 100)                                                                                        |
+| GET    | `/api/platform/tenants/:slug`                  | plataforma · + sucursales activas y últimos 20 eventos                                                                                         |
+| POST   | `/api/platform/tenants/:slug/suspend`          | plataforma · `{reason?}`                                                                                                                       |
+| POST   | `/api/platform/tenants/:slug/reactivate`       | plataforma · abre un período desde hoy (conserva uno ya pagado); `409` con un cobro sin confirmar                                              |
+| POST   | `/api/platform/tenants/:slug/change-plan`      | plataforma · `{planCode, interval?}`                                                                                                           |
+| POST   | `/api/platform/tenants/:slug/extend-trial`     | plataforma · `{days}` (1–90)                                                                                                                   |
+| POST   | `/api/platform/tenants/:slug/record-payment`   | plataforma · `{amountCents, reference}`: pago recibido por fuera; abre un período; `409` con un cobro sin confirmar                            |
+| POST   | `/api/platform/tenants/:slug/resolve-payment`  | plataforma · `{orderId, outcome: succeeded·failed, note?}`: cierra un cobro sin confirmar                                                      |
+| GET    | `/api/platform/billing/summary`                | plataforma · `{currency, mrrCents, byStatus, failuresLast7Days, unresolvedPayments, alertsLast7Days}`                                          |
+| GET    | `/api/platform/tenant-ready?slug=`             | público · `{ready}`: ¿`https://<slug>.<dominio>` ya responde con HTTPS válido? `404` si no existe; 240/IP/h                                    |
+| POST   | `/api/platform/analytics/event`                | público · `{event}` del embudo → `204`; sin cookies ni PII; 120/IP/h (`ANALYTICS_RATE_LIMIT_PER_HOUR`)                                         |
+| GET    | `/api/platform/analytics/funnel?days=`         | plataforma · `{timezone, days: [{day, counts}], totals}` (1–90 días, default 30, más nuevo primero)                                            |
+| GET    | `/api/platform/app-requests?status=`           | plataforma · cola de apps (TASK-016): sin `status`, todo lo `requested` · `building` · `in_review`                                             |
+| GET    | `/api/platform/tenants/:slug/app`              | plataforma · `AppConfig` (o los valores por defecto, `exists: false`), `push {configured}` y últimos 20 eventos                                |
+| PATCH  | `/api/platform/tenants/:slug/app`              | plataforma · `{bundleId?, publisher?, status?, version? (X.Y.Z), buildNumber?, storeUrls? {android?, ios?}}`; `bundleId` de otra marca → `409` |
+| GET    | `/api/platform/tenants/:slug/app/build-config` | plataforma · para el generador (TASK-019): marca, branding con URLs absolutas, `AppConfig`, `apiBaseUrl`, `push {configured}`                  |
+| PUT    | `/api/platform/tenants/:slug/push-credentials` | plataforma · JSON de la service account de Firebase; se guarda cifrado; responde `{configured, projectId, updatedAt}`                          |
+| DELETE | `/api/platform/tenants/:slug/push-credentials` | plataforma · las borra                                                                                                                         |
 
 - **Registro:** `{restaurantName, slug, ownerName, ownerEmail, ownerPassword (≥ 10), planCode,
 interval, acceptedTermsVersion, country?, currency?}`. `acceptedTermsVersion` (TASK-007) es
@@ -266,6 +385,9 @@ createdAt}` de los cobros `pending`/`unknown`/`needs_review`): son los que se ci
 - **Token de plataforma:** lleva `ver` (`PlatformAdmin.tokenVersion`); resetear la clave lo sube
   y todos los tokens vivos dejan de valer.
 - **Región:** la asigna `REGIONS` por país: el del body, si no `CF-IPCountry` / `X-Country`.
+- **Credenciales push:** se guardan solo `project_id`, `client_email` y `private_key`, cifrados
+  con AES-256-GCM (`PUSH_CREDENTIALS_KEY`, el tenantId como dato asociado). Ninguna respuesta ni
+  log las incluye; sin la variable → `503`.
 - **Transiciones:** suspender desde `trialing`/`active`/`past_due`; reactivar desde
   `suspended`/`past_due`/`canceled`; extender la prueba desde `trialing`/`past_due`; cambiar de
   plan salvo `canceled`, y nunca a uno donde no quepan las sucursales activas. Fuera de eso,

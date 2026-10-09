@@ -49,6 +49,8 @@ services:
     # El apagado espera hasta 35 s la corrida de cobro en curso (BillingScheduler): sin esto,
     # Docker mata el proceso a los 10 s y el cobro en vuelo queda para conciliar a mano.
     stop_grace_period: 40s
+    # Techo de memoria (TASK-016): sharp pide RAM fuera del heap de Node.
+    mem_limit: 768m
     environment:
       NODE_ENV: production
       API_PORT: 3000
@@ -60,6 +62,16 @@ services:
       TENANT_SLUG: ${TENANT_SLUG}
       TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+      # Medios y push (TASK-016). Ver docs/deployment.md.
+      MEDIA_DIR: /data/media
+      MEDIA_QUOTA_MB: ${MEDIA_QUOTA_MB:-}
+      MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: ${MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      MEDIA_PROCESSING_CONCURRENCY: ${MEDIA_PROCESSING_CONCURRENCY:-}
+      MEDIA_PROCESSING_WAIT_MS: ${MEDIA_PROCESSING_WAIT_MS:-}
+      PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+    volumes:
+      - media:/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,5 +105,6 @@ services:
 
 volumes:
   pgdata:
+  media: # imágenes de las marcas (TASK-016): backup.sh lo respalda junto con la base
   caddy-data: # certificados TLS: perder este volumen fuerza a reemitirlos
   caddy-config:

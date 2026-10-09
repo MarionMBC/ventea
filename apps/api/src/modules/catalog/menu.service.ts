@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { PublicMenu } from '@ventea/shared';
 
+import { absoluteMediaUrl } from '@/modules/media/media-url';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
@@ -14,8 +15,15 @@ export class MenuService {
    *
    * Hoy el catálogo es único por tenant: la sucursal se valida y se devuelve, pero
    * no filtra ítems (no hay disponibilidad por sucursal en el esquema).
+   *
+   * Los ítems y categorías borrados desde el panel (`deletedAt`, TASK-016) no salen. Las fotos
+   * subidas a Ventea salen como URL absoluta con `base` (`https://host`).
    */
-  async publicMenu(tenantId: string, locationId?: string): Promise<PublicMenu> {
+  async publicMenu(
+    tenantId: string,
+    locationId: string | undefined,
+    base: string,
+  ): Promise<PublicMenu> {
     const location = await this.prisma.location.findFirst({
       where: { tenantId, isActive: true, ...(locationId ? { id: locationId } : {}) },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -26,11 +34,11 @@ export class MenuService {
     const [tenant, categories] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
       this.prisma.menuCategory.findMany({
-        where: { tenantId, isActive: true },
+        where: { tenantId, isActive: true, deletedAt: null },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
         include: {
           items: {
-            where: { tenantId },
+            where: { tenantId, deletedAt: null },
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
             include: {
               modifierGroups: {
@@ -66,7 +74,7 @@ export class MenuService {
           categoryId: item.categoryId,
           name: item.name,
           description: item.description,
-          imageUrl: item.imageUrl,
+          imageUrl: absoluteMediaUrl(item.imageUrl, base),
           basePriceCents: item.basePriceCents,
           compareAtPriceCents: item.compareAtPriceCents,
           tags: item.tags,

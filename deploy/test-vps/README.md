@@ -164,6 +164,10 @@ grep -q '^IMAGE_WEB=' .env   && sed -i 's/^IMAGE_WEB=.*/IMAGE_WEB=ventea-web:0.1
 cp src/deploy/test-vps/docker-compose.yml src/deploy/test-vps/*.sh .   # si cambiaron
 chmod +x *.sh
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > backup-$(date +%F-%H%M).sql.gz
+# Medios de las marcas (TASK-016, volumen `media`). La primera vez el volumen no existe: se salta.
+docker compose exec -T api tar -C /data/media -czf - . > media-$(date +%F-%H%M).tar.gz 2>/dev/null || true
+# PUSH_CREDENTIALS_KEY (una vez, TASK-016): 32 bytes; guardarla también fuera de la VPS.
+grep -q '^PUSH_CREDENTIALS_KEY=' .env || echo "PUSH_CREDENTIALS_KEY=$(openssl rand -base64 32)" >> .env
 docker compose up -d && ./sync-routes.sh   # sync-routes INMEDIATAMENTE después (ver abajo)
 docker compose logs migrate | tail -5     # "All migrations have been successfully applied"
 curl -fsS https://api.ventea.tech/api/health   # REGIONS mal escrito = la API no arranca (todas las marcas)

@@ -68,6 +68,10 @@ model Tenant {
   orders          Order[]
   rewardEntries   RewardLedgerEntry[]
   devices         Device[]
+  mediaAssets     MediaAsset[]
+  menuChanges     MenuChange[]
+  appConfig       AppConfig?
+  appConfigEvents AppConfigEvent[]
 
   @@map("tenants")
 }
@@ -271,14 +275,125 @@ enum PaymentAttemptStatus {
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.
 model TenantBranding {
   tenantId       String  @id
+  /// Media propia (`/api/media/<tenantId>/<hash>.webp`, TASK-016) o una URL heredada.
   logoUrl        String?
   primaryColor   String  @default("#E23B2E")
   secondaryColor String  @default("#1F1D1B")
   appDisplayName String?
+  // TASK-016 (Mi marca). Todos opcionales: las marcas existentes no cambian.
+  accentColor           String?
+  /// Ícono de la app nativa (cuadrado). Media propia.
+  iconUrl               String?
+  /// Descripción corta para la ficha de la tienda (≤ 80 caracteres).
+  storeShortDescription String?
+  supportEmail          String?
+  websiteUrl            String?
+  /// Idioma de los textos que la API genera para la marca (push): `es` | `en`.
+  language              String  @default("es")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_branding")
+}
+
+// ─── Medios, auditoría del menú y app por marca (TASK-016) ───────────────────
+
+/// Imagen subida por la marca (producto, logo, ícono). El archivo vive en el volumen
+/// `MEDIA_DIR/<tenantId>/<hash>.webp` (+ `.thumb.webp`); acá queda el registro para la cuota
+/// y para verificar que una marca solo referencia medios propios.
+model MediaAsset {
+  id        String   @id @default(uuid())
+  tenantId  String
+  /// sha256 hex del WebP normalizado: nombre del archivo y clave de deduplicación.
+  hash      String   @db.Char(64)
+  /// Bytes en disco (imagen + miniatura): cuenta para la cuota de la marca.
+  bytes     Int
+  width     Int
+  height    Int
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, hash])
+  @@map("media_assets")
+}
+
+/// Auditoría del menú: quién cambió qué y cuándo. Append-only.
+model MenuChange {
+  id       String @id @default(uuid())
+  tenantId String
+  staffId  String
+  /// `category` | `item` | `modifier_group` | `modifier_option`.
+  entity   String
+  entityId String
+  /// `create` | `update` | `delete` | `soft_delete` | `reorder` | `availability`.
+  action   String
+  /// Campos cambiados (valores nuevos). Nunca datos personales.
+  changes  Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("menu_changes")
+}
+
+/// App nativa de la marca (1:1). La crea la solicitud del dueño o la plataforma.
+model AppConfig {
+  tenantId        String       @id
+  /// Identificador en las tiendas. Único GLOBAL a propósito: es un espacio de nombres de
+  /// Apple/Google, no un dato de negocio de la marca. Solo plataforma lo edita.
+  bundleId        String       @unique
+  publisher       AppPublisher
+  status          AppStatus    @default(not_requested)
+  version         String?
+  buildNumber     Int?
+  storeUrlAndroid String?
+  storeUrlIos     String?
+  requestedAt     DateTime?
+  /// Service account de FCM cifrada (AES-256-GCM, `PUSH_CREDENTIALS_KEY`, AAD = tenantId).
+  /// Nunca sale de la API: las respuestas solo dicen `configured`.
+  pushCredentialsEnc String?
+  /// Proyecto de Firebase de esas credenciales (no es secreto; ayuda a operar).
+  pushProjectId      String?
+  pushUpdatedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("app_configs")
+}
+
+enum AppPublisher {
+  ventea
+  client
+}
+
+enum AppStatus {
+  not_requested
+  requested
+  building
+  in_review
+  published
+}
+
+/// Historial de la app de la marca (solicitud, cambios de plataforma, credenciales push).
+model AppConfigEvent {
+  id        String @id @default(uuid())
+  tenantId  String
+  /// `requested` | `updated` | `push_credentials_set` | `push_credentials_cleared`.
+  type      String
+  /// Quién: email del admin de plataforma o id del staff dueño.
+  actor     String
+  message   String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("app_config_events")
 }
 
 // ─── Sucursales ──────────────────────────────────────────────────────────────
@@ -312,6 +427,8 @@ model MenuCategory {
   name      String
   sortOrder Int     @default(0)
   isActive  Boolean @default(true)
+  /// Soft-delete (TASK-016): solo cuando conserva ítems borrados con pedidos (FK Restrict).
+  deletedAt DateTime?
 
   tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  MenuItem[]
@@ -335,6 +452,8 @@ model MenuItem {
   tags           String[] @default([])
   isAvailable    Boolean  @default(true)
   sortOrder      Int      @default(0)
+  /// Soft-delete (TASK-016): un ítem con pedidos no se borra; sale del menú y del panel.
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -462,6 +581,7 @@ model Device {
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, customerId])
+  @@index([tenantId, pushToken])
   @@map("devices")
 }
 

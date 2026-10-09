@@ -31,6 +31,9 @@ services:
     # El apagado espera hasta 35 s la corrida de cobro en curso (BillingScheduler): sin esto,
     # Docker mata el proceso a los 10 s y el cobro en vuelo queda para conciliar a mano.
     stop_grace_period: 40s
+    # Techo de memoria (TASK-016): el procesamiento de imágenes (sharp) pide RAM fuera del heap
+    # de Node; con el tope, un abuso reinicia la API en vez de tumbar la VPS compartida.
+    mem_limit: 768m
     environment:
       NODE_ENV: production
       API_PORT: 3000
@@ -52,6 +55,18 @@ services:
       MS_PAYMENTS_KEY: ${MS_PAYMENTS_KEY:-}
       MS_PAYMENTS_PROVIDER: ${MS_PAYMENTS_PROVIDER:-}
       BILLING_CYCLE_INTERVAL_MINUTES: ${BILLING_CYCLE_INTERVAL_MINUTES:-}
+      # Medios y push (TASK-016). MEDIA_DIR es el volumen `media` (entra en el respaldo).
+      # Opcionales: cuota 200 MB por marca, 60 subidas/hora por marca, base = host del request.
+      MEDIA_DIR: /data/media
+      MEDIA_QUOTA_MB: ${MEDIA_QUOTA_MB:-}
+      MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: ${MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      MEDIA_PROCESSING_CONCURRENCY: ${MEDIA_PROCESSING_CONCURRENCY:-}
+      MEDIA_PROCESSING_WAIT_MS: ${MEDIA_PROCESSING_WAIT_MS:-}
+      # 32 bytes (openssl rand -base64 32). Vacía = push apagado (no se aceptan credenciales).
+      # Perderla deja ilegibles las credenciales FCM guardadas: va al gestor de secretos.
+      PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+    volumes: [media:/data/media]
     networks: [internal, dokploy-network]
     depends_on:
       postgres: { condition: service_healthy }
@@ -71,3 +86,4 @@ networks:
   dokploy-network: { external: true }
 volumes:
   pgdata:
+  media: # imágenes de las marcas (TASK-016): respaldarlo junto con la base

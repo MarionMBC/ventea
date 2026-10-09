@@ -24,6 +24,41 @@ instancia y una base por región.
 - **Respaldos**: centralizados y copiados fuera de la VPS; ahora un disco perdido es el de
   todos los clientes.
 - **Cobro de suscripciones** (TASK-005): ver [abajo](#cobro-de-suscripciones).
+- **Medios y push** (TASK-016): volumen `media` y `PUSH_CREDENTIALS_KEY`, ver
+  [abajo](#medios-de-las-marcas).
+
+## Medios de las marcas
+
+Las imágenes que suben las marcas (fotos del menú, logo, ícono) viven en el **volumen Docker
+`media`**, montado en `/data/media` de la API (`MEDIA_DIR`). La imagen de la API crea ese
+directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los dos compose
+(`deploy/test-vps/docker-compose.yml` y `deploy/docker-compose.prod.yml`) lo declaran.
+
+| Variable                           | Default                                | Qué hace                                                                                                                                                                                                                                   |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MEDIA_DIR`                        | `/data/media` (prod) · `./media` (dev) | raíz de los archivos                                                                                                                                                                                                                       |
+| `MEDIA_QUOTA_MB`                   | `200`                                  | cuota por marca (imagen + miniatura)                                                                                                                                                                                                       |
+| `MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR` | `60`                                   | subidas por marca y hora (en memoria, por proceso)                                                                                                                                                                                         |
+| `MEDIA_PROCESSING_CONCURRENCY`     | `2`                                    | imágenes que sharp procesa a la vez por proceso; el resto espera                                                                                                                                                                           |
+| `MEDIA_PROCESSING_WAIT_MS`         | `20000`                                | espera máxima por un lugar (después, `503`; más de 20 en fila, `503` en el acto)                                                                                                                                                           |
+| `MEDIA_PUBLIC_BASE_URL`            | host del request                       | base fija de las URLs absolutas (CDN o dominio canónico). Vacía a propósito en test-vps: cada marca usa su host. Sin ella, solo se refleja un Host de `TENANT_BASE_DOMAIN` (apex o subdominio) o de `PUBLIC_ORIGIN`; otro → URLs relativas |
+| `PUSH_CREDENTIALS_KEY`             | vacía = push apagado                   | 32 bytes (`openssl rand -base64 32`) para cifrar las credenciales FCM de cada marca                                                                                                                                                        |
+
+- **Respaldo:** el volumen `media` entra en el respaldo junto con la base: `backup.sh` deja un
+  `ventea-media-<fecha>.tar.gz` al lado del `.sql.gz`. Restaurar la base sin los medios deja
+  ítems y logos apuntando a archivos que no existen.
+- **`PUSH_CREDENTIALS_KEY`** va al gestor de secretos, fuera de la VPS. Perderla deja ilegibles
+  las credenciales FCM guardadas (se vuelven a cargar marca por marca); mal formada, la API no
+  arranca. Rotarla exige volver a cargar las credenciales de todas las marcas.
+- **Memoria:** el servicio `api` corre con `mem_limit: 768m` en los dos compose. sharp decodifica
+  fuera del heap de Node (hasta 24 MP por imagen, ~100 MB); con el semáforo de 2 y el tope, un
+  abuso reinicia la API en vez de dejar sin memoria a la VPS.
+- **Proxy:** la subida es `multipart` hasta 5 MB y va directo a la API (Traefik / Caddy no limitan
+  el cuerpo por defecto). Si se pone un proxy con límite (nginx: `client_max_body_size`), dejar
+  al menos 6 MB en `/api/staff/media`.
+- **Verificación tras desplegar:** subir una imagen desde Mi marca o el menú de una marca de
+  prueba → asignarla a un ítem → `GET /api/menu` la muestra con URL absoluta → abrirla (200,
+  `image/webp`) → `GET /api/tenant` trae `logoUrl`/`iconUrl` absolutos.
 
 ## Cobro de suscripciones
 
@@ -207,7 +242,8 @@ parten en dos versiones: primero dejar de usar la columna, después borrarla.
 
 ## Respaldos
 
-[`backup.sh`](../deploy/backup.sh) hace `pg_dump` comprimido con retención de 14 días.
+[`backup.sh`](../deploy/backup.sh) hace `pg_dump` comprimido y un `tar.gz` del volumen
+`media` (imágenes de las marcas, TASK-016), con retención de 14 días.
 Por cron en el VPS:
 
 ```cron

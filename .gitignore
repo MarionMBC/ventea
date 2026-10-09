@@ -52,3 +52,6 @@ graphify-out/
 deploy/test-vps/.sync-routes.lock
 deploy/test-vps/*.tmp
 dist-ssr/
+
+# medios subidos en desarrollo (MEDIA_DIR por defecto, TASK-016)
+apps/api/media/
