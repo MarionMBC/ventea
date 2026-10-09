@@ -1,21 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- title, description, canonical, Open Graph y JSON-LD: los pone seo-plugin.ts por ruta. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- title, description, canonical, hreflang, Open Graph y JSON-LD: scripts/prerender.mjs por ruta. -->
     <!--seo-->
     <!--/seo-->
-    <meta name="theme-color" content="#0b1220" />
+    <!--preload-->
+    <meta name="theme-color" content="#06182c" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
   </head>
   <body>
-    <div id="root"></div>
-    <noscript>
-      <p style="padding: 16px; font-family: system-ui, sans-serif">
-        Ventea designs and builds software and architecture. Write to us at hola@ventea.tech.
-      </p>
-    </noscript>
+    <div id="root"><!--app--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

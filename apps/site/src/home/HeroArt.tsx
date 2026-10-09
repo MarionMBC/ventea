@@ -1,67 +1,171 @@
-/**
- * Ilustración del hero: un diagrama de arquitectura genérico (clientes → API → servicios →
- * datos). SVG propio, liviano y decorativo (`aria-hidden`); colores desde los tokens.
- */
-function Box({
-  x,
-  y,
-  w,
-  label,
-  accent = false,
-}: {
+import { useEffect, useRef } from 'react';
+
+import type { Dict } from '@/i18n';
+import { cssVars } from '@/style';
+
+interface Module {
+  id: keyof Dict['hero']['modules'];
   x: number;
   y: number;
   w: number;
-  label: string;
+  h: number;
+  /** Desde dónde llega al ensamblarse (px del viewBox). */
+  from: [number, number];
   accent?: boolean;
-}) {
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={w}
-        height={40}
-        rx={8}
-        className={accent ? 'art__box art__box--accent' : 'art__box'}
-      />
-      <text x={x + w / 2} y={y + 25} textAnchor="middle" className="art__label">
-        {label}
-      </text>
-    </g>
-  );
 }
 
-export function HeroArt() {
+/** Composición propia (TASK-009): canales arriba, núcleo al centro, datos y servicios abajo. */
+const MODULES: readonly Module[] = [
+  { id: 'web', x: 40, y: 40, w: 120, h: 44, from: [-40, -30] },
+  { id: 'mobile', x: 240, y: 40, w: 120, h: 44, from: [0, -44] },
+  { id: 'partners', x: 440, y: 40, w: 120, h: 44, from: [40, -30] },
+  { id: 'core', x: 150, y: 196, w: 300, h: 64, from: [0, 0], accent: true },
+  { id: 'ai', x: 480, y: 206, w: 100, h: 44, from: [44, 0] },
+  { id: 'data', x: 60, y: 380, w: 120, h: 44, from: [-40, 30] },
+  { id: 'events', x: 240, y: 380, w: 120, h: 44, from: [0, 44] },
+  { id: 'payments', x: 420, y: 380, w: 120, h: 44, from: [40, 30] },
+];
+
+/** Conectores ortogonales (bus superior, núcleo, bus inferior, IA). `pathLength=1` para dibujarlos. */
+const LINKS: readonly string[] = [
+  'M100 84V140H500V84',
+  'M300 84V196',
+  'M450 228H480',
+  'M300 260V320',
+  'M120 380V320H480V380',
+  'M300 320V380',
+];
+
+const NODES: readonly [number, number][] = [
+  [300, 140],
+  [300, 320],
+  [465, 228],
+];
+
+/**
+ * Hero: arquitectura modular que se ensambla (~1,2 s, solo CSS: funciona antes de hidratar) y
+ * responde al puntero con un parallax sutil de tres capas (solo puntero fino, escritorio y sin
+ * reduced-motion). El texto del hero no depende de esto: es el LCP y está en el HTML.
+ */
+export function HeroArt({ t }: { t: Dict }) {
+  const ref = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const svg = ref.current;
+    const hero = svg?.closest<HTMLElement>('.hero');
+    if (!svg || !hero || !window.matchMedia) return;
+    const query = window.matchMedia(
+      '(pointer: fine) and (min-width: 1080px) and (prefers-reduced-motion: no-preference)',
+    );
+    let frame = 0;
+    let x = 0;
+    let y = 0;
+    const apply = () => {
+      frame = 0;
+      svg.style.setProperty('--px', x.toFixed(3));
+      svg.style.setProperty('--py', y.toFixed(3));
+    };
+    const onMove = (event: PointerEvent) => {
+      if (!query.matches) return;
+      const box = hero.getBoundingClientRect();
+      x = ((event.clientX - box.left) / box.width - 0.5) * 2;
+      y = ((event.clientY - box.top) / box.height - 0.5) * 2;
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    const onLeave = () => {
+      x = 0;
+      y = 0;
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    hero.addEventListener('pointermove', onMove, { passive: true });
+    hero.addEventListener('pointerleave', onLeave, { passive: true });
+    return () => {
+      hero.removeEventListener('pointermove', onMove);
+      hero.removeEventListener('pointerleave', onLeave);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
   return (
-    <svg className="hero__art" viewBox="0 0 440 360" aria-hidden="true" focusable="false">
-      <g className="art__wires">
-        <path d="M75 70v40h145v30M220 70v70M365 70v40H220" />
-        <path d="M220 180v30M85 210h270M85 210v30M220 210v30M355 210v30" />
-        <path d="M85 280v26M220 280v26" />
-        <path d="M355 280v26" className="art__wire--dashed" />
+    <svg
+      ref={ref}
+      className="hero-art"
+      viewBox="0 0 600 464"
+      role="img"
+      aria-labelledby="hero-art-title"
+      focusable="false"
+    >
+      <title id="hero-art-title">{t.hero.artLabel}</title>
+      <defs>
+        <pattern id="hero-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M20 0H0V20" fill="none" className="hero-art__grid-line" />
+        </pattern>
+      </defs>
+      <g className="hero-art__layer hero-art__layer--back">
+        <rect
+          className="hero-art__field"
+          x="0"
+          y="0"
+          width="600"
+          height="464"
+          fill="url(#hero-grid)"
+        />
+        <path
+          className="hero-art__frame"
+          d="M8 20V8H20M580 8H592V20M592 444V456H580M20 456H8V444"
+        />
       </g>
-      <Box x={20} y={30} w={110} label="web app" />
-      <Box x={165} y={30} w={110} label="mobile app" />
-      <Box x={310} y={30} w={110} label="partners" />
-      <Box x={110} y={140} w={220} label="api · auth · tenants" accent />
-      <Box x={30} y={240} w={110} label="orders" />
-      <Box x={165} y={240} w={110} label="billing" />
-      <Box x={300} y={240} w={110} label="integrations" />
-      <g className="art__db">
-        <path d="M45 312c0-6 18-10 40-10s40 4 40 10v26c0 6-18 10-40 10s-40-4-40-10z" />
-        <path d="M45 312c0 6 18 10 40 10s40-4 40-10" className="art__line" />
+      <g className="hero-art__layer hero-art__layer--mid">
+        {LINKS.map((d, index) => (
+          <g key={d}>
+            <path
+              className="hero-art__link"
+              d={d}
+              pathLength={1}
+              style={{ animationDelay: `${420 + index * 70}ms` }}
+            />
+            <path
+              className="hero-art__flow"
+              d={d}
+              pathLength={1}
+              style={{ animationDelay: `${1600 + index * 380}ms` }}
+            />
+          </g>
+        ))}
+        {NODES.map(([cx, cy], index) => (
+          <circle
+            key={`${cx}-${cy}`}
+            className="hero-art__node"
+            cx={cx}
+            cy={cy}
+            r="4"
+            style={{ animationDelay: `${1000 + index * 80}ms` }}
+          />
+        ))}
       </g>
-      <g className="art__db">
-        <rect x={180} y={306} width={80} height={40} rx={8} />
-        <path d="M196 320h48M196 332h32" className="art__line" />
+      <g className="hero-art__layer hero-art__layer--front">
+        {MODULES.map((module, index) => (
+          <g
+            key={module.id}
+            className={`hero-art__module${module.accent ? ' hero-art__module--core' : ''}`}
+            style={{
+              animationDelay: module.accent ? '120ms' : `${300 + index * 90}ms`,
+              ...cssVars({ '--fx': `${module.from[0]}px`, '--fy': `${module.from[1]}px` }),
+            }}
+          >
+            <rect x={module.x} y={module.y} width={module.w} height={module.h} rx="3" />
+            <circle className="hero-art__tick" cx={module.x + 10} cy={module.y + 10} r="2" />
+            <text
+              x={module.x + module.w / 2}
+              y={module.y + module.h / 2}
+              dy="0.35em"
+              textAnchor="middle"
+            >
+              {t.hero.modules[module.id]}
+            </text>
+          </g>
+        ))}
       </g>
-      <g className="art__db art__db--muted">
-        <rect x={315} y={306} width={80} height={40} rx={8} />
-        <path d="M340 326l10 8 18-16" className="art__line" />
-      </g>
-      <circle cx={220} cy={140} r={4} className="art__dot" />
-      <circle cx={220} cy={210} r={4} className="art__dot" />
     </svg>
   );
 }

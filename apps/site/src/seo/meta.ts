@@ -1,69 +1,54 @@
 import { config } from '../config';
-import { SERVICES } from '../content';
+import { dict, LOCALES, type Dict, type Locale } from '../i18n';
+import { alternatePath, PATHS, ROUTES, type Route } from '../routes';
 
 /**
- * Metadatos por ruta, JSON-LD, sitemap y robots del sitio corporativo. Lo usa el cliente (título
- * al navegar) y el plugin del build (`seo-plugin.ts`), que escribe un `index.html` por ruta con su
- * `<head>` completo (los buscadores y las vistas previas de enlaces no ejecutan JS), más
- * `404.html`.
+ * `<head>` por ruta e idioma, JSON-LD, sitemap y robots (TASK-009). Lo usan el cliente (título al
+ * navegar), el prerender del build (`scripts/prerender.mjs`, un `index.html` por ruta con su
+ * `<head>` y el HTML ya renderizado) y el plugin de Vite (head de `/` en desarrollo).
  */
-
-export type RoutePath = '/' | '/privacy' | '/404';
-
-export interface RouteMeta {
-  path: RoutePath;
-  title: string;
-  description: string;
-  /** Prioridad en el sitemap; `null` = fuera del sitemap y `noindex`. */
-  priority: number | null;
-}
-
-export const ROUTES: readonly RouteMeta[] = [
-  {
-    path: '/',
-    title: 'Ventea · Software development and architecture',
-    description:
-      'We design and build software your business can run and scale: custom web apps, mobile apps, SaaS platforms, integrations and cloud architecture.',
-    priority: 1,
-  },
-  {
-    path: '/privacy',
-    title: 'Privacy notice · Ventea',
-    description:
-      'This site does not use cookies or third-party analytics. The contact form only opens your email app with a pre-filled message.',
-    priority: 0.3,
-  },
-  {
-    path: '/404',
-    title: 'Page not found · Ventea',
-    description:
-      'The page you are looking for does not exist. Go back to Ventea, software development and architecture.',
-    priority: null,
-  },
-];
 
 export const OG_IMAGE = { path: '/og.png', width: 1200, height: 630 } as const;
-/** Logo PNG para el JSON-LD (Google no acepta SVG): lo rasteriza el build desde el favicon. */
+/** Logo PNG para el JSON-LD (Google no acepta SVG): lo rasteriza el build desde el isotipo. */
 export const LOGO_IMAGE = { path: '/logo.png', size: 512 } as const;
-export const OG_IMAGE_ALT = 'Ventea: we design and build software your business can run and scale.';
 
-/** Metadatos de una ruta; cualquier ruta desconocida es la 404. */
-export function routeMeta(pathname: string): RouteMeta {
-  const clean = pathname.replace(/\/+$/, '').replace(/\/index\.html$/, '') || '/';
-  return ROUTES.find((route) => route.path === clean) ?? ROUTES.find((r) => r.path === '/404')!;
+export function pageMeta(route: Route): { title: string; description: string } {
+  return dict(route.locale).meta[route.page];
 }
 
-export function canonicalUrl(route: RouteMeta): string {
-  return route.path === '/' ? `${config.siteUrl}/` : `${config.siteUrl}${route.path}`;
+export function isIndexable(route: Route): boolean {
+  return route.page !== 'notFound';
+}
+
+export function absoluteUrl(path: string): string {
+  return `${config.siteUrl}${path}`;
+}
+
+/** URL canónica; la 404 no tiene (su `og:url` es la home de su idioma). */
+export function canonicalUrl(route: Route): string {
+  return absoluteUrl(isIndexable(route) ? route.path : PATHS.home[route.locale]);
+}
+
+/** `hreflang` de la ruta: es, en y x-default (= español, el idioma de la raíz). */
+export function alternates(route: Route): { hreflang: string; href: string }[] {
+  return [
+    ...LOCALES.map((locale) => ({
+      hreflang: locale,
+      href: absoluteUrl(alternatePath(route, locale)),
+    })),
+    { hreflang: 'x-default', href: absoluteUrl(alternatePath(route, 'es')) },
+  ];
 }
 
 /**
- * `Organization` (con un `Offer` por servicio) + `ProfessionalService` en un `@graph`. Sin
- * dirección física, teléfono, área atendida, reseñas ni ratings: nada de eso está confirmado.
+ * `Organization` + `WebSite` + `ProfessionalService` + un `Service` por servicio. Solo datos
+ * confirmados: sin dirección, teléfono, `areaServed`, idiomas atendidos, reseñas ni ratings.
  */
-export function organizationJsonLd() {
-  const url = `${config.siteUrl}/`;
-  const orgId = `${url}#organization`;
+export function organizationJsonLd(locale: Locale) {
+  const t: Dict = dict(locale);
+  const home = absoluteUrl(PATHS.home[locale]);
+  const orgId = `${config.siteUrl}/#organization`;
+  const serviceId = `${home}#service`;
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -71,25 +56,37 @@ export function organizationJsonLd() {
         '@type': 'Organization',
         '@id': orgId,
         name: config.companyName,
-        url,
-        logo: `${config.siteUrl}${LOGO_IMAGE.path}`,
+        url: `${config.siteUrl}/`,
+        logo: absoluteUrl(LOGO_IMAGE.path),
         email: config.contactEmail,
-        makesOffer: SERVICES.map((service) => ({
-          '@type': 'Offer',
-          itemOffered: { '@type': 'Service', name: service.title, description: service.summary },
-        })),
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${home}#website`,
+        url: home,
+        name: config.companyName,
+        inLanguage: locale,
+        publisher: { '@id': orgId },
       },
       {
         '@type': 'ProfessionalService',
-        '@id': `${url}#service`,
-        name: `${config.companyName} — software development and architecture`,
-        url,
+        '@id': serviceId,
+        name: t.meta.serviceName,
+        url: home,
         email: config.contactEmail,
-        image: `${config.siteUrl}${OG_IMAGE.path}`,
-        description: ROUTES[0]!.description,
+        image: absoluteUrl(OG_IMAGE.path),
+        description: t.meta.home.description,
         parentOrganization: { '@id': orgId },
-        knowsAbout: SERVICES.map((service) => service.title),
+        knowsAbout: t.services.items.map((service) => service.title),
       },
+      ...t.services.items.map((service) => ({
+        '@type': 'Service',
+        '@id': `${home}#service-${service.id}`,
+        name: service.title,
+        description: service.summary,
+        serviceType: service.title,
+        provider: { '@id': serviceId },
+      })),
     ],
   };
 }
@@ -110,57 +107,80 @@ function jsonForScript(value: unknown): string {
 export const SEO_START = '<!--seo-->';
 export const SEO_END = '<!--/seo-->';
 
-/** Bloque `<head>` de una ruta (title, description, canonical, Open Graph, Twitter, JSON-LD). */
-export function headHtml(route: RouteMeta): string {
+/** Bloque `<head>` de una ruta. */
+export function headHtml(route: Route): string {
+  const t = dict(route.locale);
+  const meta = pageMeta(route);
   const url = canonicalUrl(route);
-  const image = `${config.siteUrl}${OG_IMAGE.path}`;
+  const image = absoluteUrl(OG_IMAGE.path);
+  const other = LOCALES.find((locale) => locale !== route.locale)!;
   const lines = [
-    `<title>${escapeAttr(route.title)}</title>`,
-    `<meta name="description" content="${escapeAttr(route.description)}" />`,
+    `<title>${escapeAttr(meta.title)}</title>`,
+    `<meta name="description" content="${escapeAttr(meta.description)}" />`,
   ];
-  if (route.priority === null) {
-    lines.push(`<meta name="robots" content="noindex" />`);
-  } else {
+  if (isIndexable(route)) {
     lines.push(`<link rel="canonical" href="${url}" />`);
+    for (const alt of alternates(route)) {
+      lines.push(`<link rel="alternate" hreflang="${alt.hreflang}" href="${alt.href}" />`);
+    }
+  } else {
+    lines.push(`<meta name="robots" content="noindex" />`);
   }
   lines.push(
     `<meta property="og:type" content="website" />`,
     `<meta property="og:site_name" content="${config.companyName}" />`,
-    `<meta property="og:locale" content="en_US" />`,
-    // La 404 no tiene URL propia: su og:url es la portada.
-    `<meta property="og:url" content="${route.priority === null ? `${config.siteUrl}/` : url}" />`,
-    `<meta property="og:title" content="${escapeAttr(route.title)}" />`,
-    `<meta property="og:description" content="${escapeAttr(route.description)}" />`,
+    `<meta property="og:locale" content="${t.ogLocale}" />`,
+    `<meta property="og:locale:alternate" content="${dict(other).ogLocale}" />`,
+    `<meta property="og:url" content="${url}" />`,
+    `<meta property="og:title" content="${escapeAttr(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeAttr(meta.description)}" />`,
     `<meta property="og:image" content="${image}" />`,
     `<meta property="og:image:width" content="${OG_IMAGE.width}" />`,
     `<meta property="og:image:height" content="${OG_IMAGE.height}" />`,
-    `<meta property="og:image:alt" content="${escapeAttr(OG_IMAGE_ALT)}" />`,
+    `<meta property="og:image:alt" content="${escapeAttr(t.meta.ogImageAlt)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeAttr(meta.title)}" />`,
+    `<meta name="twitter:description" content="${escapeAttr(meta.description)}" />`,
+    `<meta name="twitter:image" content="${image}" />`,
+    `<meta name="twitter:image:alt" content="${escapeAttr(t.meta.ogImageAlt)}" />`,
   );
-  if (route.path === '/') {
+  if (route.page === 'home') {
     lines.push(
-      `<script type="application/ld+json">${jsonForScript(organizationJsonLd())}</script>`,
+      `<script type="application/ld+json">${jsonForScript(organizationJsonLd(route.locale))}</script>`,
     );
   }
   return [SEO_START, ...lines, SEO_END].join('\n    ');
 }
 
-/** Reemplaza el bloque SEO de un HTML ya construido por el de otra ruta. */
-export function withRouteHead(html: string, route: RouteMeta): string {
+/** Reemplaza el bloque SEO y el `lang` de un HTML ya construido por los de otra ruta. */
+export function withRouteHead(html: string, route: Route): string {
   const start = html.indexOf(SEO_START);
   const end = html.indexOf(SEO_END);
   if (start < 0 || end < start) throw new Error('index.html sin bloque <!--seo-->');
-  return html.slice(0, start) + headHtml(route) + html.slice(end + SEO_END.length);
+  const out = html.slice(0, start) + headHtml(route) + html.slice(end + SEO_END.length);
+  return out.replace(/<html lang="[^"]*"/, `<html lang="${route.locale}"`);
 }
 
-export function sitemapXml(lastmod: string): string {
-  const urls = ROUTES.filter((route) => route.priority !== null)
-    .map(
-      (route) =>
-        `  <url>\n    <loc>${canonicalUrl(route)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <priority>${route.priority!.toFixed(1)}</priority>\n  </url>`,
-    )
+/**
+ * Fecha del último cambio de contenido del sitio (`lastmod` del sitemap). Se actualiza a mano al
+ * cambiar textos o páginas: no es la fecha del build, que cambiaría en cada deploy sin cambios.
+ */
+export const CONTENT_UPDATED = '2026-10-08';
+
+export function sitemapXml(lastmod: string = CONTENT_UPDATED): string {
+  const urls = ROUTES.filter(isIndexable)
+    .map((route) => {
+      const links = alternates(route)
+        .map(
+          (alt) =>
+            `    <xhtml:link rel="alternate" hreflang="${alt.hreflang}" href="${alt.href}" />`,
+        )
+        .join('\n');
+      const priority = route.page === 'home' ? '1.0' : '0.3';
+      return `  <url>\n    <loc>${canonicalUrl(route)}</loc>\n${links}\n    <lastmod>${lastmod}</lastmod>\n    <priority>${priority}</priority>\n  </url>`;
+    })
     .join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
 }
 
 export function robotsTxt(): string {
