@@ -29,4 +29,15 @@ fi
 
 echo "OK: $target ($(du -h "$target" | cut -f1))"
 
+# Medios de las marcas (TASK-016): el volumen `media` de la API. Sin esto, restaurar la base
+# deja ítems y logos apuntando a imágenes que no existen.
+media="$BACKUP_DIR/ventea-media-$stamp.tar.gz"
+docker compose -f "$COMPOSE_FILE" exec -T api tar -C /data/media -czf - . > "$media"
+if [ ! -s "$media" ]; then
+  echo "ERROR: respaldo de medios vacío: $media" >&2
+  exit 1
+fi
+echo "OK: $media ($(du -h "$media" | cut -f1))"
+
 find "$BACKUP_DIR" -name 'ventea-*.sql.gz' -mtime "+$RETENTION_DAYS" -delete
+find "$BACKUP_DIR" -name 'ventea-media-*.tar.gz' -mtime "+$RETENTION_DAYS" -delete
