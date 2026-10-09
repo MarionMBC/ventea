@@ -1,39 +1,40 @@
 import { useEffect } from 'react';
 
+import { Footer } from './components/Footer';
+import { Header } from './components/Header';
 import { HomePage } from './home/HomePage';
-import { SiteFooter, SiteHeader } from './home/SiteChrome';
+import { dict } from './i18n';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
-import { canonicalUrl, routeMeta } from './seo/meta';
+import { resolveRoute } from './routes';
+import { pageMeta } from './seo/meta';
 
 /**
- * Vistas sin router: `/`, `/privacy` y todo lo demás la 404. nginx sirve el `index.html` de cada
- * ruta (con su `<head>` del build) y `404.html` para lo que no existe.
+ * Vistas sin router: home y privacidad por idioma, y la 404 de cada idioma. El build prerenderiza
+ * cada ruta en su `index.html` (con su `<head>`); el cliente hidrata ese HTML.
  */
-export function App({ path = window.location.pathname }: { path?: string }) {
-  const route = routeMeta(path);
+export function App({ path }: { path: string }) {
+  const route = resolveRoute(path);
+  const t = dict(route.locale);
 
   useEffect(() => {
-    document.title = route.title;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', route.description);
-    if (route.priority !== null) {
-      document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl(route));
-    }
+    document.documentElement.lang = route.locale;
+    document.title = pageMeta(route).title;
   }, [route]);
 
   return (
     <>
-      <SiteHeader />
+      <Header route={route} />
       <main id="main" tabIndex={-1}>
-        {route.path === '/' ? (
-          <HomePage />
-        ) : route.path === '/privacy' ? (
-          <PrivacyPage />
+        {route.page === 'home' ? (
+          <HomePage t={t} />
+        ) : route.page === 'privacy' ? (
+          <PrivacyPage t={t} />
         ) : (
-          <NotFoundPage />
+          <NotFoundPage t={t} />
         )}
       </main>
-      <SiteFooter />
+      <Footer route={route} />
     </>
   );
 }
