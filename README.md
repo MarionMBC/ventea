@@ -27,7 +27,9 @@ apps/
   mobile/    Ionic React + Capacitor — app de cliente (iOS, Android, web)
   admin/     React + Vite — panel de gestión del tenant (desktop; /admin/facturacion para el
              dueño) y, en /admin/plataforma, el panel de la plataforma (marcas, cobros)
-  landing/   React + Vite — app.ventea.tech (el apex redirige): landing, registro y legales
+  landing/   React + Vite — app.ventea.tech: landing del SaaS de restaurantes, registro y legales
+  site/      React + Vite — ventea.tech (www redirige): sitio corporativo en inglés (software y
+             arquitectura), estático, contacto por mailto a hola@ventea.tech
 packages/
   shared/         contratos zod + vocabulario de dominio, compartidos por los tres
   tsconfig/       configuraciones base de TypeScript
@@ -45,7 +47,7 @@ npm install
 npm run db:up                 # PostgreSQL en Docker
 npm run db:migrate            # crea el esquema
 npm run db:seed               # 2 tenants de prueba (ver nota abajo)
-npm run dev                   # api :3000 · mobile :5173 · admin :5174 · landing :5175
+npm run dev                   # api :3000 · mobile :5173 · admin :5174 · landing :5175 · site :5176
 ```
 
 Landing y registro: `http://localhost:5175` (y `/registro`); el panel de plataforma:

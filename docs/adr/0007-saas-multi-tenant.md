@@ -102,6 +102,15 @@ La landing, el registro, las páginas legales y el panel de plataforma se sirven
 apex queda libre para un sitio institucional futuro sin mover el producto. Detalle en
 `deploy/nginx.conf` y `deploy/test-vps/README.md`.
 
+## Nota (TASK-008, 2026-10-08): el apex pasa a ser el sitio corporativo
+
+`https://ventea.tech` sirve el sitio de la empresa (servicios de software y arquitectura,
+`apps/site`, en inglés); `www` → `301` al apex. El producto no se mueve: sigue en `app.`. Las
+rutas del SaaS que vivieron en el apex (`/registro`, `/terminos`, `/privacidad`, `/precios`,
+`/admin*`, `/plataforma`) responden `301` a su ruta canónica en `app.` con la query, para no
+romper links ya compartidos. El apex no enruta `/api` a la API (el sitio no la usa): nginx
+responde `308` a `app.` para clientes viejos.
+
 ## Decisión (TASK-007, 2026-10-08): `past_due` atiende durante la gracia
 
 Decisión de producto: una marca cuyo período pagado venció sin pago (`past_due`) **sigue
