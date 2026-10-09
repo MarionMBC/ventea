@@ -1,3 +1,5 @@
+import { useT } from '@/i18n';
+
 import { DEMO_RESTAURANT, DishPhoto } from './food';
 
 /**
@@ -5,19 +7,16 @@ import { DEMO_RESTAURANT, DishPhoto } from './food';
  * terceros sobran: sirven para que lo descubran; el canal propio es para los que vuelven.
  */
 export function OwnBrand() {
+  const o = useT().ownBrand;
   return (
     <section className="section own" id="beneficio" aria-labelledby="own-title">
       <div className="container own__inner">
         <header className="own__head" data-reveal>
-          <p className="eyebrow">Identidad propia</p>
+          <p className="eyebrow">{o.eyebrow}</p>
           <h2 className="display own__title" id="own-title">
-            Su marca merece algo más que aparecer en una app de terceros.
+            {o.title}
           </h2>
-          <p className="section__lead">
-            Las apps de terceros pueden ayudarle a que clientes nuevos lo descubran. Ventea es el
-            canal para quienes ya lo conocen: un menú y un pedido con su nombre, su propia dirección
-            en ventea.tech y su propio programa de puntos.
-          </p>
+          <p className="section__lead">{o.lead}</p>
         </header>
 
         <div className="own__compare">
@@ -30,15 +29,15 @@ export function OwnBrand() {
               ))}
             </div>
             <figcaption>
-              <strong>En una app de terceros</strong>
-              Su restaurante es una opción más en una lista, con la marca de la app.
+              <strong>{o.crowdTitle}</strong>
+              {o.crowdText}
             </figcaption>
           </figure>
 
           <figure className="own__panel own__panel--own" data-reveal>
             <div className="ownapp" aria-hidden="true">
               <div className="ownapp__url">
-                <span className="ownapp__lock" /> App de {DEMO_RESTAURANT.name}
+                <span className="ownapp__lock" /> {o.ownUrl(DEMO_RESTAURANT.name)}
               </div>
               <div className="ownapp__hero">
                 <DishPhoto dish="chicken" sizes="(min-width: 768px) 280px, 70vw" />
@@ -48,14 +47,14 @@ export function OwnBrand() {
                 </span>
               </div>
               <div className="ownapp__row">
-                <span>Menú</span>
-                <span>Mis pedidos</span>
-                <span className="is-on">★ Mis puntos</span>
+                <span>{o.ownTabs[0]}</span>
+                <span>{o.ownTabs[1]}</span>
+                <span className="is-on">{o.ownTabs[2]}</span>
               </div>
             </div>
             <figcaption>
-              <strong>En su canal propio</strong>
-              Su nombre, sus fotos y sus colores de principio a fin. El cliente le pide a usted.
+              <strong>{o.ownTitle}</strong>
+              {o.ownText}
             </figcaption>
           </figure>
         </div>

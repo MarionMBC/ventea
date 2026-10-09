@@ -32,6 +32,14 @@ export function LegalLayout({
       <main className="legal" id="contenido">
         <div className="container container--narrow">
           <header className="legal__head">
+            {/* Las legales existen solo en español (TASK-012): aviso para quien llega del sitio en
+                inglés. No es parte del texto legal. */}
+            <p className="legal__lang-note" lang="en">
+              This document is available in Spanish only.{' '}
+              <a href="/" hrefLang="en">
+                Back to the English site
+              </a>
+            </p>
             <p className="eyebrow">Legal</p>
             <h1 className="legal__title">{title}</h1>
             <p className="legal__updated">Última actualización: {LEGAL_UPDATED_LABEL}</p>

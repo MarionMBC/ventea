@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs as render } from '@/test/render';
 
 import { LandingPage } from './LandingPage';
 
@@ -9,7 +10,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Landing (AC1)', () => {
+describe('Landing en español (AC1)', () => {
   it('muestra los precios de la API, ordenados, con Pro destacado', async () => {
     const fetchMock = mockFetch(() => json(PLANS));
     render(<LandingPage />);
@@ -70,7 +71,8 @@ describe('Landing (AC1)', () => {
     const h1 = screen.getAllByRole('heading', { level: 1 });
     expect(h1).toHaveLength(1);
     expect(text(h1[0])).toBe('Su restaurante. Su propia app. Sus propios clientes.');
-    expect(container.textContent).not.toMatch(/uber|pedidosya|rappi|glovo|didi|hugo/i);
+    // Con límites de palabra: `textContent` pega los textos («privacidadIdioma» contiene «didi»).
+    expect(container.textContent).not.toMatch(/\b(uber|pedidosya|rappi|glovo|didi|hugo)\b/i);
   });
 
   it('no promete lo que el producto no hace: delivery, pago en línea ni cifras inventadas', async () => {

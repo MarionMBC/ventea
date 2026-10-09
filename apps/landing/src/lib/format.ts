@@ -1,9 +1,12 @@
 import type { BillingInterval } from '@ventea/shared';
 
-/** Precio en dólares sin decimales si es entero: `$25`, `$20.83`. */
-export function formatUsd(cents: number): string {
+/**
+ * Precio en dólares sin decimales si es entero: `$25`, `$20.83`. `locale` es el de `Intl`
+ * (`en-US` o `es-HN`; los dos agrupan con coma y usan punto decimal).
+ */
+export function formatUsd(cents: number, locale = 'en-US'): string {
   const amount = cents / 100;
-  const formatted = new Intl.NumberFormat('en-US', {
+  const formatted = new Intl.NumberFormat(locale, {
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(amount);
@@ -65,16 +68,9 @@ export function passwordStrength(password: string): PasswordStrength {
   return Math.min(score, 4) as PasswordStrength;
 }
 
-export const STRENGTH_LABEL: Record<PasswordStrength, string> = {
-  0: 'Muy corta',
-  1: 'Aceptable',
-  2: 'Buena',
-  3: 'Fuerte',
-  4: 'Muy fuerte',
-};
-
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-HN', {
+/** Fecha larga: «22 de octubre de 2026» (`es-HN`) u «October 22, 2026» (`en-US`). */
+export function formatDate(date: Date, locale = 'es-HN'): string {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

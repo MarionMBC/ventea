@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { TRIAL_DAYS } from '@/config';
+import { signupHref, useLocale, useT } from '@/i18n';
 
 import { DEMO_EARNED, DEMO_RESTAURANT, DEMO_TOTAL, DishPhoto, lempiras } from './food';
 import { useReducedMotion, useSequence } from './motion';
@@ -11,17 +12,19 @@ import { Phone, type PhoneScreen } from './Phone';
  * restaurante y suma puntos. Cinco pasos que avanzan solos (pausables; con movimiento reducido
  * quedan quietos y se avanzan a mano). Los CTA no se mueven nunca.
  */
-const STEPS: { screen: PhoneScreen; added: boolean; label: string }[] = [
-  { screen: 'menu', added: false, label: 'Menú' },
-  { screen: 'menu', added: true, label: 'Agregar' },
-  { screen: 'cart', added: true, label: 'Confirmar' },
-  { screen: 'confirmed', added: true, label: 'En la cocina' },
-  { screen: 'points', added: true, label: 'Puntos' },
+const STEPS: { screen: PhoneScreen; added: boolean }[] = [
+  { screen: 'menu', added: false },
+  { screen: 'menu', added: true },
+  { screen: 'cart', added: true },
+  { screen: 'confirmed', added: true },
+  { screen: 'points', added: true },
 ];
 
 const STEP_MS = 2600;
 
 export function Hero() {
+  const t = useT();
+  const locale = useLocale();
   const reduced = useReducedMotion();
   const [paused, setPaused] = useState(false);
   const playing = !reduced && !paused;
@@ -33,39 +36,31 @@ export function Hero() {
       <div className="hero__glow" aria-hidden="true" />
       <div className="container hero__inner">
         <div className="hero__copy">
-          <p className="eyebrow eyebrow--on-dark hero__eyebrow">
-            La plataforma digital para su restaurante
-          </p>
+          <p className="eyebrow eyebrow--on-dark hero__eyebrow">{t.hero.eyebrow}</p>
           <h1 className="hero__title" id="hero-title">
             <span className="hero__line">
-              <span>Su restaurante.</span>
+              <span>{t.hero.titleLines[0]}</span>
             </span>{' '}
             <span className="hero__line">
-              <span>Su propia app.</span>
+              <span>{t.hero.titleLines[1]}</span>
             </span>{' '}
             <span className="hero__line hero__line--accent">
-              <span>Sus propios clientes.</span>
+              <span>{t.hero.titleLines[2]}</span>
             </span>
           </h1>
-          <p className="hero__lead">
-            Reciba pedidos directos, recompense a sus clientes con puntos y fortalezca su marca
-            desde una experiencia digital propia.
-          </p>
+          <p className="hero__lead">{t.hero.lead}</p>
           <p className="hero__fee">
-            <strong>0% de comisión por pedido.</strong> Paga una tarifa fija mensual o anual, venda
-            lo que venda.
+            <strong>{t.hero.feeStrong}</strong> {t.hero.feeRest}
           </p>
           <div className="hero__actions">
-            <a className="btn btn--sun btn--lg" href="/registro">
-              Registrar mi restaurante
+            <a className="btn btn--sun btn--lg" href={signupHref(locale)}>
+              {t.hero.primaryCta}
             </a>
             <a className="btn btn--ghost btn--lg" href="#como-funciona">
-              Ver cómo funciona
+              {t.hero.secondaryCta}
             </a>
           </div>
-          <p className="hero__fine">
-            {TRIAL_DAYS} días de prueba gratis · Sin tarjeta · Sin permanencia
-          </p>
+          <p className="hero__fine">{t.hero.fine(TRIAL_DAYS)}</p>
         </div>
 
         <div className="hero__stage" data-step={step}>
@@ -80,21 +75,23 @@ export function Hero() {
 
           <div className="hero__ticket" aria-hidden="true">
             <p className="hero__ticket-head">
-              <span className="dot" /> Pedido nuevo · #{DEMO_RESTAURANT.orderNumber}
+              <span className="dot" /> {t.hero.ticketNew} · #{DEMO_RESTAURANT.orderNumber}
             </p>
-            <p>Para llevar · {lempiras(DEMO_TOTAL)}</p>
+            <p>
+              {t.hero.ticketTakeout} · {lempiras(DEMO_TOTAL)}
+            </p>
             <p className="hero__ticket-fee">
-              Comisión Ventea <strong>L 0.00</strong>
+              {t.hero.ticketFee} <strong>{lempiras(0)}</strong>
             </p>
           </div>
           <div className="hero__points" aria-hidden="true">
-            <span>★</span> +{DEMO_EARNED} puntos
+            <span>★</span> {t.hero.pointsBadge(DEMO_EARNED)}
           </div>
 
           <div className="hero__controls">
-            <ol className="hero__steps" aria-label="Pasos de la demostración">
-              {STEPS.map((s, index) => (
-                <li key={s.label}>
+            <ol className="hero__steps" aria-label={t.hero.stepsLabel}>
+              {STEPS.map((_s, index) => (
+                <li key={index}>
                   <button
                     type="button"
                     className="hero__step"
@@ -104,8 +101,8 @@ export function Hero() {
                       setPaused(true);
                     }}
                   >
-                    <span className="sr-only">Paso {index + 1}: </span>
-                    {s.label}
+                    <span className="sr-only">{t.hero.stepPrefix(index + 1)}</span>
+                    {t.hero.steps[index]}
                   </button>
                 </li>
               ))}
@@ -117,12 +114,12 @@ export function Hero() {
                 aria-pressed={paused}
                 onClick={() => setPaused((p) => !p)}
               >
-                {paused ? 'Reproducir' : 'Pausar'}
-                <span className="sr-only"> la demostración</span>
+                {paused ? t.hero.play : t.hero.pause}
+                <span className="sr-only">{t.hero.controlSuffix}</span>
               </button>
             )}
           </div>
-          <p className="hero__disclaimer">Demostración con un restaurante de ejemplo.</p>
+          <p className="hero__disclaimer">{t.hero.disclaimer}</p>
         </div>
       </div>
     </section>

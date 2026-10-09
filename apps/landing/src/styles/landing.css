@@ -227,6 +227,70 @@
   }
 }
 
+/* Cambio de idioma (TASK-012): «ES»/«EN» en la barra; en móvil va dentro del menú. */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.lang-switch:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.topbar--landing .topbar__lang {
+  display: none;
+  color: var(--on-ink-muted);
+  border: 1px solid rgb(255 255 255 / 0.24);
+  min-height: 36px;
+  min-width: 40px;
+}
+
+.topbar--landing .topbar__lang:hover {
+  color: var(--on-ink);
+}
+
+.topbar--landing.is-light .topbar__lang {
+  color: var(--text-muted);
+  border-color: var(--line);
+}
+
+.topbar--landing.is-light .topbar__lang:hover {
+  color: var(--text);
+}
+
+.topbar__lang-item .lang-switch {
+  justify-content: flex-start;
+  letter-spacing: 0;
+}
+
+.topbar__plain-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .topbar--landing .topbar__lang {
+    display: inline-flex;
+  }
+
+  .topbar__lang-item {
+    display: none;
+  }
+}
+
 /* ── Piezas comunes de sección ───────────────────────────────────────── */
 .section {
   padding: 88px 0;
@@ -2773,6 +2837,17 @@
   color: var(--on-ink);
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.footer__stack {
+  display: grid;
+  gap: 2rem;
+  align-content: start;
+}
+
+.footer__links a[aria-current='page'] {
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .footer__legal {

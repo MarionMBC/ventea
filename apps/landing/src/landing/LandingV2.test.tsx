@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CONTACT_EMAIL, DEMO_URL } from '@/config';
 import { beaconEvents, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs as render } from '@/test/render';
 import { PanelAccess } from '@/site/PanelAccess';
 import { WhatsAppButton } from '@/site/WhatsAppButton';
 
