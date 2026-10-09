@@ -9,6 +9,8 @@ import './styles/shell.css';
 import './styles/orders.css';
 import './styles/pages.css';
 import './styles/platform.css';
+import './styles/menu.css';
+import './styles/brand.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root in index.html');

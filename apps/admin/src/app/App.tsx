@@ -4,10 +4,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { LoginPage } from '@/features/auth/LoginPage';
 import { BillingPage } from '@/features/billing/BillingPage';
+import { BrandPage } from '@/features/brand/BrandPage';
+import { MenuPage } from '@/features/menu/MenuPage';
 import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
 import { OrdersHistory } from '@/features/orders/OrdersHistory';
 import { OrdersSection } from '@/features/orders/OrdersSection';
+import { AppRequests } from '@/features/platform/AppRequests';
 import { isPlatformHost, isPlatformPath, PlatformElsewhere } from '@/features/platform/host';
 import { PlatformLayout } from '@/features/platform/PlatformLayout';
 import { PlatformLogin } from '@/features/platform/PlatformLogin';
@@ -17,6 +20,7 @@ import {
   type PlatformServices,
 } from '@/features/platform/services';
 import { Funnel } from '@/features/platform/Funnel';
+import { TenantApp } from '@/features/platform/TenantApp';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
 import { I18nProvider } from '@/i18n';
@@ -104,6 +108,8 @@ export function App({
                       <Route path="/plataforma" element={<PlatformLayout />}>
                         <Route index element={<TenantList />} />
                         <Route path="marcas/:slug" element={<TenantDetail />} />
+                        <Route path="marcas/:slug/app" element={<TenantApp />} />
+                        <Route path="apps" element={<AppRequests />} />
                         <Route path="embudo" element={<Funnel />} />
                         <Route path="*" element={<Navigate to="/plataforma" replace />} />
                       </Route>
@@ -118,8 +124,9 @@ export function App({
                         <Route index element={<OrdersBoard />} />
                         <Route path="history" element={<OrdersHistory />} />
                       </Route>
-                      {/* TODO: features/menu, locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
-                      <Route path="/menu" element={<Placeholder title="nav.menu" />} />
+                      <Route path="/menu" element={<MenuPage />} />
+                      <Route path="/brand" element={<BrandPage />} />
+                      {/* TODO: locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
                       <Route path="/locations" element={<Placeholder title="nav.locations" />} />
                       <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
                       <Route path="/staff" element={<Placeholder title="nav.staff" />} />
