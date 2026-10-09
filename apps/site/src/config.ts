@@ -1,6 +1,6 @@
 /**
- * Datos fijos del sitio corporativo. Los importa también el plugin de SEO del build
- * (`seo-plugin.ts`, en Node): nada de `import.meta.env` acá.
+ * Datos fijos del sitio corporativo. Los importa también el prerender del build (Node): nada de
+ * `import.meta.env` acá.
  */
 export const config = {
   companyName: 'Ventea',
@@ -8,13 +8,12 @@ export const config = {
   siteUrl: 'https://ventea.tech',
   /** Destino del formulario de contacto (`mailto:`). */
   contactEmail: 'hola@ventea.tech',
-  /**
-   * WhatsApp en formato internacional, solo dígitos (p. ej. `50499998888`). Vacío = el link de
-   * WhatsApp no se muestra.
-   */
-  whatsapp: '',
-  /** Producto propio: Ventea for restaurants (landing del SaaS, en español). */
-  productUrl: 'https://app.ventea.tech',
+  /** Producto propio: Ventea para restaurantes (SaaS, en español). */
+  restaurantsUrl: 'https://app.ventea.tech',
+  restaurantsPrivacyUrl: 'https://app.ventea.tech/privacidad',
+  /** Producto propio: Ventea Marketing (en español). */
+  marketingUrl: 'https://marketing.ventea.tech',
+  marketingPricingUrl: 'https://marketing.ventea.tech/precios',
 } as const;
 
 export type SiteConfig = typeof config;
