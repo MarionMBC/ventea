@@ -72,6 +72,8 @@ model Tenant {
   menuChanges     MenuChange[]
   appConfig       AppConfig?
   appConfigEvents AppConfigEvent[]
+  staffInvitations    StaffInvitation[]
+  staffPasswordResets StaffPasswordReset[]
 
   @@map("tenants")
 }
@@ -108,6 +110,8 @@ model Plan {
   currency          String   @default("USD") @db.Char(3)
   /// Sucursales activas permitidas. Null = ilimitadas.
   maxLocations      Int?
+  /// Usuarios del panel (activos + invitaciones pendientes) permitidos. Null = ilimitados (TASK-022).
+  maxStaff          Int?
   /// `{ brandedApp, customDomain, reports, prioritySupport }` (booleanos).
   features          Json
   isActive          Boolean  @default(true)
@@ -409,6 +413,8 @@ model Location {
   /// Horario semanal como JSON: [{ day: 0-6, opens: "11:00", closes: "23:00" }]
   openingHours Json?
   isActive  Boolean  @default(true)
+  /// Recibe pedidos de la app (TASK-022). Activa pero sin pedidos = se muestra, no vende.
+  acceptsOrders Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -550,13 +556,60 @@ model StaffMember {
   name         String
   role         TenantRole @default(staff)
   isActive     Boolean    @default(true)
+  /// Va en el JWT (`ver`) y el guard lo compara (TASK-022): subirlo (cambio de rol,
+  /// desactivación, reset de contraseña) corta en el acto las sesiones vivas del miembro.
+  tokenVersion Int        @default(0)
   createdAt    DateTime   @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  passwordResets StaffPasswordReset[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
   @@map("staff_members")
+}
+
+/// Invitación al equipo de la marca (TASK-022). El token viaja una sola vez al dueño; acá
+/// queda su sha256. Un solo uso (`acceptedAt`), revocable, vence a las 72 h.
+model StaffInvitation {
+  id          String     @id @default(uuid())
+  tenantId    String
+  email       String
+  role        TenantRole
+  /// sha256 hex del token (32 bytes aleatorios en base64url). Nunca el token.
+  tokenHash   String     @db.Char(64)
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime   @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, email])
+  @@map("staff_invitations")
+}
+
+/// Link de un solo uso para que un miembro elija contraseña nueva (TASK-022). Mismas reglas
+/// que la invitación: sha256 del token, 72 h, un solo uso; uno nuevo revoca los anteriores.
+model StaffPasswordReset {
+  id          String    @id @default(uuid())
+  tenantId    String
+  staffId     String
+  tokenHash   String    @db.Char(64)
+  createdById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, staffId])
+  @@map("staff_password_resets")
 }
 
 enum TenantRole {

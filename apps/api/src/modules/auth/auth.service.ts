@@ -6,6 +6,7 @@ import type {
   RegisterInput,
   StaffAuthResponse,
   TenantContext,
+  TenantRole,
 } from '@ventea/shared';
 import argon2 from 'argon2';
 
@@ -16,6 +17,23 @@ import { isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { TokenService } from './token.service';
+
+/** Lo que hace falta de un `StaffMember` para abrirle sesión. */
+export const STAFF_SESSION_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  tokenVersion: true,
+} as const;
+
+export interface StaffSessionRow {
+  id: string;
+  email: string;
+  name: string;
+  role: TenantRole;
+  tokenVersion: number;
+}
 
 /** Mismo mensaje para email inexistente y clave incorrecta: no se puede enumerar cuentas. */
 const INVALID_CREDENTIALS = 'Email o contraseña incorrectos';
@@ -93,18 +111,27 @@ export class AuthService {
   async staffLogin(tenant: TenantContext, input: LoginInput): Promise<StaffAuthResponse> {
     const staff = await this.prisma.staffMember.findFirst({
       where: { tenantId: tenant.tenantId, email: input.email, isActive: true },
-      select: { id: true, email: true, name: true, role: true, passwordHash: true },
+      select: { ...STAFF_SESSION_SELECT, passwordHash: true },
     });
 
     if (!(await this.passwordMatches(staff?.passwordHash ?? null, input.password)) || !staff) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
+    return this.staffSession(tenant.tenantId, staff);
+  }
+
+  /**
+   * Sesión del panel para un miembro ya verificado (login, invitación aceptada, contraseña
+   * nueva). El token lleva su `tokenVersion`: subirlo la corta (TASK-022).
+   */
+  async staffSession(tenantId: string, staff: StaffSessionRow): Promise<StaffAuthResponse> {
     const tokens = await this.tokens.issuePair({
       subject: staff.id,
-      tenantId: tenant.tenantId,
+      tenantId,
       kind: 'staff',
       role: staff.role,
+      tokenVersion: staff.tokenVersion,
     });
     return {
       ...tokens,
@@ -137,14 +164,18 @@ export class AuthService {
 
     const staff = await this.prisma.staffMember.findFirst({
       where: { tenantId: tenant.tenantId, id: claims.sub, isActive: true },
-      select: { id: true, role: true },
+      select: { id: true, role: true, tokenVersion: true },
     });
-    if (!staff) throw new UnauthorizedException('Sesión inválida o expirada');
+    // Rol cambiado, desactivado o contraseña nueva (TASK-022): el refresh viejo ya no sirve.
+    if (!staff || staff.tokenVersion !== (claims.ver ?? 0)) {
+      throw new UnauthorizedException('Sesión inválida o expirada');
+    }
     return this.tokens.issuePair({
       subject: staff.id,
       tenantId: tenant.tenantId,
       kind: 'staff',
       role: staff.role,
+      tokenVersion: staff.tokenVersion,
     });
   }
 

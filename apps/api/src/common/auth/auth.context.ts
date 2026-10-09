@@ -14,6 +14,11 @@ export interface TenantJwtClaims {
   typ: 'access' | 'refresh';
   kind: AuthKind;
   role?: TenantRole;
+  /**
+   * Staff: `StaffMember.tokenVersion` al emitir (TASK-022). Si cambió (rol, desactivación,
+   * nueva contraseña) el token muere. Ausente en tokens anteriores = 0.
+   */
+  ver?: number;
 }
 
 /**
