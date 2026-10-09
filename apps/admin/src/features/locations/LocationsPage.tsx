@@ -124,6 +124,12 @@ export function LocationsPage() {
       )}
 
       <PlanUsage label={t('locations.usageLabel')} usage={usage} />
+      {locations.some((l) => l.isActive) &&
+        !locations.some((l) => l.isActive && l.acceptsOrders) && (
+          <p className="banner banner--warn" role="status">
+            {t('locations.noneTakingOrders')}
+          </p>
+        )}
       {!canEdit && <p className="muted">{t('locations.readOnly')}</p>}
 
       {locations.length === 0 ? (

@@ -396,17 +396,19 @@ export function TeamPage() {
                   <span className="team-row__actions">
                     {member.isActive ? (
                       <>
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--small"
-                          onClick={() => {
-                            start();
-                            setPanel({ kind: 'reset', member });
-                          }}
-                        >
-                          <IconLock size={16} />
-                          {t('team.resetPassword')}
-                        </button>
+                        {member.role !== 'owner' && (
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--small"
+                            onClick={() => {
+                              start();
+                              setPanel({ kind: 'reset', member });
+                            }}
+                          >
+                            <IconLock size={16} />
+                            {t('team.resetPassword')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn btn--ghost btn--small btn--danger-text"
@@ -462,6 +464,8 @@ export function TeamPage() {
                   <span className="team-row__email">
                     {t(`role.${invitation.role}`)} ·{' '}
                     {t('team.expires', { date: dateTime(invitation.expiresAt) })}
+                    {invitation.invitedByName &&
+                      ` · ${t('team.invitedBy', { name: invitation.invitedByName })}`}
                   </span>
                 </span>
                 <span className="team-row__actions">

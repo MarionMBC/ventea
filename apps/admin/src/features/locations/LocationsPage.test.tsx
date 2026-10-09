@@ -242,4 +242,24 @@ describe('Sucursales', () => {
       expect(screen.queryByRole('heading', { name: 'Sucursal Centro' })).toBeNull(),
     );
   });
+
+  it('avisa si ninguna sucursal activa recibe pedidos', async () => {
+    renderLocations({
+      data: {
+        locations: [makeLocation({ acceptsOrders: false })],
+        usage: { used: 1, max: 3, plan: 'pro', planName: 'Pro' },
+      },
+    });
+    expect(
+      await screen.findByText(
+        'No active location is taking orders: customers can’t order from your app right now.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('sin aviso si alguna activa recibe pedidos', async () => {
+    renderLocations();
+    await screen.findByRole('heading', { name: 'Sucursal Centro' });
+    expect(screen.queryByText(/No active location is taking orders/)).toBeNull();
+  });
 });

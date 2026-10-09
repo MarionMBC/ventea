@@ -201,6 +201,45 @@ describe('Equipo', () => {
   });
 });
 
+describe('Equipo: dueños e invitaciones (review)', () => {
+  it('otro dueño: sin enlace de contraseña; invitación con quién la creó', async () => {
+    const base = makeTeam();
+    renderApp('/admin/team', {
+      team: {
+        ...base,
+        members: [
+          ...base.members,
+          {
+            id: uuid(12),
+            email: 'socio@chc.test',
+            name: 'Socio Dueño',
+            role: 'owner',
+            isActive: true,
+            isSelf: false,
+            createdAt: new Date('2026-10-03T12:00:00Z'),
+          },
+        ],
+        invitations: [
+          {
+            id: uuid(60),
+            email: 'pendiente@chc.test',
+            role: 'staff',
+            expiresAt: new Date('2026-10-12T12:00:00Z'),
+            createdAt: new Date('2026-10-09T12:00:00Z'),
+            invitedByName: 'Marta López',
+          },
+        ],
+      },
+    });
+    const socio = (await screen.findByText('socio@chc.test')).closest('li')!;
+    expect(within(socio).queryByRole('button', { name: 'Password link' })).toBeNull();
+    expect(within(socio).getByRole('button', { name: 'Deactivate' })).toBeTruthy();
+    const ana = screen.getByText('ana@chc.test').closest('li')!;
+    expect(within(ana).getByRole('button', { name: 'Password link' })).toBeTruthy();
+    expect(screen.getByText(/invited by Marta López/)).toBeTruthy();
+  });
+});
+
 describe('Enlaces públicos', () => {
   it('lee el token del fragmento', () => {
     expect(tokenFromHash(`#${TOKEN}`)).toBe(TOKEN);
@@ -263,6 +302,24 @@ describe('Enlaces públicos', () => {
     );
     await waitFor(() => expect(session.get()?.staff.role).toBe('manager'));
     expect(await screen.findByRole('heading', { name: 'Orders' })).toBeTruthy();
+  });
+
+  it('el token sale de la barra de direcciones tras leerlo', async () => {
+    renderApp(`/admin/join#${TOKEN}`, {
+      signedIn: false,
+      before: (req) =>
+        req.path === '/api/staff/auth/invitation/lookup'
+          ? json({
+              email: 'nuevo@example.com',
+              role: 'staff',
+              brandName: 'Carolina Hot Chicken',
+              expiresAt: '2026-10-12T12:00:00Z',
+            })
+          : undefined,
+    });
+    await screen.findByRole('heading', { name: 'Join the Carolina Hot Chicken team' });
+    expect(window.location.hash).toBe('');
+    expect(window.location.pathname).toBe('/admin/join');
   });
 
   it('enlace vencido o usado: aviso sin detalle y vuelta al login', async () => {

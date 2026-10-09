@@ -74,6 +74,8 @@ export const teamLocationsEn = {
   'locations.deleteBody': 'It will disappear from your dashboard and app. This can’t be undone.',
   'locations.deleted': 'Location deleted.',
   'locations.hasOrders': 'It has orders, so it can’t be deleted. Deactivate it instead.',
+  'locations.noneTakingOrders':
+    'No active location is taking orders: customers can’t order from your app right now.',
 
   'team.pageTitle': 'Team · {brand}',
   'team.title': 'Team',
@@ -106,6 +108,7 @@ export const teamLocationsEn = {
   'team.invitations': 'Pending invitations',
   'team.noInvitations': 'No pending invitations.',
   'team.expires': 'Expires {date}',
+  'team.invitedBy': 'invited by {name}',
   'team.revoke': 'Revoke',
   'team.revokeAria': 'Revoke invitation for {email}',
   'team.revoked': 'Invitation revoked.',
@@ -227,6 +230,8 @@ export const teamLocationsEs: TeamLocationsMessages = {
   'locations.deleteBody': 'Desaparece del panel y de la app. No se puede deshacer.',
   'locations.deleted': 'Sucursal borrada.',
   'locations.hasOrders': 'Tiene pedidos, así que no se puede borrar. Desactívala.',
+  'locations.noneTakingOrders':
+    'Ninguna sucursal activa está recibiendo pedidos: ahora tus clientes no pueden pedir desde la app.',
 
   'team.pageTitle': 'Equipo · {brand}',
   'team.title': 'Equipo',
@@ -259,6 +264,7 @@ export const teamLocationsEs: TeamLocationsMessages = {
   'team.invitations': 'Invitaciones pendientes',
   'team.noInvitations': 'No hay invitaciones pendientes.',
   'team.expires': 'Vence el {date}',
+  'team.invitedBy': 'invitó {name}',
   'team.revoke': 'Revocar',
   'team.revokeAria': 'Revocar la invitación de {email}',
   'team.revoked': 'Invitación revocada.',

@@ -157,6 +157,12 @@ function usePasswordFields() {
 function useLinkPreview<T>(path: string, parse: (data: unknown) => T) {
   const { client } = useServices();
   const [token] = useState(() => tokenFromHash());
+  // Leído el token, sale de la barra de direcciones y del historial (un solo uso, pero igual).
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const { pathname, search } = window.location;
+    window.history.replaceState(window.history.state, '', `${pathname}${search}`);
+  }, []);
   const lookup = useMutation({
     mutationFn: () =>
       client.request<T>(path, {
