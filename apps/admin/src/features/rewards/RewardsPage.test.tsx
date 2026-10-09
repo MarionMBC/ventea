@@ -13,6 +13,7 @@ import { createSessionStore } from '@/lib/session';
 import { createFakeApi, json, STAFF_SESSION } from '@/test/fixtures';
 import { makeMenu, menuHandler } from '@/test/menu-fixtures';
 
+import { actionKeys } from './api';
 import { parseRate, programInput } from './ProgramCard';
 
 const CUSTOMER_ID = '00000000-0000-4000-8000-00000000c001';
@@ -180,6 +181,18 @@ describe('parseRate / programInput', () => {
   });
 });
 
+describe('actionKeys', () => {
+  it('misma clave al reintentar el mismo envío; nueva con otros datos o tras un éxito', () => {
+    const keys = actionKeys();
+    const first = keys.keyFor({ points: 5 });
+    expect(keys.keyFor({ points: 5 })).toBe(first);
+    const other = keys.keyFor({ points: 6 });
+    expect(other).not.toBe(first);
+    keys.done();
+    expect(keys.keyFor({ points: 6 })).not.toBe(other);
+  });
+});
+
 describe('Puntos', () => {
   it('solo el dueño: el gerente vuelve a pedidos y no ve el enlace', async () => {
     renderRewards({ role: 'manager' });
@@ -263,6 +276,10 @@ describe('Puntos', () => {
       points: -20,
       reason: 'Pedido duplicado',
     });
+    // Cada envío lleva su Idempotency-Key (un reintento por timeout no duplica el ajuste).
+    expect(
+      api.calls.find((c) => c.path.endsWith('/adjustments'))!.headers['idempotency-key'],
+    ).toMatch(/^[0-9a-f-]{36}$/);
     expect(within(dialog).getByText('Pedido duplicado')).toBeTruthy();
     expect(within(dialog).getByText(/by Marta López/)).toBeTruthy();
     expect(within(dialog).getByText('-20')).toBeTruthy();

@@ -740,6 +740,9 @@ model RewardLedgerEntry {
   staffNote String?
   /// Recompensa del catálogo canjeada en el local (asiento `redemption` sin pedido).
   rewardId  String?
+  /// Header `Idempotency-Key` del ajuste o canje desde el panel: un reintento (timeout, red)
+  /// devuelve el asiento ya creado en vez de duplicarlo. Único por marca.
+  idempotencyKey String?
   createdAt DateTime           @default(now())
 
   tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -748,6 +751,7 @@ model RewardLedgerEntry {
   staff    StaffMember?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
   reward   RewardCatalogItem? @relation(fields: [rewardId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, customerId, createdAt])
   @@map("reward_ledger_entries")
 }

@@ -23,6 +23,7 @@ import {
 } from '@ventea/shared';
 
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
+import { isUniqueViolation } from '@/prisma/prisma-errors';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { RewardsService } from './rewards.service';
@@ -353,15 +354,74 @@ export class StaffRewardsService {
     if (locked.length === 0) throw new NotFoundException('Cliente no encontrado');
   }
 
+  /**
+   * Reintento con la misma `Idempotency-Key`: si el asiento ya existe y es el mismo pedido
+   * (mismo cliente y mismos datos), devuelve `true` para responder lo ya hecho sin escribir.
+   * La misma clave con otro movimiento es un 409. Corre con el cliente bloqueado y antes de
+   * validar saldo o programa (que pudieron cambiar justamente por el asiento original).
+   */
+  private async isReplay(
+    tx: PrismaDb,
+    tenantId: string,
+    customerId: string,
+    idempotencyKey: string | undefined,
+    same: (entry: {
+      reason: string;
+      points: number;
+      staffNote: string | null;
+      rewardId: string | null;
+    }) => boolean,
+  ): Promise<boolean> {
+    if (!idempotencyKey) return false;
+    const existing = await tx.rewardLedgerEntry.findFirst({
+      where: { tenantId, idempotencyKey },
+      select: { customerId: true, reason: true, points: true, staffNote: true, rewardId: true },
+    });
+    if (!existing) return false;
+    if (existing.customerId !== customerId || !same(existing)) {
+      throw new ConflictException('Idempotency-Key ya usada con otro movimiento');
+    }
+    return true;
+  }
+
+  /** Inserta el asiento; la misma clave en paralelo para otro cliente termina en 409. */
+  private async createEntry(
+    tx: PrismaDb,
+    data: Prisma.RewardLedgerEntryUncheckedCreateInput,
+  ): Promise<void> {
+    try {
+      await tx.rewardLedgerEntry.create({ data });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('Idempotency-Key ya usada con otro movimiento');
+      }
+      throw error;
+    }
+  }
+
   /** Ajuste manual con motivo. Restar más de lo que hay es un 400: el saldo nunca es negativo. */
   async adjust(
     actor: RewardsActor,
     customerId: string,
     input: RewardAdjustmentInput,
-  ): Promise<RewardCustomerDetail> {
+    idempotencyKey?: string,
+  ): Promise<{ detail: RewardCustomerDetail; created: boolean }> {
     const { tenantId, staffId } = actor;
     return this.prisma.$transaction(async (tx) => {
       await this.lockCustomer(tx, tenantId, customerId);
+      const replay = await this.isReplay(
+        tx,
+        tenantId,
+        customerId,
+        idempotencyKey,
+        (entry) =>
+          entry.reason === 'manual_adjustment' &&
+          entry.points === input.points &&
+          entry.staffNote === input.reason,
+      );
+      if (replay) {
+        return { detail: await this.customerDetail(tenantId, customerId, tx), created: false };
+      }
       await this.assertStaff(tx, actor);
       if (input.points < 0) {
         const balance = await this.rewards.balance(tx, tenantId, customerId);
@@ -371,17 +431,16 @@ export class StaffRewardsService {
           );
         }
       }
-      await tx.rewardLedgerEntry.create({
-        data: {
-          tenantId,
-          customerId,
-          points: input.points,
-          reason: 'manual_adjustment',
-          staffId,
-          staffNote: input.reason,
-        },
+      await this.createEntry(tx, {
+        tenantId,
+        customerId,
+        points: input.points,
+        reason: 'manual_adjustment',
+        staffId,
+        staffNote: input.reason,
+        idempotencyKey: idempotencyKey ?? null,
       });
-      return this.customerDetail(tenantId, customerId, tx);
+      return { detail: await this.customerDetail(tenantId, customerId, tx), created: true };
     });
   }
 
@@ -390,10 +449,21 @@ export class StaffRewardsService {
     actor: RewardsActor,
     customerId: string,
     rewardId: string,
-  ): Promise<RewardCustomerDetail> {
+    idempotencyKey?: string,
+  ): Promise<{ detail: RewardCustomerDetail; created: boolean }> {
     const { tenantId, staffId } = actor;
     return this.prisma.$transaction(async (tx) => {
       await this.lockCustomer(tx, tenantId, customerId);
+      const replay = await this.isReplay(
+        tx,
+        tenantId,
+        customerId,
+        idempotencyKey,
+        (entry) => entry.reason === 'redemption' && entry.rewardId === rewardId,
+      );
+      if (replay) {
+        return { detail: await this.customerDetail(tenantId, customerId, tx), created: false };
+      }
       await this.assertStaff(tx, actor);
       const program = await this.rewards.program(tx, tenantId);
       if (!program?.isEnabled) throw new BadRequestException('El programa de puntos está apagado');
@@ -413,19 +483,18 @@ export class StaffRewardsService {
           `Saldo insuficiente: tiene ${balance} puntos y la recompensa cuesta ${reward.pointsCost}`,
         );
       }
-      await tx.rewardLedgerEntry.create({
-        data: {
-          tenantId,
-          customerId,
-          points: -reward.pointsCost,
-          reason: 'redemption',
-          rewardId: reward.id,
-          staffId,
-          // El nombre queda en el asiento: sobrevive a que la recompensa se edite o se borre.
-          note: reward.name,
-        },
+      await this.createEntry(tx, {
+        tenantId,
+        customerId,
+        points: -reward.pointsCost,
+        reason: 'redemption',
+        rewardId: reward.id,
+        staffId,
+        // El nombre queda en el asiento: sobrevive a que la recompensa se edite o se borre.
+        note: reward.name,
+        idempotencyKey: idempotencyKey ?? null,
       });
-      return this.customerDetail(tenantId, customerId, tx);
+      return { detail: await this.customerDetail(tenantId, customerId, tx), created: true };
     });
   }
 

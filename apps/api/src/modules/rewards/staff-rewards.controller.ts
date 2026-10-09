@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -10,9 +11,13 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyKeySchema,
   rewardAdjustmentSchema,
   rewardCatalogInputSchema,
   rewardCustomersQuerySchema,
@@ -36,6 +41,16 @@ import { ZodValidationPipe } from '@/common/zod-validation.pipe';
 import { StaffRewardsService } from './staff-rewards.service';
 
 const ID = new ParseUUIDPipe({ version: '4' });
+const IDEMPOTENCY_KEY_PIPE = new ZodValidationPipe(idempotencyKeySchema.optional());
+
+/** `201` con el movimiento nuevo; un reintento con la misma `Idempotency-Key`, `200`. */
+function respond(
+  response: Response,
+  result: { detail: RewardCustomerDetail; created: boolean },
+): RewardCustomerDetail {
+  response.status(result.created ? HttpStatus.CREATED : HttpStatus.OK);
+  return result.detail;
+}
 
 /**
  * Programa de puntos desde el panel (TASK-023). Solo el dueño: decide cuánto regala la marca
@@ -100,22 +115,27 @@ export class StaffRewardsController {
   }
 
   @Post('customers/:id/adjustments')
-  @HttpCode(HttpStatus.CREATED)
-  adjust(
+  async adjust(
     @CurrentStaff() staff: StaffPrincipal,
     @Param('id', ID) id: string,
     @Body(new ZodValidationPipe(rewardAdjustmentSchema)) input: RewardAdjustmentInput,
+    @Headers(IDEMPOTENCY_KEY_HEADER) rawKey: string | undefined,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<RewardCustomerDetail> {
-    return this.rewards.adjust(staff, id, input);
+    // @Headers() no admite pipes en Nest: se valida acá, como en pedidos.
+    const key = IDEMPOTENCY_KEY_PIPE.transform(rawKey, { type: 'custom' });
+    return respond(response, await this.rewards.adjust(staff, id, input, key));
   }
 
   @Post('customers/:id/redemptions')
-  @HttpCode(HttpStatus.CREATED)
-  redeem(
+  async redeem(
     @CurrentStaff() staff: StaffPrincipal,
     @Param('id', ID) id: string,
     @Body(new ZodValidationPipe(rewardRedemptionSchema)) input: RewardRedemptionInput,
+    @Headers(IDEMPOTENCY_KEY_HEADER) rawKey: string | undefined,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<RewardCustomerDetail> {
-    return this.rewards.redeem(staff, id, input.rewardId);
+    const key = IDEMPOTENCY_KEY_PIPE.transform(rawKey, { type: 'custom' });
+    return respond(response, await this.rewards.redeem(staff, id, input.rewardId, key));
   }
 }

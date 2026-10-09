@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  IDEMPOTENCY_KEY_HEADER,
   rewardCatalogItemSchema,
   rewardCustomerDetailSchema,
   rewardCustomersPageSchema,
@@ -122,10 +123,17 @@ function useCustomerMutation<TVars>(id: string, path: string) {
   const client = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: TVars) =>
+    // `key`: Idempotency-Key del envío. Un reintento del mismo envío (timeout, red) la repite
+    // y la API devuelve el movimiento ya hecho en vez de duplicarlo.
+    mutationFn: ({ body, key }: { body: TVars; key: string }) =>
       client.request<RewardCustomerDetail>(
         `/staff/rewards/customers/${encodeURIComponent(id)}/${path}`,
-        { method: 'POST', body, schema: rewardCustomerDetailSchema },
+        {
+          method: 'POST',
+          body,
+          schema: rewardCustomerDetailSchema,
+          headers: { [IDEMPOTENCY_KEY_HEADER]: key },
+        },
       ),
     onSuccess: (detail) => {
       queryClient.setQueryData(customerKey(id), detail);
@@ -133,6 +141,24 @@ function useCustomerMutation<TVars>(id: string, path: string) {
       void queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
     },
   });
+}
+
+/**
+ * Clave de idempotencia por acción: la misma mientras se reintenta el mismo envío (mismos
+ * datos, sin éxito todavía); una nueva al cambiar los datos o después de un éxito.
+ */
+export function actionKeys() {
+  let last: { payload: string; key: string } | null = null;
+  return {
+    keyFor(payload: unknown): string {
+      const text = JSON.stringify(payload);
+      if (last?.payload !== text) last = { payload: text, key: crypto.randomUUID() };
+      return last.key;
+    },
+    done() {
+      last = null;
+    },
+  };
 }
 
 export const useAdjustPoints = (id: string) =>

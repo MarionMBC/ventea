@@ -310,4 +310,52 @@ describe('Puntos desde el panel (TASK-023)', () => {
       '$1 de descuento',
     );
   });
+
+  it('Idempotency-Key: un reintento de ajuste o canje no duplica el asiento (review)', async () => {
+    const other = await registerCustomer(app, tenant.slug);
+    const fresh = (await registerCustomer(app, tenant.slug)).customer.id;
+    const post = (path: string, key: string, body: object) =>
+      as(owner)
+        .post(`/api/staff/rewards/customers/${fresh}/${path}`, body)
+        .set('Idempotency-Key', key);
+
+    const first = await post('adjustments', 'adjust-key-0001', { points: 10, reason: 'Reintento' });
+    expect(first.status).toBe(201);
+    const again = await post('adjustments', 'adjust-key-0001', { points: 10, reason: 'Reintento' });
+    expect(again.status).toBe(200);
+    expect((again.body as RewardCustomerDetail).customer.balance).toBe(60);
+    expect(
+      (again.body as RewardCustomerDetail).entries.filter((e) => e.reason === 'manual_adjustment'),
+    ).toHaveLength(1);
+
+    // Misma clave con otro movimiento u otro cliente: 409, nada se escribe.
+    await post('adjustments', 'adjust-key-0001', { points: 11, reason: 'Reintento' }).expect(409);
+    await as(owner)
+      .post(`/api/staff/rewards/customers/${other.customer.id}/adjustments`, {
+        points: 10,
+        reason: 'Reintento',
+      })
+      .set('Idempotency-Key', 'adjust-key-0001')
+      .expect(409);
+    await post('adjustments', 'x', { points: 10, reason: 'Reintento' }).expect(400);
+
+    const reward = (
+      await as(owner)
+        .post('/api/staff/rewards/catalog', {
+          name: 'Postre',
+          pointsCost: 20,
+          kind: 'discount',
+          discountCents: 50,
+        })
+        .expect(201)
+    ).body as RewardCatalogItem;
+    await post('redemptions', 'redeem-key-0001', { rewardId: reward.id }).expect(201);
+    const replay = await post('redemptions', 'redeem-key-0001', { rewardId: reward.id }).expect(
+      200,
+    );
+    expect((replay.body as RewardCustomerDetail).customer.balance).toBe(40);
+    expect(
+      (replay.body as RewardCustomerDetail).entries.filter((e) => e.reason === 'redemption'),
+    ).toHaveLength(1);
+  });
 });

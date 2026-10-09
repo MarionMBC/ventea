@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { describeError, useI18n, type TKey } from '@/i18n';
 import { Drawer } from '@/ui/Drawer';
 
-import { useAdjustPoints, useRedeemReward, useRewardCustomer } from './api';
+import { actionKeys, useAdjustPoints, useRedeemReward, useRewardCustomer } from './api';
 
 const REASON: Record<RewardLedgerReason, TKey> = {
   order_earned: 'rewards.reason.order_earned',
@@ -50,6 +50,8 @@ export function CustomerDrawer({
   const current = detail.data?.customer ?? customer;
   const busy = adjust.isPending || redeem.isPending;
   const content = useRef<HTMLDivElement>(null);
+  const [adjustKeys] = useState(actionKeys);
+  const [redeemKeys] = useState(actionKeys);
 
   // Mientras guarda, el botón pulsado se deshabilita y el foco cae al <body>: al terminar se
   // devuelve al panel (si no, Escape y el ciclo de Tab dejan de funcionar en el cajón).
@@ -75,10 +77,12 @@ export function CustomerDrawer({
     if (Object.keys(found).length > 0) return;
     setFlash(null);
     redeem.reset();
+    const body = { points: direction === 'add' ? amount : -amount, reason: reason.trim() };
     adjust.mutate(
-      { points: direction === 'add' ? amount : -amount, reason: reason.trim() },
+      { body, key: adjustKeys.keyFor([customer.id, body]) },
       {
         onSuccess: () => {
+          adjustKeys.done();
           setPoints('');
           setReason('');
           setFlash(t('rewards.adjusted'));
@@ -92,10 +96,12 @@ export function CustomerDrawer({
     if (busy || !selected) return;
     setFlash(null);
     adjust.reset();
+    const body = { rewardId: selected.id };
     redeem.mutate(
-      { rewardId: selected.id },
+      { body, key: redeemKeys.keyFor([customer.id, body]) },
       {
         onSuccess: () => {
+          redeemKeys.done();
           setRewardId('');
           setFlash(t('rewards.redeemed', { name: selected.name }));
         },
