@@ -15,6 +15,8 @@ import type {
   TenantContext,
 } from '@ventea/shared';
 
+import { isOrderPushStatus } from '@/modules/push/push-messages';
+import { PushService } from '@/modules/push/push.service';
 import { computeRedemption, type Redemption } from '@/modules/rewards/points';
 import { RewardsService } from '@/modules/rewards/rewards.service';
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
@@ -59,6 +61,7 @@ export class OrdersService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly rewards: RewardsService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -277,6 +280,9 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
     await this.transition(tenantId, order, to);
+    // Después del commit y sin esperar: el aviso al cliente nunca demora ni rompe el cambio
+    // de estado (TASK-016). La cancelación del propio cliente no le avisa a él mismo.
+    if (isOrderPushStatus(to)) this.push.notifyOrderStatus(tenantId, order.id, to);
     return this.getStaffOrderOrThrow(tenantId, order.id);
   }
 

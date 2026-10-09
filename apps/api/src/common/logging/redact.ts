@@ -8,6 +8,9 @@
  *   evita tachar ids y timestamps largos que no son tarjetas.
  * - El valor de claves sensibles (`cvv`, `cvc`, `securityCode`, `number`, `cardNumber`…) en
  *   JSON o `clave=valor` → `[REDACTED]`, sea cual sea el valor.
+ * - Push (TASK-016): bloques PEM de clave privada, y el valor de `private_key`/`privateKey`,
+ *   `access_token`/`accessToken`, `assertion` (JWT de la service account), `pushToken` y
+ *   `pushCredentialsEnc` → `[REDACTED]`.
  */
 
 // Dígitos separados por espacio, guion, punto o barra (`4111.1111.1111.1111`).
@@ -15,7 +18,7 @@ const PAN_CANDIDATE = /\d(?:[ ./-]?\d){12,18}/g;
 // Clave sensible y su valor, también en JSON escapado una o más veces (`{\"cvv\":\"737\"}`,
 // típico de un body serializado dentro de otro string).
 const SENSITIVE_KEY =
-  /(\\*["']?\b(?:cvv2?|cvc2?|csc|cvn|card_?cvc|card_?cvv|card_?csc|security_?code|card_?number|pan|number)\b\\*["']?\s*[:=]\s*)(\\*"(?:[^"\\]|\\(?!"))*\\*"|'[^']*'|[^\s,}\]&\\]+)/gi;
+  /(\\*["']?\b(?:cvv2?|cvc2?|csc|cvn|card_?cvc|card_?cvv|card_?csc|security_?code|card_?number|pan|number|private_?key|access_?token|assertion|push_?token|push_?credentials_?enc)\b\\*["']?\s*[:=]\s*)(\\*"(?:[^"\\]|\\(?!"))*\\*"|'[^']*'|[^\s,}\]&\\]+)/gi;
 
 function passesLuhn(digits: string): boolean {
   let sum = 0;
@@ -32,8 +35,13 @@ function passesLuhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+// Clave privada PEM completa, con saltos reales o escapados (`\n` dentro de un JSON).
+const PEM_PRIVATE_KEY =
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
+
 export function redactSensitive(text: string): string {
   return text
+    .replace(PEM_PRIVATE_KEY, '[REDACTED PRIVATE KEY]')
     .replace(SENSITIVE_KEY, (_match, key: string) => `${key}"[REDACTED]"`)
     .replace(PAN_CANDIDATE, (candidate) => {
       const digits = candidate.replace(/[ ./-]/g, '');

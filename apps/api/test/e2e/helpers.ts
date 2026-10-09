@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -18,19 +18,22 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PAYMENT_GATEWAY, type PaymentGateway } from '@/modules/billing/gateway/payment-gateway';
 import { importMenu, type MenuImportOptions } from '@/modules/catalog/menu-import';
+import { PUSH_TRANSPORT, type PushTransport } from '@/modules/push/push-transport';
 
 export const STAFF_PASSWORD = 'staff-password-123';
 export const CUSTOMER_PASSWORD = 'customer-password-123';
 
 /**
  * La app completa, configurada como en main.ts (prefijo `api`). `gateway` reemplaza la
- * pasarela de cobro (FakeGateway); sin él rige `BILLING_MODE` (manual en env.cjs).
+ * pasarela de cobro (FakeGateway); sin él rige `BILLING_MODE` (manual en env.cjs). `push`
+ * reemplaza el transporte de notificaciones (FakePushTransport, TASK-016).
  */
 export async function createApp(
-  options: { gateway?: PaymentGateway } = {},
+  options: { gateway?: PaymentGateway; push?: PushTransport } = {},
 ): Promise<INestApplication> {
   const builder = Test.createTestingModule({ imports: [AppModule] });
   if (options.gateway) builder.overrideProvider(PAYMENT_GATEWAY).useValue(options.gateway);
+  if (options.push) builder.overrideProvider(PUSH_TRANSPORT).useValue(options.push);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
@@ -235,4 +238,22 @@ export async function platformAdminToken(
     .send({ email, password })
     .expect(200);
   return (response.body as PlatformAuthResponse).accessToken;
+}
+
+/** JSON de service account de Firebase con una clave RSA real de prueba (TASK-016). */
+export function serviceAccount(projectId = 'ventea-push-test'): Record<string, string> {
+  const { privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  });
+  return {
+    type: 'service_account',
+    project_id: projectId,
+    private_key_id: 'abc123',
+    private_key: privateKey,
+    client_email: `firebase-adminsdk@${projectId}.iam.gserviceaccount.com`,
+    client_id: '1234567890',
+    token_uri: 'https://oauth2.googleapis.com/token',
+  };
 }
