@@ -8,6 +8,7 @@ import {
   SUBSCRIPTION_STATUS,
 } from '../domain/enums.js';
 import { tenantSlugSchema } from '../domain/tenant.js';
+import { hasLinkLike } from '../utils/links.js';
 import { emailSchema } from './auth.js';
 
 /**
@@ -52,10 +53,21 @@ export const TERMS_VERSIONS = ['2026-10-08'] as const;
 export const TERMS_VERSION: (typeof TERMS_VERSIONS)[number] =
   TERMS_VERSIONS[TERMS_VERSIONS.length - 1]!;
 
+/**
+ * Nombre de marca o de persona del registro. Sin links ni dominios (TASK-021): llega al correo
+ * de bienvenida, que sale desde la dirección de Ventea hacia un correo todavía sin verificar.
+ */
+const personOrBrandName = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .refine((value) => !hasLinkLike(value), 'Sin links ni direcciones web en el nombre');
+
 export const signupSchema = z.object({
-  restaurantName: z.string().trim().min(2).max(80),
+  restaurantName: personOrBrandName,
   slug: tenantSlugSchema,
-  ownerName: z.string().trim().min(2).max(80),
+  ownerName: personOrBrandName,
   ownerEmail: emailSchema,
   ownerPassword: z.string().min(10).max(128),
   planCode: z.enum(PLAN_CODE),
