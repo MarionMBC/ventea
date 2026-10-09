@@ -39,8 +39,11 @@ el panel llaman a `app.ventea.tech/api` (mismo origen).
 En el apex `ventea.tech` (TASK-008) el mismo nginx sirve el **sitio corporativo** (`apps/site`,
 en inglés, estático, sin `/api`): `/`, `/privacy` y un `404` propio. `www` responde `301` al apex
 conservando ruta y query. Las rutas del SaaS que vivieron en el apex (`/registro`, `/terminos`,
-`/privacidad`, `/precios`, `/admin*`, `/plataforma`) responden `301` a `app.` con la misma ruta y
-query (`ventea.tech/registro?plan=pro` → `app.ventea.tech/registro?plan=pro`). Las rutas de `app.`, del apex y de `www` son fijas: las
+`/privacidad`, `/precios`, `/admin*`, `/plataforma`, sin distinguir mayúsculas) responden `301` a
+su ruta canónica en `app.` con la query (`ventea.tech/REGISTRO?plan=pro` →
+`app.ventea.tech/registro?plan=pro`; `/precios` → `app.ventea.tech/#precios`; `/admin*` y
+`/plataforma` → `app.ventea.tech/admin/plataforma`). Traefik no manda el `/api` del apex a la
+API: nginx responde `308` a `app.ventea.tech/api/...` (conserva método y cuerpo). Las rutas de `app.`, del apex y de `www` son fijas: las
 publica `sync-routes.sh` en cada corrida, cada una con su certificado. Priority explícita 50
 (no 10) en sus routers web: sin ella Traefik usa el largo de la regla, y cualquier otro router
 del Traefik compartido que declare `Host(ventea.tech)` ganaría en silencio. Antes del primer
