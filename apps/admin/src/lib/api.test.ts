@@ -179,3 +179,97 @@ describe('createApiClient', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('subidas', () => {
+  const file = () => new Blob(['img'], { type: 'image/png' });
+
+  it('multipart sin Content-Type propio, con sesión; 401 → refresh y reintento', async () => {
+    let uploads = 0;
+    const { client, fetchMock } = setup((url, init) => {
+      if (url === '/api/auth/refresh') {
+        return json({ accessToken: 'access-2', refreshToken: 'refresh-2' });
+      }
+      uploads += 1;
+      if (authOf(init) === 'Bearer access-1') return apiError(401, 'Token vencido');
+      expect(init.body).toBeInstanceOf(FormData);
+      expect((init.body as FormData).get('file')).toBeTruthy();
+      expect(init.headers).not.toHaveProperty('Content-Type');
+      return json({ url: 'https://x/a.webp' }, 201);
+    });
+    const progress: number[] = [];
+    const result = await client.upload<{ url: string }>('/staff/media', file(), {
+      onProgress: (p) => progress.push(p),
+    });
+    expect(result.url).toBe('https://x/a.webp');
+    expect(uploads).toBe(2);
+    expect(progress).toEqual([1]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('el error de la API llega con status y código', async () => {
+    const { client } = setup(() =>
+      json(
+        {
+          statusCode: 403,
+          message: 'x',
+          error: 'Forbidden',
+          code: 'plan_limit',
+          limit: { resource: 'locations', plan: 'basic', planName: 'Básico', max: 1 },
+        },
+        403,
+      ),
+    );
+    const error = await client.upload('/staff/media', file()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe('plan_limit');
+    expect((error as ApiError).limit?.max).toBe(1);
+  });
+
+  it('XHR: informa el avance y lee la respuesta', async () => {
+    const { xhrUpload } = await import('./api');
+    class FakeXhr {
+      static last: FakeXhr;
+      upload: {
+        onprogress?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void;
+      } = {};
+      headers: Record<string, string> = {};
+      status = 0;
+      responseText = '';
+      onload?: () => void;
+      onerror?: () => void;
+      onabort?: () => void;
+      constructor() {
+        FakeXhr.last = this;
+      }
+      open() {}
+      setRequestHeader(name: string, value: string) {
+        this.headers[name] = value;
+      }
+      abort() {
+        this.onabort?.();
+      }
+      send() {
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 });
+        this.status = 201;
+        this.responseText = '{"url":"https://x/b.webp"}';
+        this.onload?.();
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    try {
+      const seen: number[] = [];
+      const response = await xhrUpload(
+        '/api/staff/media',
+        new FormData(),
+        { Authorization: 'Bearer t' },
+        (p) => seen.push(p),
+        new AbortController().signal,
+      );
+      expect(response).toEqual({ status: 201, body: { url: 'https://x/b.webp' } });
+      expect(seen).toEqual([0.5]);
+      expect(FakeXhr.last.headers.Authorization).toBe('Bearer t');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

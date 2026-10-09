@@ -43,6 +43,7 @@ export function PlatformLayout() {
           <NavLink to="/plataforma" end>
             Marcas
           </NavLink>
+          <NavLink to="/plataforma/apps">Apps</NavLink>
           <NavLink to="/plataforma/embudo">Embudo de registro</NavLink>
         </nav>
         <div className="pf__user">

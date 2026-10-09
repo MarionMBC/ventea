@@ -1,4 +1,6 @@
 import type {
+  AppPublisher,
+  AppStatus,
   BillingEventType,
   BillingInterval,
   PlanCode,
@@ -105,4 +107,28 @@ export function cardLabel(card: { brand: string | null; last4: string | null } |
   return [card.brand ?? 'Tarjeta', card.last4 ? `••••${card.last4}` : null]
     .filter(Boolean)
     .join(' ');
+}
+
+export const APP_STATUS_LABEL: Record<AppStatus, string> = {
+  not_requested: 'Sin solicitar',
+  requested: 'Solicitada',
+  building: 'En construcción',
+  in_review: 'En revisión de tienda',
+  published: 'Publicada',
+};
+
+export const PUBLISHER_LABEL: Record<AppPublisher, string> = {
+  ventea: 'Ventea (cuenta de Ventea)',
+  client: 'La marca (su cuenta de desarrollador)',
+};
+
+/** Etiqueta de un evento de la app; uno desconocido se muestra tal cual. */
+export function appEventLabel(type: string): string {
+  const labels: Record<string, string> = {
+    requested: 'Solicitud del dueño',
+    updated: 'Configuración actualizada',
+    push_credentials_set: 'Credenciales push cargadas',
+    push_credentials_cleared: 'Credenciales push borradas',
+  };
+  return labels[type] ?? `Evento: ${type}`;
 }
