@@ -32,10 +32,43 @@ const apiProxyTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:3000';
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-/** `%BRAND_NAME%` in index.html → the brand's app name (title before JS runs). */
+/**
+ * Content Security Policy for the built page. On the web, nginx sends the
+ * same policy as a header (connect-src 'self': the API is same-origin); inside
+ * the native WebView there is no server, so the page carries it: scripts only
+ * from the bundle, API calls only to the brand's API.
+ */
+const apiOrigins = [brand.apiUrl, process.env.VITE_API_URL]
+  .filter((url): url is string => Boolean(url))
+  .map((url) => new URL(url).origin);
+const buildCsp = (origins: string[]): string =>
+  [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    `connect-src 'self' ${[...new Set(origins)].join(' ')}`.trim(),
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+
+/**
+ * `%BRAND_NAME%` → the brand's app name (title before JS runs); the CSP meta
+ * only in builds (`vite dev` needs inline scripts and a websocket for HMR).
+ */
 const brandHtml = (): Plugin => ({
   name: 'ventea-brand-html',
-  transformIndexHtml: (html) => html.replaceAll('%BRAND_NAME%', escapeHtml(brand.appName)),
+  transformIndexHtml: (html, context) =>
+    html
+      .replaceAll('%BRAND_NAME%', escapeHtml(brand.appName))
+      .replace(
+        '<!--%BRAND_CSP%-->',
+        context.server
+          ? ''
+          : `<meta http-equiv="Content-Security-Policy" content="${escapeHtml(buildCsp(apiOrigins))}" />`,
+      ),
 });
 
 export default defineConfig({
