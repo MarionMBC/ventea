@@ -66,6 +66,13 @@ services:
       # 32 bytes (openssl rand -base64 32). Vacía = push apagado (no se aceptan credenciales).
       # Perderla deja ilegibles las credenciales FCM guardadas: va al gestor de secretos.
       PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+      # Correos (TASK-021). SMTP_URL vacía = no se envía nada: la outbox registra `skipped`.
+      # Lleva la clave del SMTP: va al gestor de secretos. Ver docs/deployment.md#correos.
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      PLATFORM_ALERT_EMAILS: ${PLATFORM_ALERT_EMAILS:-}
+      MAIL_RATE_LIMIT_PER_MINUTE: ${MAIL_RATE_LIMIT_PER_MINUTE:-}
+      LIFECYCLE_EMAILS_INTERVAL_MINUTES: ${LIFECYCLE_EMAILS_INTERVAL_MINUTES:-}
     volumes: [media:/data/media]
     networks: [internal, dokploy-network]
     depends_on:

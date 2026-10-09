@@ -26,6 +26,79 @@ instancia y una base por región.
 - **Cobro de suscripciones** (TASK-005): ver [abajo](#cobro-de-suscripciones).
 - **Medios y push** (TASK-016): volumen `media` y `PUSH_CREDENTIALS_KEY`, ver
   [abajo](#medios-de-las-marcas).
+- **Correos** (TASK-021): `SMTP_URL` y compañía, ver [abajo](#correos).
+
+## Correos
+
+La API manda correos transaccionales (nunca marketing) desde una **outbox** en Postgres
+(`email_messages`): cada evento inserta una fila por destinatario con una clave única, y un
+despachador la envía con reintentos (5 intentos: al minuto, a los 5 min, a los 30 min y a las 2 h;
+después queda `failed`). Repetir un evento no repite el correo.
+
+| Evento                             | A quién                                | Cuándo                                                            |
+| ---------------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Solicitud de app (`app_request`)   | `PLATFORM_ALERT_EMAILS` (o los admins) | al pedir la app (`POST /api/staff/brand/app-request`), en español |
+| Bienvenida (`welcome`)             | dueño                                  | al registrarse (`POST /api/platform/signup`)                      |
+| Prueba por vencer (`trial_ending`) | dueños activos                         | 3 días y 1 día antes del fin de la prueba                         |
+| Pago pendiente (`past_due`)        | dueños activos                         | al entrar en `past_due` (o al vencer la prueba sin pago)          |
+| Recordatorio (`past_due_reminder`) | dueños activos                         | a mitad de los 7 días de gracia                                   |
+
+Los de la marca van en su idioma (`TenantBranding.language`, es/en). Los dos últimos tipos los
+encola un job idempotente (cada `LIFECYCLE_EMAILS_INTERVAL_MINUTES`, con un advisory lock de
+Postgres: con varias réplicas corre una). Ningún correo lleva datos de pedidos ni de clientes
+finales; el pie dice por qué llega.
+
+| Variable                            | Default                      | Qué hace                                                                                                                                                        |
+| ----------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SMTP_URL`                          | vacía = no se envía nada     | `smtps://usuario:clave@host:465` (TLS directo) o `smtp://usuario:clave@host:587` (STARTTLS obligatorio). Lleva la clave: gestor de secretos; los logs la tachan |
+| `MAIL_FROM`                         | `Ventea <hola@ventea.tech>`  | remitente (`Nombre <correo>` o `correo`); el dominio tiene que estar autorizado en SPF/DKIM                                                                     |
+| `PLATFORM_ALERT_EMAILS`             | vacía = admins de plataforma | lista separada por comas para los avisos a la plataforma                                                                                                        |
+| `MAIL_RATE_LIMIT_PER_MINUTE`        | `30`                         | envíos SMTP por minuto y proceso; el resto espera en la cola                                                                                                    |
+| `LIFECYCLE_EMAILS_INTERVAL_MINUTES` | `60`                         | cada cuánto corre el job de prueba por vencer / pago pendiente                                                                                                  |
+| `MAIL_SCHEDULER_ENABLED`            | `true`                       | `false` apaga el despacho periódico y el job (tests)                                                                                                            |
+
+Un valor mal formado (`SMTP_URL` que no es `smtp(s)://`, una dirección inválida) hace que la API
+no arranque, en vez de fallar en silencio. Con `SMTP_URL` vacía la API arranca igual y cada correo
+queda `skipped` en la outbox (es lo que se ve en producción hasta configurar el SMTP).
+
+**Registro:** `/admin/plataforma/correos` (o `GET /api/platform/emails?status=failed`) muestra
+los últimos correos sin el cuerpo; un `failed` se reenvía con el botón (o
+`POST /api/platform/emails/:id/resend`).
+
+### Configurar el SMTP
+
+Cualquier proveedor con SMTP autenticado sirve. Ejemplos (verificar puertos y usuario en el panel
+de cada uno):
+
+- **Zoho Mail:** `smtps://hola%40ventea.tech:<clave de aplicación>@smtp.zoho.com:465`.
+- **Google Workspace:** `smtps://hola%40ventea.tech:<contraseña de aplicación>@smtp.gmail.com:465`
+  (exige verificación en dos pasos para crear la contraseña de aplicación).
+- **Resend:** `smtps://resend:<API key>@smtp.resend.com:465` (el dominio se verifica en Resend).
+
+La `@` del usuario va como `%40`. Después de cargarla en el `.env` de la VPS:
+`docker compose up -d api` y verificar con un evento real (pedir la app desde una marca de prueba)
+que `/admin/plataforma/correos` lo muestra `Enviado`.
+
+### SPF, DKIM y DMARC para `ventea.tech`
+
+Sin esto, los correos de `hola@ventea.tech` caen en spam o se rechazan:
+
+1. **SPF** (TXT en `ventea.tech`): un solo registro con el include del proveedor, p. ej.
+   `v=spf1 include:zoho.com ~all` (Zoho), `include:_spf.google.com` (Google) o el que indique
+   Resend (`send.ventea.tech`). Si ya hay un SPF, sumar el include al mismo registro: dos registros
+   SPF invalidan los dos.
+2. **DKIM**: el proveedor genera la clave; se publica el TXT/CNAME que indica (p. ej.
+   `zmail._domainkey.ventea.tech`, `google._domainkey.ventea.tech` o `resend._domainkey`).
+3. **DMARC** (TXT en `_dmarc.ventea.tech`): empezar en observación,
+   `v=DMARC1; p=none; rua=mailto:hola@ventea.tech`, y pasar a `p=quarantine` cuando los reportes
+   muestren SPF y DKIM alineados.
+
+### WhatsApp (siguiente paso, fuera de alcance)
+
+Los avisos por WhatsApp necesitan la WhatsApp Business Platform (Cloud API de Meta) con un
+número y una cuenta de negocio verificados, y plantillas aprobadas por Meta para mensajes
+iniciados por la empresa. Cuando exista, se suma como otro transporte de la misma outbox (un
+`kind` por plantilla); hoy no hay nada de eso.
 
 ## Medios de las marcas
 
