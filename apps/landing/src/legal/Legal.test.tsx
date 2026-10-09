@@ -1,11 +1,14 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { CONTACT_EMAIL, LEGAL_NAME, TERMS_VERSION } from '@/config';
 import { text } from '@/test/fixtures';
+import { renderEs } from '@/test/render';
 
 import { PrivacyPage } from './PrivacyPage';
 import { TermsPage } from './TermsPage';
+
+const render = (ui: Parameters<typeof renderEs>[0]) => renderEs(ui, '/terminos');
 
 describe('Términos del servicio (TASK-007 AC1)', () => {
   it('un h1, índice con anclas y las secciones que pide la spec', () => {

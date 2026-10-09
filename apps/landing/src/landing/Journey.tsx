@@ -1,45 +1,40 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
 
-import { DEMO_EARNED, REWARDS } from './food';
+import { useT } from '@/i18n';
+
 import { useInView, useReducedMotion, useSequence } from './motion';
-import { Phone, type PhoneScreen } from './Phone';
+import { REWARDS } from './rewards';
+import { SAMPLE_ORDER, ShotPhone, type AppShot } from './shots';
 
 /**
  * Sección B — el recorrido del cliente en tres etapas, como pestañas (WAI-ARIA tabs: flechas,
  * Inicio y Fin). Avanza sola solo cuando está en pantalla, se pausa, y deja de avanzar en cuanto
- * la persona elige una etapa. Es una demostración: no hace pedidos ni toca datos reales.
+ * la persona elige una etapa. Capturas reales de la app de Carolina (cuenta y pedido de ejemplo). Los
+ * textos de cada etapa, por idioma, en `t.journey.stages`.
  */
-const STAGES: { id: string; screen: PhoneScreen; tab: string; title: string; text: string }[] = [
-  {
-    id: 'explorar',
-    screen: 'menu',
-    tab: 'Explorar el menú',
-    title: 'Un menú con su marca, desde el teléfono',
-    text: 'Su cliente abre la app de su restaurante y recorre el menú con fotos, precios y combos. Su marca es lo primero que ve.',
-  },
-  {
-    id: 'pedir',
-    screen: 'cart',
-    tab: 'Realizar un pedido',
-    title: 'Pide para llevar o para comer en el local',
-    text: 'Elige sus platos, confirma con su cuenta y sigue el estado del pedido: Nuevo, En cocina, Listo. Paga al retirar, directo en su restaurante.',
-  },
-  {
-    id: 'volver',
-    screen: 'points',
-    tab: 'Acumular recompensas',
-    title: 'Cada pedido suma puntos para el siguiente',
-    text: `Con la configuración inicial gana 1 punto por cada lempira y ${REWARDS.welcomeBonus} de bienvenida al crear su cuenta. Este pedido le dio ${DEMO_EARNED}.`,
-  },
+const STAGES: { id: string; key: 'explore' | 'order' | 'return'; screen: AppShot }[] = [
+  { id: 'explorar', key: 'explore', screen: 'menu' },
+  { id: 'pedir', key: 'order', screen: 'tracking' },
+  { id: 'volver', key: 'return', screen: 'profile' },
 ];
 
 export function Journey() {
+  const j = useT().journey;
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
   const reduced = useReducedMotion();
   const [paused, setPaused] = useState(false);
   const [step, setStep] = useSequence(STAGES.length, 4200, seen && !reduced && !paused);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const copy = {
+    explore: j.stages.explore,
+    order: j.stages.order,
+    return: {
+      ...j.stages.return,
+      text: j.stages.return.text(REWARDS.welcomeBonus, SAMPLE_ORDER.earnedPoints),
+    },
+  };
 
   const select = (index: number, focus = false) => {
     setStep(index);
@@ -78,15 +73,15 @@ export function Journey() {
     >
       <div className="container">
         <header className="section__head" data-reveal>
-          <p className="eyebrow">Experiencia del cliente</p>
+          <p className="eyebrow">{j.eyebrow}</p>
           <h2 className="display section__title" id="journey-title">
-            Una experiencia que invita a volver.
+            {j.title}
           </h2>
         </header>
 
         <div className="journey__layout" ref={ref}>
           <div className="journey__copy">
-            <div className="journey__tabs" role="tablist" aria-label="Etapas del recorrido">
+            <div className="journey__tabs" role="tablist" aria-label={j.tablistLabel}>
               {STAGES.map((s, index) => (
                 <button
                   key={s.id}
@@ -104,7 +99,7 @@ export function Journey() {
                   onKeyDown={onKeyDown}
                 >
                   <span className="journey__num">0{index + 1}</span>
-                  {s.tab}
+                  {copy[s.key].tab}
                   <span
                     className={`journey__progress${index === step && seen && !reduced && !paused ? ' is-running' : ''}`}
                     aria-hidden="true"
@@ -124,8 +119,8 @@ export function Journey() {
                   aria-labelledby={`tab-${s.id}`}
                   className={`journey__panel${index === step ? ' is-active' : ''}`}
                 >
-                  <h3 className="journey__title">{s.title}</h3>
-                  <p>{s.text}</p>
+                  <h3 className="journey__title">{copy[s.key].title}</h3>
+                  <p>{copy[s.key].text}</p>
                 </div>
               ))}
             </div>
@@ -137,14 +132,14 @@ export function Journey() {
                 aria-pressed={paused}
                 onClick={() => setPaused((p) => !p)}
               >
-                {paused ? 'Reproducir recorrido' : 'Pausar recorrido'}
+                {paused ? j.play : j.pause}
               </button>
             )}
           </div>
 
           <div className="journey__device">
             <div className="journey__halo" aria-hidden="true" />
-            <Phone screen={stage.screen} />
+            <ShotPhone screens={STAGES.map((s) => s.screen)} active={stage.screen} />
           </div>
         </div>
       </div>

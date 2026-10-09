@@ -13,7 +13,10 @@ export function NotFoundPage({ t }: { t: Dict }) {
         </h1>
         <p className="page__lead">
           {n.text} {n.productText}{' '}
-          <a href={config.restaurantsUrl}>{config.restaurantsUrl.replace('https://', '')}</a>.
+          <a href={config.restaurantsUrl[t.locale]}>
+            {config.restaurantsUrl[t.locale].replace('https://', '').replace(/[/]$/, '')}
+          </a>
+          .
         </p>
         <p>
           <a className="btn btn--primary" href={PATHS.home[t.locale]}>

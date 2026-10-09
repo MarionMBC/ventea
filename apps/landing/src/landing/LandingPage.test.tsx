@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs as render } from '@/test/render';
 
 import { LandingPage } from './LandingPage';
 
@@ -9,7 +10,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Landing (AC1)', () => {
+describe('Landing en español (AC1)', () => {
   it('muestra los precios de la API, ordenados, con Pro destacado', async () => {
     const fetchMock = mockFetch(() => json(PLANS));
     render(<LandingPage />);
@@ -70,7 +71,8 @@ describe('Landing (AC1)', () => {
     const h1 = screen.getAllByRole('heading', { level: 1 });
     expect(h1).toHaveLength(1);
     expect(text(h1[0])).toBe('Su restaurante. Su propia app. Sus propios clientes.');
-    expect(container.textContent).not.toMatch(/uber|pedidosya|rappi|glovo|didi|hugo/i);
+    // Con límites de palabra: `textContent` pega los textos («privacidadIdioma» contiene «didi»).
+    expect(container.textContent).not.toMatch(/\b(uber|pedidosya|rappi|glovo|didi|hugo)\b/i);
   });
 
   it('no promete lo que el producto no hace: delivery, pago en línea ni cifras inventadas', async () => {
@@ -96,18 +98,20 @@ describe('Landing (AC1)', () => {
     const { container } = render(<LandingPage />);
     await screen.findByTestId('price-pro');
     const loyalty = text(container.querySelector('#puntos'));
-    expect(loyalty).toContain('1 punto por cada lempira del pedido');
+    expect(loyalty).toContain('1 punto por unidad de moneda gastada (lempira o dólar)');
     expect(loyalty).toContain('50 puntos al crear su cuenta');
     expect(loyalty).toContain('Desde 100 puntos; cada punto vale 1 centavo');
   });
 
-  it('el pedido de ejemplo pasa por las columnas reales del tablero', async () => {
+  it('el tablero es la captura real del panel en español, con sus columnas en el alt', async () => {
     mockFetch(() => json(PLANS));
-    render(<LandingPage />);
+    const { container } = render(<LandingPage />);
     await screen.findByTestId('price-pro');
-    const board = screen.getByRole('img', { name: /Tablero de pedidos del restaurante/ });
-    expect(text(board)).toContain('Nuevos');
-    expect(text(board)).toContain('En cocina');
-    expect(text(board)).toContain('Listos');
+    const board = screen.getByRole('img', {
+      name: /tablero de pedidos con las columnas Nuevos, En cocina y Listos/,
+    });
+    expect(board.getAttribute('src')).toMatch(/panel-board-es/);
+    const history = container.querySelector<HTMLImageElement>('#panel img');
+    expect(history?.getAttribute('src')).toMatch(/panel-history-es/);
   });
 });

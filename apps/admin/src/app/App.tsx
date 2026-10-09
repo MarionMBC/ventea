@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -8,7 +8,7 @@ import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
 import { OrdersHistory } from '@/features/orders/OrdersHistory';
 import { OrdersSection } from '@/features/orders/OrdersSection';
-import { isPlatformHost, PlatformElsewhere } from '@/features/platform/host';
+import { isPlatformHost, isPlatformPath, PlatformElsewhere } from '@/features/platform/host';
 import { PlatformLayout } from '@/features/platform/PlatformLayout';
 import { PlatformLogin } from '@/features/platform/PlatformLogin';
 import {
@@ -19,11 +19,12 @@ import {
 import { Funnel } from '@/features/platform/Funnel';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
+import { I18nProvider } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
 import { AppShell, Placeholder } from './AppShell';
 import { ErrorBoundary } from './ErrorBoundary';
-import { ServicesProvider, type Services } from './services';
+import { ServicesProvider, useServices, type Services } from './services';
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -37,6 +38,25 @@ export function createQueryClient(): QueryClient {
       mutations: { retry: false },
     },
   });
+}
+
+/**
+ * Al perder la sesión (cerrar sesión, refresh rechazado, otra pestaña) se vacía TODA la caché:
+ * si no, quien entre después en la misma pestaña (p. ej. alguien del equipo tras el dueño)
+ * vería datos del anterior, como la facturación, aunque su rol no los pida.
+ */
+function ClearCacheOnSignOut() {
+  const { session } = useServices();
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let signedIn = session.get() !== null;
+    return session.subscribe(() => {
+      const now = session.get() !== null;
+      if (signedIn && !now) queryClient.clear();
+      signedIn = now;
+    });
+  }, [session, queryClient]);
+  return null;
 }
 
 /**
@@ -63,48 +83,57 @@ export function App({
 }) {
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
   const [platform] = useState(() => providedPlatform ?? createDefaultPlatformServices());
+  // El panel de plataforma es solo en español: también su <html lang> y su pantalla de error.
+  const [forcedLang] = useState(() =>
+    isPlatformHost(hostname) && isPlatformPath(window.location.pathname, basename)
+      ? ('es' as const)
+      : undefined,
+  );
   return (
-    <ErrorBoundary>
-      <ServicesProvider services={services}>
-        <PlatformProvider services={platform}>
-          <QueryClientProvider client={queryClient}>
-            <BrowserRouter basename={basename}>
-              <Routes>
-                {isPlatformHost(hostname) ? (
-                  <>
-                    <Route path="/plataforma/login" element={<PlatformLogin />} />
-                    <Route path="/plataforma" element={<PlatformLayout />}>
-                      <Route index element={<TenantList />} />
-                      <Route path="marcas/:slug" element={<TenantDetail />} />
-                      <Route path="embudo" element={<Funnel />} />
-                      <Route path="*" element={<Navigate to="/plataforma" replace />} />
+    <I18nProvider lang={forcedLang}>
+      <ErrorBoundary>
+        <ServicesProvider services={services}>
+          <PlatformProvider services={platform}>
+            <QueryClientProvider client={queryClient}>
+              <ClearCacheOnSignOut />
+              <BrowserRouter basename={basename}>
+                <Routes>
+                  {isPlatformHost(hostname) ? (
+                    <>
+                      <Route path="/plataforma/login" element={<PlatformLogin />} />
+                      <Route path="/plataforma" element={<PlatformLayout />}>
+                        <Route index element={<TenantList />} />
+                        <Route path="marcas/:slug" element={<TenantDetail />} />
+                        <Route path="embudo" element={<Funnel />} />
+                        <Route path="*" element={<Navigate to="/plataforma" replace />} />
+                      </Route>
+                    </>
+                  ) : (
+                    <Route path="/plataforma/*" element={<PlatformElsewhere />} />
+                  )}
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route element={<RequireStaff />}>
+                    <Route element={<AppShell />}>
+                      <Route path="/orders" element={<OrdersSection />}>
+                        <Route index element={<OrdersBoard />} />
+                        <Route path="history" element={<OrdersHistory />} />
+                      </Route>
+                      {/* TODO: features/menu, locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
+                      <Route path="/menu" element={<Placeholder title="nav.menu" />} />
+                      <Route path="/locations" element={<Placeholder title="nav.locations" />} />
+                      <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
+                      <Route path="/staff" element={<Placeholder title="nav.staff" />} />
+                      <Route path="/reports" element={<Placeholder title="nav.reports" />} />
+                      <Route path="/facturacion" element={<BillingPage />} />
                     </Route>
-                  </>
-                ) : (
-                  <Route path="/plataforma/*" element={<PlatformElsewhere />} />
-                )}
-                <Route path="/login" element={<LoginPage />} />
-                <Route element={<RequireStaff />}>
-                  <Route element={<AppShell />}>
-                    <Route path="/orders" element={<OrdersSection />}>
-                      <Route index element={<OrdersBoard />} />
-                      <Route path="history" element={<OrdersHistory />} />
-                    </Route>
-                    {/* TODO: features/menu, locations, rewards, staff y reports (fuera de TASK-003). */}
-                    <Route path="/menu" element={<Placeholder title="Menú" />} />
-                    <Route path="/locations" element={<Placeholder title="Sucursales" />} />
-                    <Route path="/rewards" element={<Placeholder title="Puntos" />} />
-                    <Route path="/staff" element={<Placeholder title="Equipo" />} />
-                    <Route path="/reports" element={<Placeholder title="Reportes" />} />
-                    <Route path="/facturacion" element={<BillingPage />} />
                   </Route>
-                </Route>
-                <Route path="*" element={<Navigate to="/orders" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </QueryClientProvider>
-        </PlatformProvider>
-      </ServicesProvider>
-    </ErrorBoundary>
+                  <Route path="*" element={<Navigate to="/orders" replace />} />
+                </Routes>
+              </BrowserRouter>
+            </QueryClientProvider>
+          </PlatformProvider>
+        </ServicesProvider>
+      </ErrorBoundary>
+    </I18nProvider>
   );
 }

@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 
 import { BASE_DOMAIN } from '@/config';
+import { useT } from '@/i18n';
 import { isSlugFormatValid, slugify } from '@/lib/format';
 
 /**
@@ -12,6 +13,7 @@ export function PanelAccess({
 }: {
   navigate?: (url: string) => void;
 }) {
+  const a = useT().panelAccess;
   const id = useId();
   const [value, setValue] = useState('');
   const [error, setError] = useState<string>();
@@ -25,7 +27,7 @@ export function PanelAccess({
       .replace(/^https?:\/\//, '');
     const slug = slugify(host.split('.')[0] ?? '');
     if (!isSlugFormatValid(slug)) {
-      setError('Escriba la dirección de su restaurante, por ejemplo: mi-restaurante.');
+      setError(a.error);
       return;
     }
     setError(undefined);
@@ -35,13 +37,13 @@ export function PanelAccess({
   return (
     <form className="access" id="acceso" onSubmit={onSubmit} noValidate>
       <label className="access__label" htmlFor={id}>
-        Entrar a mi panel
+        {a.label}
       </label>
       <div className="access__row">
         <input
           id={id}
           className="access__input"
-          placeholder="su-restaurante"
+          placeholder={a.placeholder}
           autoComplete="off"
           autoCapitalize="none"
           spellCheck={false}
@@ -54,7 +56,7 @@ export function PanelAccess({
           .{BASE_DOMAIN}
         </span>
         <button type="submit" className="access__go">
-          Ir
+          {a.go}
         </button>
       </div>
       {error ? (
@@ -63,7 +65,7 @@ export function PanelAccess({
         </p>
       ) : (
         <p className="access__hint" id={`${id}-hint`}>
-          La dirección que eligió al registrarse.
+          {a.hint}
         </p>
       )}
     </form>

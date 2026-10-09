@@ -10,6 +10,7 @@ import type { OrderStatus, StaffOrder } from '@ventea/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useApi } from '@/app/services';
+import { describeError, useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
 import {
@@ -111,6 +112,8 @@ export interface StatusChange {
 export function useUpdateOrderStatus(notify: (tone: Notice['tone'], text: string) => void) {
   const client = useApi();
   const queryClient = useQueryClient();
+  const i18n = useI18n();
+  const { t } = i18n;
 
   return useMutation({
     mutationKey: UPDATE_STATUS_KEY,
@@ -129,11 +132,12 @@ export function useUpdateOrderStatus(notify: (tone: Notice['tone'], text: string
         (current) => current && upsertOrder(current, updated),
       );
       if (updated.status === 'cancelled') {
-        const refund =
+        notify(
+          'info',
           order.pointsRedeemed > 0
-            ? ` Se devolvieron ${order.pointsRedeemed} puntos al cliente.`
-            : '';
-        notify('info', `Pedido ${order.code} cancelado.${refund}`);
+            ? t('notice.cancelledPoints', { code: order.code, count: order.pointsRedeemed })
+            : t('notice.cancelled', { code: order.code }),
+        );
       }
     },
     onError: (error, { order }) => {
@@ -143,12 +147,12 @@ export function useUpdateOrderStatus(notify: (tone: Notice['tone'], text: string
         (current) => current && upsertOrder(current, order),
       );
       if (error instanceof ApiError && error.status === 409) {
-        notify(
-          'warning',
-          `Otra persona ya cambió el pedido ${order.code}. Actualizamos el tablero.`,
-        );
+        notify('warning', t('notice.conflict', { code: order.code }));
       } else {
-        notify('error', `No se pudo actualizar el pedido ${order.code}. ${error.message}`);
+        notify(
+          'error',
+          t('notice.failed', { code: order.code, message: describeError(error, i18n) }),
+        );
       }
     },
     onSettled: () => {

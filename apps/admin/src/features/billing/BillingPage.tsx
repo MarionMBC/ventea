@@ -11,16 +11,9 @@ import { Navigate } from 'react-router-dom';
 
 import { useApi, useSession } from '@/app/services';
 import { ConfirmDialog } from '@/features/platform/ConfirmDialog';
-import {
-  cardLabel,
-  formatDateTime,
-  formatDay,
-  formatUsdCents,
-  INTERVAL_LABEL,
-  PLAN_LABEL,
-} from '@/features/platform/labels';
-import { StatusBadge } from '@/features/platform/StatusBadge';
+import { describeError, useI18n, type I18n } from '@/i18n';
 import { panelBillingOverviewSchema, type PanelBillingOverview } from '@/lib/billing-schemas';
+import { IconAlert, IconBilling, IconHistory, IconStar } from '@/ui/icons';
 
 import {
   BILLING_CONTACT_EMAIL,
@@ -38,6 +31,26 @@ const plansSchema = {
 
 type Action = 'change-plan' | 'cancel' | 'resume';
 
+/** Insignia del estado de la suscripción (mismos colores que la de plataforma, traducida). */
+function SubscriptionBadge({ status }: { status: PanelBillingOverview['status'] | undefined }) {
+  const { t } = useI18n();
+  return (
+    <span className={`pf-badge pf-badge--${status ?? 'none'}`}>
+      {t(status ? `subscription.${status}` : 'subscription.none')}
+    </span>
+  );
+}
+
+/** `visa ••••4242`, o «Sin tarjeta». La API nunca expone más datos de la tarjeta. */
+function cardText(card: PanelBillingOverview['card'], t: I18n['t']): string {
+  if (!card) return t('billing.noCard');
+  return [card.brand ?? t('billing.card'), card.last4 ? `••••${card.last4}` : null]
+    .filter(Boolean)
+    .join(' ');
+}
+
+const contactLink = <a href={`mailto:${BILLING_CONTACT_EMAIL}`}>{BILLING_CONTACT_EMAIL}</a>;
+
 /**
  * Facturación de la marca (`GET /api/billing`), solo para el dueño: la API responde 403
  * a manager y staff, y el panel ni siquiera muestra la sección. Funciona con la marca
@@ -47,12 +60,14 @@ export function BillingPage() {
   const session = useSession();
   const client = useApi();
   const queryClient = useQueryClient();
+  const i18n = useI18n();
+  const { t, rich, day, dateTime, money } = i18n;
   const [dialog, setDialog] = useState<Action | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'Facturación · Ventea';
-  }, []);
+    document.title = t('billing.pageTitle');
+  }, [t]);
 
   const billing = useBillingOverview();
 
@@ -71,12 +86,31 @@ export function BillingPage() {
   if (billing.error) {
     return (
       <div className="state state--error" role="alert">
-        <h1>No se pudo cargar la facturación</h1>
-        <p>{billing.error.message}</p>
+        <span className="state__icon">
+          <IconAlert size={28} />
+        </span>
+        <h1>{t('billing.errorTitle')}</h1>
+        <p>{describeError(billing.error, i18n)}</p>
       </div>
     );
   }
-  if (!billing.data) return <p className="pf-muted">Cargando facturación…</p>;
+  if (!billing.data) {
+    return (
+      <div className="page" role="status">
+        <span className="sr-only">{t('billing.loading')}</span>
+        <div className="page-grid" aria-hidden="true">
+          {[0, 1].map((i) => (
+            <div key={i} className="card card--skeleton">
+              <span className="skeleton" style={{ width: '40%', height: 22 }} />
+              <span className="skeleton" style={{ width: '90%', height: 14 }} />
+              <span className="skeleton" style={{ width: '75%', height: 14 }} />
+              <span className="skeleton" style={{ width: '60%', height: 14 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const data = billing.data;
   const open = (kind: Action) => {
@@ -94,113 +128,143 @@ export function BillingPage() {
         },
       },
     );
-  const periodEnd = formatDay(data.currentPeriodEnd);
+  const periodEnd = day(data.currentPeriodEnd);
+  const per = data.interval === 'year' ? t('billing.perYear') : t('billing.perMonth');
+  const actionError = action.error ? describeError(action.error, i18n) : undefined;
+  const dialogLabels = {
+    cancelLabel: t('billing.dialogBack'),
+    pendingLabel: t('billing.applying'),
+  };
 
   return (
-    <section className="pf-page billing" aria-labelledby="billing-title">
-      <div className="pf-page__head">
-        <h1 id="billing-title">Facturación</h1>
-        <StatusBadge status={data.status} />
-      </div>
+    <section className="page billing" aria-labelledby="billing-title">
+      <header className="page-head">
+        <div className="page-head__text">
+          <h1 id="billing-title" className="page-head__title">
+            {t('billing.title')}
+          </h1>
+          <p className="page-head__sub">{t('billing.subtitle')}</p>
+        </div>
+        <SubscriptionBadge status={data.status} />
+      </header>
 
       <StatusBanner data={data} />
 
       {done && (
-        <p className="pf-flash" role="status">
+        <p className="flash" role="status">
           {done}
         </p>
       )}
 
-      <div className="pf-grid">
-        <article className="pf-card" aria-labelledby="billing-plan">
-          <h2 id="billing-plan">Tu plan</h2>
-          <dl className="pf-facts">
-            <Fact label="Plan">
-              {data.planName} {INTERVAL_LABEL[data.interval]}
+      <div className="page-grid">
+        <article className="card" aria-labelledby="billing-plan">
+          <div className="card__head">
+            <span className="card__icon" aria-hidden="true">
+              <IconStar size={20} />
+            </span>
+            <h2 id="billing-plan">{t('billing.yourPlan')}</h2>
+          </div>
+          <dl className="facts">
+            <Fact label={t('billing.plan')}>
+              {data.planName} {t(`interval.${data.interval}`)}
             </Fact>
-            <Fact label="Precio">
-              {formatUsdCents(data.price.amountCents)} {data.price.currency} /{' '}
-              {data.interval === 'year' ? 'año' : 'mes'}
+            <Fact label={t('billing.price')}>
+              {money(data.price.amountCents, data.price.currency)} {data.price.currency} / {per}
             </Fact>
-            <Fact label="Estado">
-              <StatusBadge status={data.status} />
+            <Fact label={t('billing.status')}>
+              <SubscriptionBadge status={data.status} />
             </Fact>
             {data.status === 'trialing' && data.trialEndsAt && (
-              <Fact label="Prueba gratis hasta">{formatDay(data.trialEndsAt)}</Fact>
+              <Fact label={t('billing.trialUntil')}>{day(data.trialEndsAt)}</Fact>
             )}
-            <Fact label="Período actual">
-              {formatDay(data.currentPeriodStart)} – {periodEnd}
+            <Fact label={t('billing.currentPeriod')}>
+              {day(data.currentPeriodStart)} – {periodEnd}
             </Fact>
-            {data.retryAt && <Fact label="Próximo reintento">{formatDay(data.retryAt)}</Fact>}
+            {data.retryAt && <Fact label={t('billing.nextRetry')}>{day(data.retryAt)}</Fact>}
             {data.pendingPlan && (
-              <Fact label="Cambio agendado">
-                {PLAN_LABEL[data.pendingPlan.planCode]} {INTERVAL_LABEL[data.pendingPlan.interval]}{' '}
-                desde el {periodEnd}
+              <Fact label={t('billing.scheduledChange')}>
+                {t('billing.scheduledChangeValue', {
+                  plan: t(`plan.${data.pendingPlan.planCode}`),
+                  interval: t(`interval.${data.pendingPlan.interval}`),
+                  date: periodEnd,
+                })}
               </Fact>
             )}
-            <Fact label="Renovación">
-              {data.cancelAtPeriodEnd ? `Se cancela el ${periodEnd}` : 'Automática'}
+            <Fact label={t('billing.renewal')}>
+              {data.cancelAtPeriodEnd
+                ? t('billing.cancelsOn', { date: periodEnd })
+                : t('billing.automatic')}
             </Fact>
           </dl>
-          <div className="pf-actions" role="group" aria-label="Acciones del plan">
+          <div className="card__actions" role="group" aria-label={t('billing.planActions')}>
             <button type="button" className="btn btn--ghost" onClick={() => open('change-plan')}>
-              Cambiar plan
+              {t('billing.changePlan')}
             </button>
             {data.cancelAtPeriodEnd ? (
               <button type="button" className="btn btn--primary" onClick={() => open('resume')}>
-                Reanudar suscripción
+                {t('billing.resume')}
               </button>
             ) : (
               data.status !== 'canceled' && (
-                <button type="button" className="btn btn--danger" onClick={() => open('cancel')}>
-                  Cancelar suscripción
+                <button
+                  type="button"
+                  className="btn btn--quiet btn--danger-text"
+                  onClick={() => open('cancel')}
+                >
+                  {t('billing.cancel')}
                 </button>
               )
             )}
           </div>
         </article>
 
-        <article className="pf-card" aria-labelledby="billing-card">
-          <h2 id="billing-card">Forma de pago</h2>
-          <dl className="pf-facts">
-            <Fact label="Tarjeta">{cardLabel(data.card)}</Fact>
+        <article className="card" aria-labelledby="billing-card">
+          <div className="card__head">
+            <span className="card__icon" aria-hidden="true">
+              <IconBilling size={20} />
+            </span>
+            <h2 id="billing-card">{t('billing.paymentMethod')}</h2>
+          </div>
+          <dl className="facts">
+            <Fact label={t('billing.card')}>{cardText(data.card, t)}</Fact>
           </dl>
-          <p className="billing__note">
-            El pago se coordina con el equipo de Ventea: escríbenos a{' '}
-            <a href={`mailto:${BILLING_CONTACT_EMAIL}`}>{BILLING_CONTACT_EMAIL}</a>.
-          </p>
-          {data.mode !== 'manual' && (
-            <p className="pf-muted">
-              Pronto vas a poder registrar tu tarjeta desde acá para el cobro automático.
-            </p>
-          )}
+          <p className="card__note">{rich('billing.paymentNote', { email: contactLink })}</p>
+          {data.mode !== 'manual' && <p className="muted">{t('billing.cardSoon')}</p>}
         </article>
       </div>
 
-      <article className="pf-card" aria-labelledby="billing-events">
-        <h2 id="billing-events">Movimientos recientes</h2>
+      <article className="card" aria-labelledby="billing-events">
+        <div className="card__head">
+          <span className="card__icon" aria-hidden="true">
+            <IconHistory size={20} />
+          </span>
+          <h2 id="billing-events">{t('billing.events')}</h2>
+        </div>
         {data.events.length === 0 ? (
-          <p className="pf-muted">Sin movimientos.</p>
+          <p className="muted">{t('billing.noEvents')}</p>
         ) : (
-          <div className="pf-table-wrap">
-            <table className="pf-table">
-              <caption className="sr-only">Últimos movimientos, el más reciente primero</caption>
+          <div className="table-wrap">
+            <table className="data-table">
+              <caption className="sr-only">{t('billing.eventsCaption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Fecha</th>
-                  <th scope="col">Movimiento</th>
-                  <th scope="col" className="pf-num">
-                    Monto
+                  <th scope="col">{t('billing.colDate')}</th>
+                  <th scope="col">{t('billing.colEvent')}</th>
+                  <th scope="col" className="num">
+                    {t('billing.colAmount')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {data.events.map((event, index) => (
                   <tr key={`${event.createdAt.toISOString()}-${index}`}>
-                    <td>{formatDateTime(event.createdAt)}</td>
+                    <td className="nowrap">{dateTime(event.createdAt)}</td>
+                    {/* La descripción la escribe el servidor (hoy, en español). */}
                     <td>{event.description}</td>
-                    <td className="pf-num">
-                      {event.amountCents === null ? '—' : formatUsdCents(event.amountCents)}
+                    <td className="num">
+                      {event.amountCents === null
+                        ? '—'
+                        : money(event.amountCents, data.price.currency)}
                     </td>
                   </tr>
                 ))}
@@ -215,45 +279,38 @@ export function BillingPage() {
           current={{ planCode: data.planCode, interval: data.interval }}
           periodEnd={periodEnd}
           pending={action.isPending}
-          error={action.error?.message}
+          error={actionError}
           onCancel={() => setDialog(null)}
           onConfirm={(planCode, interval) =>
-            run(
-              'change-plan',
-              { planCode, interval },
-              `Cambio de plan agendado: empieza el ${periodEnd}.`,
-            )
+            run('change-plan', { planCode, interval }, t('billing.changeDone', { date: periodEnd }))
           }
         />
       )}
       {dialog === 'cancel' && (
         <ConfirmDialog
-          title="¿Cancelar tu suscripción?"
-          confirmLabel="Sí, cancelar"
+          {...dialogLabels}
+          title={t('billing.cancelTitle')}
+          confirmLabel={t('billing.cancelConfirm')}
           danger
           pending={action.isPending}
-          error={action.error?.message}
+          error={actionError}
           onCancel={() => setDialog(null)}
-          onConfirm={() =>
-            run('cancel', undefined, `Listo: tu servicio sigue hasta el ${periodEnd}.`)
-          }
+          onConfirm={() => run('cancel', undefined, t('billing.cancelDone', { date: periodEnd }))}
         >
-          <p>
-            Tu restaurante sigue funcionando hasta el <strong>{periodEnd}</strong>. Después tus
-            clientes ya no van a poder pedir. Puedes reanudarla antes de esa fecha.
-          </p>
+          <p>{rich('billing.cancelBody', { date: <strong>{periodEnd}</strong> })}</p>
         </ConfirmDialog>
       )}
       {dialog === 'resume' && (
         <ConfirmDialog
-          title="¿Reanudar tu suscripción?"
-          confirmLabel="Reanudar"
+          {...dialogLabels}
+          title={t('billing.resumeTitle')}
+          confirmLabel={t('billing.resumeConfirm')}
           pending={action.isPending}
-          error={action.error?.message}
+          error={actionError}
           onCancel={() => setDialog(null)}
-          onConfirm={() => run('resume', undefined, 'Suscripción reanudada.')}
+          onConfirm={() => run('resume', undefined, t('billing.resumeDone'))}
         >
-          <p>Se anula la cancelación: tu plan se renueva normalmente el {periodEnd}.</p>
+          <p>{t('billing.resumeBody', { date: periodEnd })}</p>
         </ConfirmDialog>
       )}
     </section>
@@ -283,6 +340,7 @@ function ChangePlanDialog({
   onConfirm: (planCode: PlanCode, interval: BillingInterval) => void;
 }) {
   const client = useApi();
+  const { t, money } = useI18n();
   const plans = useQuery({
     queryKey: ['billing', 'plans'],
     queryFn: ({ signal }) =>
@@ -297,12 +355,14 @@ function ChangePlanDialog({
   return (
     <ConfirmDialog
       {...props}
-      title="Cambiar plan"
-      confirmLabel="Agendar cambio"
+      cancelLabel={t('billing.dialogBack')}
+      pendingLabel={t('billing.applying')}
+      title={t('billing.changeTitle')}
+      confirmLabel={t('billing.changeConfirm')}
       onConfirm={() => (unchanged ? props.onCancel() : onConfirm(planCode, interval))}
     >
       <label className="field">
-        <span className="field__label">Plan</span>
+        <span className="field__label">{t('billing.plan')}</span>
         <select
           className="field__input"
           value={planCode}
@@ -313,11 +373,11 @@ function ChangePlanDialog({
               {plan.name}
             </option>
           ))}
-          {!plans.data && <option value={current.planCode}>{PLAN_LABEL[current.planCode]}</option>}
+          {!plans.data && <option value={current.planCode}>{t(`plan.${current.planCode}`)}</option>}
         </select>
       </label>
       <label className="field">
-        <span className="field__label">Forma de pago</span>
+        <span className="field__label">{t('billing.cycle')}</span>
         <select
           className="field__input"
           value={interval}
@@ -325,23 +385,24 @@ function ChangePlanDialog({
         >
           {BILLING_INTERVAL.map((value) => (
             <option key={value} value={value}>
-              {value === 'year' ? 'Anual (2 meses gratis)' : 'Mensual'}
+              {value === 'year' ? t('billing.yearlyOption') : t('billing.monthlyOption')}
             </option>
           ))}
         </select>
       </label>
       {price && (
         <p>
-          Nuevo precio:{' '}
+          {t('billing.newPrice')}{' '}
           <strong>
-            {formatUsdCents(interval === 'year' ? price.priceYearlyCents : price.priceMonthlyCents)}{' '}
-            USD / {interval === 'year' ? 'año' : 'mes'}
+            {money(
+              interval === 'year' ? price.priceYearlyCents : price.priceMonthlyCents,
+              price.currency,
+            )}{' '}
+            {price.currency} / {interval === 'year' ? t('billing.perYear') : t('billing.perMonth')}
           </strong>
         </p>
       )}
-      <p className="pf-muted">
-        El cambio empieza el {periodEnd}, al abrir tu próximo período. No hay cobros proporcionales.
-      </p>
+      <p className="muted">{t('billing.changeNote', { date: periodEnd })}</p>
     </ConfirmDialog>
   );
 }

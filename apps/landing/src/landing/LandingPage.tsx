@@ -1,6 +1,7 @@
 import type { BillingInterval } from '@ventea/shared';
 import { useEffect, useState } from 'react';
 
+import { useT } from '@/i18n';
 import { track, trackOnce } from '@/lib/track';
 import { usePlans } from '@/lib/usePlans';
 import { SiteFooter } from '@/site/SiteFooter';
@@ -27,15 +28,19 @@ import { Pricing } from './Pricing';
  * puntos, el panel, cómo empezar, la diferencia, los precios y las dudas.
  */
 export function LandingPage() {
+  const t = useT();
   const plans = usePlans();
   const [interval, setBillingInterval] = useState<BillingInterval>('month');
   useRevealOnScroll();
 
-  // Embudo: una visita por pestaña y cada clic en un link al registro (hero, precios, CTA…).
+  // Embudo: una visita por pestaña y cada clic en un link al registro (hero, precios, CTA…), en
+  // los dos idiomas: `/signup` (inglés) y `/registro` (español).
   useEffect(() => {
     trackOnce('visit');
     const onClick = (event: MouseEvent) => {
-      const link = (event.target as Element | null)?.closest?.('a[href^="/registro"]');
+      const link = (event.target as Element | null)?.closest?.(
+        'a[href^="/registro"], a[href^="/signup"]',
+      );
       if (link) track('cta_click');
     };
     document.addEventListener('click', onClick);
@@ -45,7 +50,7 @@ export function LandingPage() {
   return (
     <>
       <a className="skip-link" href="#contenido">
-        Saltar al contenido
+        {t.common.skipToContent}
       </a>
       <SiteHeader />
 

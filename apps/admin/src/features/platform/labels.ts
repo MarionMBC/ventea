@@ -6,6 +6,8 @@ import type {
   SubscriptionStatus,
 } from '@ventea/shared';
 
+import { formatMoney, PANEL_LOCALE } from '@/lib/format';
+
 export const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   trialing: 'En prueba',
   active: 'Activa',
@@ -92,8 +94,9 @@ const dateTimeFormat = new Intl.DateTimeFormat('es-HN', {
 export const formatDay = (date: Date) => dateFormat.format(date);
 export const formatDateTime = (date: Date) => dateTimeFormat.format(date);
 
-export function formatUsdCents(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Dólares del cobro de la plataforma, con el formato del locale (por defecto el del panel). */
+export function formatUsdCents(cents: number, locale = PANEL_LOCALE): string {
+  return formatMoney(cents, 'USD', locale);
 }
 
 /** `Visa ••••4242`, o «Sin tarjeta». Nunca hay más datos: la API no los expone. */

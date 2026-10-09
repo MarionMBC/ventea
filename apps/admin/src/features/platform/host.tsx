@@ -22,10 +22,19 @@ export function isPlatformHost(hostname: string): boolean {
   return host === PLATFORM_HOST || LOCAL_HOSTS.has(host);
 }
 
+/**
+ * La URL es del panel de plataforma (`<basename>/plataforma…`). Ese panel está solo en español:
+ * el idioma del panel (y con él `<html lang>` y la pantalla de error) se fija en español.
+ */
+export function isPlatformPath(pathname: string, basename: string): boolean {
+  const prefix = `${basename.replace(/\/$/, '')}/plataforma`;
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 /** Lo que se ve en `/admin/plataforma` desde un host que no es el de la plataforma. */
 export function PlatformElsewhere() {
   return (
-    <main className="state">
+    <main className="state" lang="es">
       <h1>El panel de plataforma no está acá</h1>
       <p>
         Se usa solo en <a href={PLATFORM_URL}>{PLATFORM_URL.replace('https://', '')}</a>.
