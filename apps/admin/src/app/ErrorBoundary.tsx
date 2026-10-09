@@ -1,5 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
+import { useT } from '@/i18n';
+import { IconAlert } from '@/ui/icons';
+
 interface State {
   failed: boolean;
 }
@@ -20,21 +23,24 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   override render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <main className="crash">
-        <div className="state state--error" role="alert">
-          <h1>Algo salió mal en el panel</h1>
-          <p>Recarga la página para seguir. Tus pedidos no se pierden.</p>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => window.location.reload()}
-          >
-            Recargar
-          </button>
-        </div>
-      </main>
-    );
+    return this.state.failed ? <CrashScreen /> : this.props.children;
   }
+}
+
+function CrashScreen() {
+  const t = useT();
+  return (
+    <main className="crash">
+      <div className="state state--error" role="alert">
+        <span className="state__icon">
+          <IconAlert size={28} />
+        </span>
+        <h1>{t('crash.title')}</h1>
+        <p>{t('crash.body')}</p>
+        <button type="button" className="btn btn--primary" onClick={() => window.location.reload()}>
+          {t('crash.reload')}
+        </button>
+      </div>
+    </main>
+  );
 }

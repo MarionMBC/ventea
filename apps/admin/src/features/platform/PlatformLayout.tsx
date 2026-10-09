@@ -34,7 +34,7 @@ export function PlatformLayout() {
   }
 
   return (
-    <div className="pf">
+    <div className="pf" lang="es">
       <header className="pf__header">
         <Link to="/plataforma" className="pf__brand">
           Ventea <span>Plataforma</span>

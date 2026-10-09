@@ -19,6 +19,7 @@ import {
 import { Funnel } from '@/features/platform/Funnel';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
+import { I18nProvider } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
 import { AppShell, Placeholder } from './AppShell';
@@ -64,47 +65,49 @@ export function App({
   const [queryClient] = useState(() => providedClient ?? createQueryClient());
   const [platform] = useState(() => providedPlatform ?? createDefaultPlatformServices());
   return (
-    <ErrorBoundary>
-      <ServicesProvider services={services}>
-        <PlatformProvider services={platform}>
-          <QueryClientProvider client={queryClient}>
-            <BrowserRouter basename={basename}>
-              <Routes>
-                {isPlatformHost(hostname) ? (
-                  <>
-                    <Route path="/plataforma/login" element={<PlatformLogin />} />
-                    <Route path="/plataforma" element={<PlatformLayout />}>
-                      <Route index element={<TenantList />} />
-                      <Route path="marcas/:slug" element={<TenantDetail />} />
-                      <Route path="embudo" element={<Funnel />} />
-                      <Route path="*" element={<Navigate to="/plataforma" replace />} />
+    <I18nProvider>
+      <ErrorBoundary>
+        <ServicesProvider services={services}>
+          <PlatformProvider services={platform}>
+            <QueryClientProvider client={queryClient}>
+              <BrowserRouter basename={basename}>
+                <Routes>
+                  {isPlatformHost(hostname) ? (
+                    <>
+                      <Route path="/plataforma/login" element={<PlatformLogin />} />
+                      <Route path="/plataforma" element={<PlatformLayout />}>
+                        <Route index element={<TenantList />} />
+                        <Route path="marcas/:slug" element={<TenantDetail />} />
+                        <Route path="embudo" element={<Funnel />} />
+                        <Route path="*" element={<Navigate to="/plataforma" replace />} />
+                      </Route>
+                    </>
+                  ) : (
+                    <Route path="/plataforma/*" element={<PlatformElsewhere />} />
+                  )}
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route element={<RequireStaff />}>
+                    <Route element={<AppShell />}>
+                      <Route path="/orders" element={<OrdersSection />}>
+                        <Route index element={<OrdersBoard />} />
+                        <Route path="history" element={<OrdersHistory />} />
+                      </Route>
+                      {/* TODO: features/menu, locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
+                      <Route path="/menu" element={<Placeholder title="nav.menu" />} />
+                      <Route path="/locations" element={<Placeholder title="nav.locations" />} />
+                      <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
+                      <Route path="/staff" element={<Placeholder title="nav.staff" />} />
+                      <Route path="/reports" element={<Placeholder title="nav.reports" />} />
+                      <Route path="/facturacion" element={<BillingPage />} />
                     </Route>
-                  </>
-                ) : (
-                  <Route path="/plataforma/*" element={<PlatformElsewhere />} />
-                )}
-                <Route path="/login" element={<LoginPage />} />
-                <Route element={<RequireStaff />}>
-                  <Route element={<AppShell />}>
-                    <Route path="/orders" element={<OrdersSection />}>
-                      <Route index element={<OrdersBoard />} />
-                      <Route path="history" element={<OrdersHistory />} />
-                    </Route>
-                    {/* TODO: features/menu, locations, rewards, staff y reports (fuera de TASK-003). */}
-                    <Route path="/menu" element={<Placeholder title="Menú" />} />
-                    <Route path="/locations" element={<Placeholder title="Sucursales" />} />
-                    <Route path="/rewards" element={<Placeholder title="Puntos" />} />
-                    <Route path="/staff" element={<Placeholder title="Equipo" />} />
-                    <Route path="/reports" element={<Placeholder title="Reportes" />} />
-                    <Route path="/facturacion" element={<BillingPage />} />
                   </Route>
-                </Route>
-                <Route path="*" element={<Navigate to="/orders" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </QueryClientProvider>
-        </PlatformProvider>
-      </ServicesProvider>
-    </ErrorBoundary>
+                  <Route path="*" element={<Navigate to="/orders" replace />} />
+                </Routes>
+              </BrowserRouter>
+            </QueryClientProvider>
+          </PlatformProvider>
+        </ServicesProvider>
+      </ErrorBoundary>
+    </I18nProvider>
   );
 }

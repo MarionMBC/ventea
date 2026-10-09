@@ -13,6 +13,11 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /**
+     * Who wrote `message`: `undefined` = the API; otherwise the panel itself (network
+     * failure, expired session, a fallback by status). The UI translates the latter.
+     */
+    readonly kind?: 'network' | 'session' | 'fallback',
   ) {
     super(message);
     this.name = 'ApiError';
@@ -53,6 +58,7 @@ export interface ApiClientOptions {
 /** Mensaje legible de una respuesta de error de la API, con fallback por status. */
 export async function errorFrom(response: Response): Promise<ApiError> {
   let message = '';
+  let kind: ApiError['kind'];
   try {
     const body = (await response.json()) as { message?: unknown };
     if (typeof body.message === 'string') message = body.message;
@@ -61,12 +67,13 @@ export async function errorFrom(response: Response): Promise<ApiError> {
     // Cuerpo vacío o no JSON (p. ej. un 502 del proxy).
   }
   if (!message) {
+    kind = 'fallback';
     message =
       response.status >= 500
         ? `El servidor no respondió bien (${response.status}). Intenta de nuevo.`
         : `La petición falló (${response.status}).`;
   }
-  return new ApiError(response.status, message);
+  return new ApiError(response.status, message, kind);
 }
 
 /**
@@ -119,13 +126,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      throw new ApiError(0, NETWORK_ERROR_MESSAGE);
+      throw new ApiError(0, NETWORK_ERROR_MESSAGE, 'network');
     }
   }
 
   async function refreshTokens(): Promise<void> {
     const current = session.get();
-    if (!current) throw new ApiError(401, SESSION_EXPIRED_MESSAGE);
+    if (!current) throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
 
     const response = await send(
       '/auth/refresh',
@@ -137,7 +144,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     );
     if ([400, 401, 403].includes(response.status)) {
       session.set(null);
-      throw new ApiError(401, SESSION_EXPIRED_MESSAGE);
+      throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
     }
     if (!response.ok) throw await errorFrom(response);
     session.updateTokens(authTokensSchema.parse(await response.json()));
@@ -154,7 +161,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
     const { method = 'GET', body, auth = true, schema, signal } = opts;
     const token = auth ? session.get()?.accessToken : undefined;
-    if (auth && !token) throw new ApiError(401, SESSION_EXPIRED_MESSAGE);
+    if (auth && !token) throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
 
     let response = await send(path, method, body, token, signal);
 
@@ -165,7 +172,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       response = await send(path, method, body, session.get()?.accessToken, signal);
       if (response.status === 401) {
         session.set(null);
-        throw new ApiError(401, SESSION_EXPIRED_MESSAGE);
+        throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
       }
     }
 

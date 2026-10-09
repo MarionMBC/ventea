@@ -25,7 +25,7 @@ export function isPlatformHost(hostname: string): boolean {
 /** Lo que se ve en `/admin/plataforma` desde un host que no es el de la plataforma. */
 export function PlatformElsewhere() {
   return (
-    <main className="state">
+    <main className="state" lang="es">
       <h1>El panel de plataforma no está acá</h1>
       <p>
         Se usa solo en <a href={PLATFORM_URL}>{PLATFORM_URL.replace('https://', '')}</a>.

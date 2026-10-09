@@ -1,6 +1,7 @@
 import { ORDER_STATUS } from '@ventea/shared';
 import { describe, expect, it } from 'vitest';
 
+import { translate } from '@/i18n';
 import { makeOrder } from '@/test/fixtures';
 
 import { createArrivalTracker } from './arrivals';
@@ -15,9 +16,11 @@ import {
 
 describe('transiciones por estado', () => {
   it('acción principal: Empezar → Listo → Entregado', () => {
-    expect(primaryAction('confirmed')).toEqual({ to: 'preparing', label: 'Empezar' });
-    expect(primaryAction('preparing')).toEqual({ to: 'ready', label: 'Listo' });
-    expect(primaryAction('ready')).toEqual({ to: 'completed', label: 'Entregado' });
+    expect(primaryAction('confirmed')).toEqual({ to: 'preparing', label: 'action.start' });
+    expect(primaryAction('preparing')).toEqual({ to: 'ready', label: 'action.ready' });
+    expect(primaryAction('ready')).toEqual({ to: 'completed', label: 'action.deliver' });
+    expect(translate('en', 'action.start')).toBe('Start');
+    expect(translate('es', 'action.deliver')).toBe('Entregado');
     expect(primaryAction('completed')).toBeNull();
     expect(primaryAction('cancelled')).toBeNull();
   });
@@ -27,9 +30,26 @@ describe('transiciones por estado', () => {
     expect(cancellable).toEqual(['draft', 'pending_payment', 'confirmed', 'preparing', 'ready']);
   });
 
-  it('todas las etiquetas en español', () => {
-    expect(ORDER_STATUS.map(statusLabel)).not.toContain(undefined);
-    expect(statusLabel('completed')).toBe('Entregado');
+  it('todas las etiquetas existen en inglés y español y reflejan el estado real', () => {
+    for (const lang of ['en', 'es'] as const) {
+      for (const status of ORDER_STATUS) {
+        expect(translate(lang, statusLabel(status))).not.toMatch(/^status\./);
+      }
+    }
+    expect(ORDER_STATUS.map((s) => translate('en', statusLabel(s)))).toEqual([
+      'Draft',
+      'Awaiting payment',
+      'New',
+      'In the kitchen',
+      'Ready',
+      'Delivered',
+      'Cancelled',
+    ]);
+    expect(translate('es', statusLabel('confirmed'))).toBe('Nuevo');
+    expect(translate('es', statusLabel('preparing'))).toBe('En cocina');
+    expect(translate('es', statusLabel('ready'))).toBe('Listo');
+    expect(translate('es', statusLabel('completed'))).toBe('Entregado');
+    expect(translate('es', statusLabel('cancelled'))).toBe('Cancelado');
   });
 });
 
