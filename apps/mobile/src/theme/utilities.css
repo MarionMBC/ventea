@@ -1,0 +1,173 @@
+/* ============================================================================
+   Ventea app template — layout utilities and global resets
+   Small, composable helpers only. Anything visual that belongs to a component
+   lives in that component's stylesheet.
+   ========================================================================= */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--vt-font-body);
+  background: var(--vt-surface-primary);
+  color: var(--vt-text-primary);
+}
+
+/* Ionic ships its own focus handling for its own elements; ours is uniform. */
+.vt-focusable:focus-visible,
+button.vt-pressable:focus-visible,
+a.vt-pressable:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--vt-focus-ring);
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+
+.vt-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-6);
+  padding: var(--vt-space-4) var(--vt-space-4) var(--vt-space-12);
+  max-width: var(--vt-content-max);
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vt-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-3);
+}
+
+.vt-stack-1 { display: flex; flex-direction: column; gap: var(--vt-space-1); }
+.vt-stack-2 { display: flex; flex-direction: column; gap: var(--vt-space-2); }
+.vt-stack-3 { display: flex; flex-direction: column; gap: var(--vt-space-3); }
+.vt-stack-4 { display: flex; flex-direction: column; gap: var(--vt-space-4); }
+
+.vt-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+}
+
+.vt-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vt-space-3);
+}
+
+.vt-spacer {
+  margin-inline-start: auto;
+}
+
+.vt-divider {
+  height: 1px;
+  background: var(--vt-surface-elevated);
+  border: 0;
+  margin: 0;
+}
+
+/* Horizontal scrollers: chips, category rails, product rails. */
+.vt-scroller {
+  display: flex;
+  gap: var(--vt-space-2);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: var(--vt-space-1);
+}
+
+.vt-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.vt-scroller > * {
+  scroll-snap-align: start;
+  flex: none;
+}
+
+/* Full-bleed rails inside a gutter-padded page. */
+.vt-bleed {
+  margin-inline: calc(var(--vt-space-4) * -1);
+  padding-inline: var(--vt-space-4);
+}
+
+.vt-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--vt-space-3);
+}
+
+@container (min-width: 640px) {
+  .vt-grid-2 {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+/* ── Accessibility ─────────────────────────────────────────────────────── */
+
+.vt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Guarantees the 44×44 target even when the visual box is smaller. */
+.vt-touch {
+  min-width: var(--vt-touch-min);
+  min-height: var(--vt-touch-min);
+}
+
+/* ── Text helpers ──────────────────────────────────────────────────────── */
+
+.vt-text-secondary { color: var(--vt-text-secondary); }
+.vt-text-brand { color: var(--vt-primary-text); }
+.vt-text-accent { color: var(--vt-accent-text); }
+
+.vt-clamp-1,
+.vt-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vt-clamp-1 { -webkit-line-clamp: 1; line-clamp: 1; }
+.vt-clamp-2 { -webkit-line-clamp: 2; line-clamp: 2; }
+
+/* ── Safe areas ────────────────────────────────────────────────────────── */
+
+.vt-safe-bottom {
+  padding-bottom: calc(var(--vt-space-4) + var(--vt-safe-bottom));
+}
+
+.vt-safe-top {
+  padding-top: calc(var(--vt-space-4) + var(--vt-safe-top));
+}
+
+/* Host that is no brand's subdomain (see App.tsx). */
+.vt-no-brand {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vt-space-3);
+  padding: var(--vt-space-6);
+  text-align: center;
+  background: var(--vt-surface-primary);
+  color: var(--vt-text-primary);
+}

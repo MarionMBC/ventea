@@ -1,0 +1,96 @@
+/* ============================================================================
+   Ventea app template — motion
+   Six named behaviours, all token-driven, all disabled under
+   prefers-reduced-motion. Nothing here animates layout-affecting properties
+   other than transform/opacity.
+   ========================================================================= */
+
+@keyframes vt-shimmer {
+  0% {
+    background-position: -320px 0;
+  }
+  100% {
+    background-position: 320px 0;
+  }
+}
+
+@keyframes vt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vt-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vt-cart-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Press feedback: applied by every interactive surface. */
+.vt-pressable {
+  transition:
+    transform var(--vt-duration-press) var(--vt-ease-out),
+    background-color var(--vt-duration-press) var(--vt-ease-out),
+    border-color var(--vt-duration-press) var(--vt-ease-out),
+    color var(--vt-duration-press) var(--vt-ease-out);
+}
+
+.vt-pressable:active:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(var(--vt-state-pressed-scale));
+}
+
+/* Card entrance, staggered by the caller through --vt-card-index. */
+.vt-animate-in {
+  animation: vt-card-in var(--vt-duration-card) var(--vt-ease-out) both;
+  animation-delay: calc(var(--vt-card-index, 0) * var(--vt-stagger-card));
+}
+
+.vt-animate-cart {
+  animation: vt-cart-pop var(--vt-duration-cart) var(--vt-ease-out);
+}
+
+.vt-animate-fade {
+  animation: vt-fade-in var(--vt-duration-tab) var(--vt-ease-in-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vt-pressable,
+  .vt-animate-in,
+  .vt-animate-cart,
+  .vt-animate-fade,
+  .vt-skeleton,
+  .vt-spinner {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .vt-pressable:active:not(:disabled) {
+    transform: none;
+  }
+}

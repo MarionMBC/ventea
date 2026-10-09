@@ -1,0 +1,25 @@
+.vt-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--vt-space-3);
+}
+
+.vt-section-header__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-1);
+  min-height: var(--vt-touch-min);
+  padding-inline: var(--vt-space-2);
+  margin-inline-end: calc(var(--vt-space-2) * -1);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--vt-primary-text);
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: var(--vt-tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}

@@ -1,0 +1,428 @@
+/* ============================================================================
+   Cards. These are own components, not IonCard: the layouts below need control
+   over the photo frame, the badge overlay and the action row that IonCard's
+   slots would fight us for.
+   ========================================================================= */
+
+.vt-card {
+  background: var(--vt-surface-secondary);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  border-radius: var(--vt-radius-xl);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  text-align: start;
+  min-width: 0;
+}
+
+.vt-card--interactive {
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  width: 100%;
+}
+
+@media (hover: hover) {
+  .vt-card--interactive:hover {
+    border-color: var(--vt-border-strong);
+  }
+}
+
+.vt-card--selected {
+  border-color: var(--vt-primary-text);
+  border-width: var(--vt-border-width-strong);
+}
+
+.vt-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-3) 14px;
+  min-width: 0;
+}
+
+.vt-card__name {
+  font-family: var(--vt-font-body);
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.vt-card__desc {
+  font-size: 13.5px;
+  color: var(--vt-text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.vt-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vt-space-2);
+  margin-top: auto;
+  padding-top: var(--vt-space-1);
+  /* The 44px action is fixed; the price is what gives way on a narrow card. */
+  min-width: 0;
+}
+
+.vt-card__footer .vt-price-group {
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+/* ── Product card: photo frame and its overlays ────────────────────────── */
+.vt-product__media {
+  position: relative;
+}
+
+/* Overlays sit above the stretched link that covers the whole card. */
+.vt-product__badge {
+  position: absolute;
+  z-index: 2;
+  top: var(--vt-space-2);
+  inset-inline-start: var(--vt-space-2);
+}
+
+.vt-product__fav {
+  position: absolute;
+  z-index: 2;
+  top: var(--vt-space-2);
+  inset-inline-end: var(--vt-space-2);
+}
+
+.vt-product__add {
+  width: var(--vt-touch-min);
+  height: var(--vt-touch-min);
+  border-radius: var(--vt-radius-lg);
+  border: 0;
+  background: var(--vt-brand-primary-filled);
+  color: var(--vt-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+  font-size: var(--vt-icon-md);
+}
+
+.vt-product__add--muted {
+  background: var(--vt-surface-muted);
+  color: var(--vt-primary-text);
+}
+
+.vt-product__add:disabled {
+  opacity: var(--vt-disabled-opacity);
+  pointer-events: none;
+}
+
+/* Horizontal variant: 100px photo, content fills the rest. */
+.vt-product--horizontal {
+  flex-direction: row;
+  gap: 14px;
+  padding: var(--vt-space-3);
+  align-items: stretch;
+}
+
+.vt-product--horizontal .vt-product__media {
+  width: 100px;
+  flex: none;
+  border-radius: var(--vt-radius-lg);
+  overflow: hidden;
+}
+
+.vt-product--horizontal .vt-card__body {
+  padding: 0;
+  flex: 1;
+}
+
+/* Compact variant: the rail card on home. */
+.vt-product--compact {
+  width: 168px;
+}
+
+.vt-product--compact .vt-card__body {
+  padding: var(--vt-space-3);
+  gap: var(--vt-space-2);
+}
+
+.vt-product--compact .vt-card__name {
+  font-size: 14px;
+}
+
+.vt-product--soldout .vt-card__name,
+.vt-product--soldout .vt-card__desc {
+  opacity: 0.6;
+}
+
+/* ── Category card ─────────────────────────────────────────────────────── */
+.vt-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-3);
+  padding: 14px;
+  min-height: 104px;
+  justify-content: space-between;
+}
+
+.vt-category__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--vt-radius-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex: none;
+}
+
+.vt-category__icon--brand {
+  background: rgba(var(--vt-brand-primary-rgb), 0.14);
+  color: var(--vt-primary-text);
+}
+.vt-category__icon--accent {
+  background: rgba(var(--vt-brand-accent-rgb), 0.16);
+  color: var(--vt-accent-text);
+}
+.vt-category__icon--neutral {
+  background: var(--vt-surface-muted);
+  color: var(--vt-text-primary);
+}
+
+.vt-category--selected .vt-category__icon {
+  background: var(--vt-brand-primary-filled);
+  color: var(--vt-on-primary);
+}
+
+.vt-category__name {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 16px;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.vt-category__count {
+  font-size: 12px;
+  color: var(--vt-text-secondary);
+}
+
+/* Rail variant used on home, narrower and centred. */
+.vt-category--rail {
+  width: 92px;
+  align-items: center;
+  text-align: center;
+  min-height: 96px;
+  gap: var(--vt-space-2);
+}
+
+.vt-category--rail .vt-category__name {
+  font-size: 13px;
+}
+
+/* ── Combo card ────────────────────────────────────────────────────────── */
+.vt-combo__ribbon {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  background: var(--vt-surface-elevated);
+  padding: var(--vt-space-2) 14px;
+  border-bottom: var(--vt-border-width) solid var(--vt-border-default);
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vt-primary-text);
+}
+
+.vt-combo__main {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+}
+
+.vt-combo__media {
+  width: 88px;
+  flex: none;
+  border-radius: var(--vt-radius-lg);
+  overflow: hidden;
+}
+
+.vt-combo__title {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 20px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.vt-combo__includes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-1) var(--vt-space-2);
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+}
+
+.vt-combo__includes li + li::before {
+  content: '·';
+  margin-inline-end: var(--vt-space-2);
+  color: var(--vt-border-strong);
+}
+
+.vt-combo__cta {
+  margin: 0 14px 14px;
+}
+
+/* ── Cart item ─────────────────────────────────────────────────────────── */
+.vt-cart-item {
+  display: flex;
+  /* .vt-card is a column; these layouts are rows and must say so. */
+  flex-direction: row;
+  gap: 14px;
+  padding: 14px;
+}
+
+.vt-cart-item__media {
+  width: 76px;
+  flex: none;
+  border-radius: var(--vt-radius-lg);
+  overflow: hidden;
+}
+
+.vt-cart-item__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+  min-width: 0;
+}
+
+.vt-cart-item__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vt-space-3);
+  align-items: flex-start;
+}
+
+.vt-cart-item__options {
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.vt-cart-item__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  flex-wrap: wrap;
+}
+
+.vt-cart-item__edit {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--vt-touch-min);
+  padding-inline: var(--vt-space-2);
+  background: transparent;
+  border: 0;
+  color: var(--vt-text-secondary);
+  font-family: var(--vt-font-body);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* On a narrow card the three actions must still share one row, so the edit
+   label collapses to its icon — the accessible name stays complete. */
+@container (max-width: 400px) {
+  .vt-cart-item__edit-label {
+    display: none;
+  }
+
+  .vt-cart-item__edit {
+    padding-inline: var(--vt-space-1);
+  }
+}
+
+/* ── Order card ────────────────────────────────────────────────────────── */
+.vt-order {
+  padding: var(--vt-space-4);
+  gap: var(--vt-space-3);
+}
+
+.vt-order__ref {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.vt-order__summary {
+  font-size: 14px;
+  color: var(--vt-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.vt-order__actions {
+  display: flex;
+  gap: var(--vt-space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ── Stretched link pattern ────────────────────────────────────────────── */
+.vt-card--interactive {
+  position: relative;
+}
+
+.vt-card__link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+/* The pseudo-element makes the whole card tappable while the real focus
+   target stays the title button — no nested interactive elements. */
+.vt-card__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.vt-card__link:focus-visible {
+  outline: none;
+}
+
+.vt-card--interactive:has(.vt-card__link:focus-visible) {
+  box-shadow: var(--vt-focus-ring);
+}
+
+/* Controls that must stay clickable above the stretched link. */
+.vt-card__above {
+  position: relative;
+  z-index: 1;
+}
+
+.vt-card__badge-slot {
+  align-self: flex-start;
+}

@@ -1,0 +1,168 @@
+/* ============================================================================
+   Ventea app template — typography
+   Barlow Cd. bold → display and page titles
+   Barlow Cd. → structural headings, buttons, badges, tab labels
+   Barlow     → everything the user has to read
+   ========================================================================= */
+
+:root {
+  --vt-font-display: 'Barlow Condensed', 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --vt-font-condensed: 'Barlow Condensed', 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --vt-font-body: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --vt-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --vt-tracking-tight: 0.01em;
+  --vt-tracking-wide: 0.08em;
+  --vt-tracking-wider: 0.1em;
+  --vt-tracking-widest: 0.22em;
+}
+
+/* ── Roles ─────────────────────────────────────────────────────────────────
+   Use the class, not the raw declarations. Every role is a <span>/<h*> level
+   decision; the class only carries the type, never the color of a container. */
+
+.vt-display,
+.vt-h1,
+.vt-h2,
+.vt-h3,
+.vt-title,
+.vt-subtitle,
+.vt-body,
+.vt-body-sm,
+.vt-label,
+.vt-caption,
+.vt-overline,
+.vt-price,
+.vt-price-previous,
+.vt-button-text,
+.vt-badge-text {
+  margin: 0;
+}
+
+.vt-display {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.vt-h1 {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1.06;
+  text-transform: uppercase;
+}
+
+.vt-h2 {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.17;
+  letter-spacing: var(--vt-tracking-tight);
+  text-transform: uppercase;
+}
+
+.vt-h3 {
+  font-family: var(--vt-font-condensed);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.vt-title {
+  font-family: var(--vt-font-body);
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.29;
+}
+
+.vt-subtitle {
+  font-family: var(--vt-font-body);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.33;
+  color: var(--vt-text-secondary);
+}
+
+.vt-body {
+  font-family: var(--vt-font-body);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.vt-body-sm {
+  font-family: var(--vt-font-body);
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.vt-label {
+  font-family: var(--vt-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.vt-caption {
+  font-family: var(--vt-font-body);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--vt-text-secondary);
+}
+
+.vt-overline {
+  font-family: var(--vt-font-condensed);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: var(--vt-tracking-widest);
+  text-transform: uppercase;
+}
+
+.vt-price {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--vt-primary-text);
+}
+
+.vt-price-previous {
+  font-family: var(--vt-font-body);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--vt-text-secondary);
+  text-decoration: line-through;
+}
+
+.vt-button-text {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: var(--vt-tracking-wider);
+  text-transform: uppercase;
+}
+
+.vt-badge-text {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Long-form copy stays comfortable on tablets and desktop. */
+.vt-prose {
+  max-width: 62ch;
+  text-wrap: pretty;
+}

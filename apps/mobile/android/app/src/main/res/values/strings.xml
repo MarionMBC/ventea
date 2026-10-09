@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Demo Burgers</string>
+    <string name="title_activity_main">Demo Burgers</string>
+    <string name="package_name">app.ventea.template</string>
+    <string name="custom_url_scheme">app.ventea.template</string>
+</resources>

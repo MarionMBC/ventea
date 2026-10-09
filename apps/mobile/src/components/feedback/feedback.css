@@ -1,0 +1,202 @@
+/* ── Inline alert ──────────────────────────────────────────────────────── */
+.vt-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--vt-space-3);
+  border-radius: var(--vt-radius-md);
+  padding: 14px var(--vt-space-4);
+  border: var(--vt-border-width) solid transparent;
+}
+
+.vt-alert__icon {
+  font-size: 22px;
+  flex: none;
+  margin-top: 1px;
+}
+
+.vt-alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vt-alert__title {
+  font-family: var(--vt-font-body);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.vt-alert__text {
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+  line-height: 1.45;
+}
+
+.vt-alert--success {
+  background: rgba(var(--vt-success-rgb), 0.12);
+  border-color: rgba(var(--vt-success-rgb), 0.45);
+}
+.vt-alert--success .vt-alert__icon { color: var(--vt-success); }
+
+.vt-alert--warning {
+  background: rgba(var(--vt-warning-rgb), 0.12);
+  border-color: rgba(var(--vt-warning-rgb), 0.45);
+}
+.vt-alert--warning .vt-alert__icon { color: var(--vt-warning); }
+
+.vt-alert--danger {
+  background: rgba(var(--vt-danger-rgb), 0.12);
+  border-color: rgba(var(--vt-danger-rgb), 0.45);
+}
+.vt-alert--danger .vt-alert__icon { color: var(--vt-danger); }
+
+.vt-alert--info {
+  background: rgba(var(--vt-info-rgb), 0.12);
+  border-color: rgba(var(--vt-info-rgb), 0.45);
+}
+.vt-alert--info .vt-alert__icon { color: var(--vt-info); }
+
+/* ── Empty / error state ───────────────────────────────────────────────── */
+.vt-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vt-space-3);
+  text-align: center;
+  padding: var(--vt-space-10) var(--vt-space-6);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  border-radius: var(--vt-radius-xl);
+  background: var(--vt-surface-primary);
+}
+
+.vt-state__icon {
+  font-size: 48px;
+  color: var(--vt-border-strong);
+}
+
+.vt-state__icon--error {
+  color: var(--vt-accent-text);
+}
+
+.vt-state__title {
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 22px;
+  text-transform: uppercase;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.vt-state__text {
+  font-size: 14px;
+  color: var(--vt-text-secondary);
+  max-width: 32ch;
+  line-height: 1.5;
+}
+
+/* ── Order progress ────────────────────────────────────────────────────── */
+.vt-progress-steps {
+  display: flex;
+  align-items: center;
+}
+
+.vt-progress-steps__dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--vt-surface-muted);
+  color: var(--vt-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 16px;
+}
+
+.vt-progress-steps__dot--done {
+  background: var(--vt-brand-primary-filled);
+  color: var(--vt-on-primary);
+}
+
+.vt-progress-steps__dot--current {
+  box-shadow: 0 0 0 4px rgba(var(--vt-brand-primary-rgb), 0.2);
+}
+
+.vt-progress-steps__line {
+  flex: 1;
+  height: 3px;
+  background: var(--vt-surface-muted);
+}
+
+.vt-progress-steps__line--done {
+  background: var(--vt-brand-primary-filled);
+}
+
+.vt-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--vt-font-condensed);
+  font-size: 12px;
+  letter-spacing: var(--vt-tracking-wider);
+  text-transform: uppercase;
+  color: var(--vt-text-secondary);
+}
+
+.vt-progress-labels > span {
+  flex: 1;
+  text-align: center;
+}
+
+.vt-progress-labels > span:first-child { text-align: start; }
+.vt-progress-labels > span:last-child { text-align: end; }
+
+.vt-progress-labels > span[data-current='true'] {
+  color: var(--vt-primary-text);
+}
+
+/* ── Linear progress ───────────────────────────────────────────────────── */
+.vt-progress-bar {
+  height: 6px;
+  border-radius: var(--vt-radius-full);
+  background: var(--vt-surface-muted);
+  overflow: hidden;
+}
+
+.vt-progress-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--vt-brand-primary-filled);
+  transition: width var(--vt-duration-card) var(--vt-ease-out);
+}
+
+/* ── Toast host (custom, used next to IonToast in the design system) ───── */
+.vt-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--vt-space-3);
+  background: var(--vt-surface-elevated);
+  border-radius: var(--vt-radius-md);
+  border-inline-start: 4px solid var(--vt-success);
+  padding: 14px var(--vt-space-4);
+  box-shadow: var(--vt-elevation-2);
+}
+
+.vt-toast--danger { border-inline-start-color: var(--vt-danger); }
+.vt-toast--warning { border-inline-start-color: var(--vt-warning); }
+.vt-toast--info { border-inline-start-color: var(--vt-info); }
+
+.vt-toast__close {
+  margin-inline-start: auto;
+  width: var(--vt-touch-min);
+  height: var(--vt-touch-min);
+  margin-block: -11px;
+  background: transparent;
+  border: 0;
+  color: var(--vt-text-secondary);
+  cursor: pointer;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
