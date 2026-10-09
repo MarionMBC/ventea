@@ -435,10 +435,10 @@ export const es: Messages = {
   'brand.pickColor': 'Elegir {label}',
   'brand.colorInvalid': 'Usa un color hex como #e23b2e.',
   'brand.contrastOk': 'El texto blanco se lee bien sobre este color.',
-  'brand.contrastLow':
-    'Contraste bajo: el texto blanco se lee mal sobre este color ({white}:1, menos de 4.5:1). Negro: {black}:1.',
-  'brand.contrastUseBlack':
-    'El texto blanco se lee mal sobre este color ({white}:1). El negro se lee mejor ({black}:1); los botones lo usarán.',
+  'brand.contrastDarkened':
+    'Para que el texto blanco se lea bien ({white}:1 sobre este color), los botones usan un tono apenas más oscuro: {fill}.',
+  'brand.contrastDarkText':
+    'Este color es claro para texto blanco ({white}:1): los botones usan texto oscuro ({black}:1).',
   'brand.store': 'Tienda y soporte',
   'brand.storeDescription': 'Descripción corta para la tienda',
   'brand.storeDescriptionHint_one': 'Queda {count} carácter.',

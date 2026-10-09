@@ -1,4 +1,11 @@
-import { isHexColor, textContrastOn, WCAG_AA_NORMAL, type BrandWarning } from '@ventea/shared';
+import {
+  filledToneHex,
+  isHexColor,
+  textContrastOn,
+  WCAG_AA_NORMAL,
+  WHITE,
+  type BrandWarning,
+} from '@ventea/shared';
 import { useId, useState } from 'react';
 
 import { useI18n } from '@/i18n';
@@ -29,6 +36,22 @@ export function contrastWarning(
 }
 
 const ratio = (value: number) => (Math.floor(value * 10) / 10).toFixed(1);
+
+/**
+ * Qué pasa con los botones: la app y la vista previa usan `filledTone` (shared), que oscurece el
+ * color hasta 20 % para que el blanco llegue a AA, o pasa a texto oscuro si no alcanza. El aviso
+ * cuenta eso, no la recomendación blanco/negro de la API.
+ */
+function contrastMessage(
+  t: ReturnType<typeof useI18n>['t'],
+  color: string,
+  warning: Pick<BrandWarning, 'whiteRatio' | 'blackRatio'>,
+): string {
+  const tone = filledToneHex(color);
+  const white = ratio(warning.whiteRatio);
+  if (tone && tone.on === WHITE) return t('brand.contrastDarkened', { white, fill: tone.fill });
+  return t('brand.contrastDarkText', { white, black: ratio(warning.blackRatio) });
+}
 
 /** Selector de color (nativo) + hex editable, con la advertencia de contraste debajo. */
 export function ColorField({
@@ -141,13 +164,7 @@ export function ColorField({
           </>
         ) : warning ? (
           <>
-            <IconAlert size={16} />{' '}
-            {t(
-              warning.recommendedTextColor === 'black'
-                ? 'brand.contrastUseBlack'
-                : 'brand.contrastLow',
-              { white: ratio(warning.whiteRatio), black: ratio(warning.blackRatio) },
-            )}
+            <IconAlert size={16} /> {contrastMessage(t, value ?? '', warning)}
           </>
         ) : (
           <>

@@ -128,8 +128,8 @@ describe('Mi marca', () => {
     expect((screen.getByLabelText('App name') as HTMLInputElement).value).toBe(
       'Carolina Hot Chicken',
     );
-    // #e23b2e: el blanco no llega a 4.5:1, el negro sí → la API lo advierte.
-    expect(screen.getByText(/White text is hard to read on this color \(4\.\d:1\)/)).toBeTruthy();
+    // #e23b2e: el blanco no llega a 4.5:1, así que los botones usan el tono oscurecido (filledTone).
+    expect(screen.getByText(/buttons use a slightly darker shade: #d9392c/)).toBeTruthy();
     expect(screen.getByText('White text reads well on this color.')).toBeTruthy();
     const preview = screen.getByRole('img', { name: /Preview of the Carolina Hot Chicken app/ });
     expect(preview).toBeTruthy();
@@ -150,7 +150,7 @@ describe('Mi marca', () => {
 
     // Color claro: advierte en vivo, sin guardar.
     fireEvent.change(hex, { target: { value: 'ffd400' } });
-    expect(screen.getByText(/Black text reads better/)).toBeTruthy();
+    expect(screen.getByText(/buttons use dark text/)).toBeTruthy();
     expect(figure.style.getPropertyValue('--pv-on-primary')).toBe('#120f0e');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

@@ -438,10 +438,10 @@ export const en = {
   'brand.pickColor': 'Pick {label}',
   'brand.colorInvalid': 'Use a hex color like #e23b2e.',
   'brand.contrastOk': 'White text reads well on this color.',
-  'brand.contrastLow':
-    'Low contrast: white text on this color is hard to read ({white}:1, below 4.5:1). Black: {black}:1.',
-  'brand.contrastUseBlack':
-    'White text is hard to read on this color ({white}:1). Black text reads better ({black}:1); buttons will use it.',
+  'brand.contrastDarkened':
+    'So white text stays readable ({white}:1 on this color), buttons use a slightly darker shade: {fill}.',
+  'brand.contrastDarkText':
+    'This color is too light for white text ({white}:1): buttons use dark text ({black}:1).',
   'brand.store': 'Store and support',
   'brand.storeDescription': 'Short store description',
   'brand.storeDescriptionHint_one': '{count} character left.',
