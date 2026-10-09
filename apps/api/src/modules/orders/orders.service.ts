@@ -120,9 +120,13 @@ export class OrdersService {
 
           const location = await tx.location.findFirst({
             where: { tenantId, id: input.locationId, isActive: true },
-            select: { id: true },
+            select: { id: true, acceptsOrders: true },
           });
           if (!location) throw new BadRequestException('Sucursal no disponible');
+          // TASK-022: activa (se muestra) pero sin recibir pedidos.
+          if (!location.acceptsOrders) {
+            throw new BadRequestException('La sucursal no está recibiendo pedidos');
+          }
 
           const catalog = await this.loadCatalog(
             tx,

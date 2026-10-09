@@ -26,7 +26,8 @@ export class MenuService {
   ): Promise<PublicMenu> {
     const location = await this.prisma.location.findFirst({
       where: { tenantId, isActive: true, ...(locationId ? { id: locationId } : {}) },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      // Sin sucursal pedida, la primera que recibe pedidos (TASK-022): la app compra ahí.
+      orderBy: [{ acceptsOrders: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true },
     });
     if (!location) throw new NotFoundException('Sucursal no encontrada');
