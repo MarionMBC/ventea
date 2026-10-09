@@ -52,6 +52,8 @@ export const teamInvitationSchema = z.object({
   role: z.enum(TENANT_ROLE),
   expiresAt: z.coerce.date(),
   createdAt: z.coerce.date(),
+  /** Quién la creó (auditoría); `null` si ya no está en el equipo. Solo en el listado. */
+  invitedByName: z.string().nullable().optional(),
 });
 
 export const teamSchema = z.object({

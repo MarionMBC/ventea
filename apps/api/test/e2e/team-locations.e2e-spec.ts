@@ -571,4 +571,60 @@ describe('Panel: sucursales y equipo (TASK-022)', () => {
         .expect(200);
     });
   });
+  describe('equipo: dueños y auditoría (review TASK-022)', () => {
+    async function coOwner() {
+      const email = await createStaffMember(prisma, tenant, 'owner');
+      const login = (
+        await anon().post('/api/staff/auth/login', { email, password: STAFF_PASSWORD }).expect(200)
+      ).body as StaffAuthResponse;
+      return login;
+    }
+
+    it('no hay enlace de contraseña para otro dueño (409)', async () => {
+      const other = await coOwner();
+      await as(owner).post(`/api/staff/team/members/${other.staff.id}/password-reset`).expect(409);
+    });
+
+    it('el listado dice quién creó cada invitación', async () => {
+      const email = `audit-${randomUUID().slice(0, 6)}@example.com`;
+      await invite(email).expect(201);
+      const team = (await as(owner).get('/api/staff/team').expect(200)).body as Team;
+      expect(team.invitations.find((i) => i.email === email)?.invitedByName).toBe('Dueño');
+    });
+
+    it('si el dueño que invitó pierde el rol o se desactiva, sus invitaciones dejan de servir', async () => {
+      const demoted = await coOwner();
+      const first = (
+        await as(demoted.accessToken)
+          .post('/api/staff/team/invitations', {
+            email: `de-${randomUUID().slice(0, 6)}@example.com`,
+            role: 'staff',
+          })
+          .expect(201)
+      ).body as CreatedInvitation;
+      await as(owner)
+        .patch(`/api/staff/team/members/${demoted.staff.id}`, { role: 'manager' })
+        .expect(204);
+      await anon().post('/api/staff/auth/invitation/lookup', { token: first.token }).expect(404);
+
+      const deactivated = await coOwner();
+      const second = (
+        await as(deactivated.accessToken)
+          .post('/api/staff/team/invitations', {
+            email: `dd-${randomUUID().slice(0, 6)}@example.com`,
+            role: 'staff',
+          })
+          .expect(201)
+      ).body as CreatedInvitation;
+      await as(owner)
+        .patch(`/api/staff/team/members/${deactivated.staff.id}`, { isActive: false })
+        .expect(204);
+      await anon().post('/api/staff/auth/invitation/lookup', { token: second.token }).expect(404);
+
+      // Las del dueño que sigue activo no se tocan.
+      const mine = (await invite(`sigue-${randomUUID().slice(0, 6)}@example.com`).expect(201))
+        .body as CreatedInvitation;
+      await anon().post('/api/staff/auth/invitation/lookup', { token: mine.token }).expect(200);
+    });
+  });
 });

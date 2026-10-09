@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
   AcceptInvitationInput,
   ConfirmPasswordResetInput,
@@ -39,6 +39,9 @@ const INVITATION_SELECT = {
   createdAt: true,
 } as const;
 
+const OWNER_RESET =
+  'El enlace de contraseña no aplica a dueños: cada dueño cambia la suya desde su cuenta';
+
 /**
  * Equipo de la marca (TASK-022): miembros, invitaciones y enlaces de contraseña nueva.
  *
@@ -52,6 +55,9 @@ const INVITATION_SELECT = {
  */
 @Injectable()
 export class TeamService {
+  /** Auditoría en el log: ids y tipo de acción; nunca emails, tokens ni contraseñas. */
+  private readonly logger = new Logger('TeamAudit');
+
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly limits: PlanLimitsService,
@@ -71,14 +77,18 @@ export class TeamService {
       }),
       this.prisma.staffInvitation.findMany({
         where: { tenantId, ...pending(now) },
-        select: INVITATION_SELECT,
+        select: { ...INVITATION_SELECT, invitedById: true },
         orderBy: { createdAt: 'desc' },
       }),
       this.limits.staffUsage(tenantId, this.prisma, now),
     ]);
+    const names = new Map(members.map((member) => [member.id, member.name]));
     return {
       members: members.map((member) => ({ ...member, isSelf: member.id === actor.staffId })),
-      invitations,
+      invitations: invitations.map(({ invitedById, ...invitation }) => ({
+        ...invitation,
+        invitedByName: names.get(invitedById) ?? null,
+      })),
       usage,
     };
   }
@@ -115,6 +125,7 @@ export class TeamService {
         select: INVITATION_SELECT,
       });
     });
+    this.audit(actor, 'invitation_created', invitation.id);
     this.deliver(tenantId, 'invitation', invitation.email, token);
     return { invitation, token, expiresAt: invitation.expiresAt };
   }
@@ -125,6 +136,7 @@ export class TeamService {
       data: { revokedAt: new Date() },
     });
     if (count === 0) throw new NotFoundException('Invitación no encontrada');
+    this.audit(actor, 'invitation_revoked', id);
   }
 
   async updateMember(actor: StaffPrincipal, id: string, input: UpdateMemberInput): Promise<void> {
@@ -158,6 +170,15 @@ export class TeamService {
           data: { revokedAt: new Date() },
         });
       }
+      // Un dueño que se desactiva o deja de serlo ya no respalda a quien invitó: sus
+      // invitaciones pendientes dejan de servir.
+      if (member.role === 'owner' && (data.isActive === false || data.role !== undefined)) {
+        await tx.staffInvitation.updateMany({
+          where: { tenantId, invitedById: id, ...pending(new Date()) },
+          data: { revokedAt: new Date() },
+        });
+      }
+      this.audit(actor, 'member_updated', id, data);
     });
   }
 
@@ -171,9 +192,11 @@ export class TeamService {
     const reset = await this.prisma.$transaction(async (tx) => {
       const member = await tx.staffMember.findFirst({
         where: { tenantId, id },
-        select: { id: true, email: true, isActive: true },
+        select: { id: true, email: true, isActive: true, role: true },
       });
       if (!member) throw new NotFoundException('Miembro no encontrado');
+      // Entre dueños no: un co-dueño no puede tomar la cuenta de otro con un enlace.
+      if (member.role === 'owner') throw new ConflictException(OWNER_RESET);
       if (!member.isActive) {
         throw new ConflictException('El miembro está desactivado: reactívelo primero');
       }
@@ -193,6 +216,7 @@ export class TeamService {
       });
       return { email: member.email, expiresAt: created.expiresAt };
     });
+    this.audit(actor, 'password_reset_created', id);
     this.deliver(tenantId, 'reset', reset.email, token);
     return { token, expiresAt: reset.expiresAt };
   }
@@ -291,6 +315,23 @@ export class TeamService {
 
   // ─── Internos ───────────────────────────────────────────────────────────────
 
+  private audit(
+    actor: StaffPrincipal,
+    action: string,
+    targetId: string,
+    changes?: Record<string, unknown>,
+  ): void {
+    this.logger.log(
+      JSON.stringify({
+        action,
+        tenantId: actor.tenantId,
+        actorId: actor.staffId,
+        targetId,
+        ...(changes ? { changes } : {}),
+      }),
+    );
+  }
+
   private async findInvitation(
     db: PrismaDb,
     tenantId: string,
@@ -312,7 +353,7 @@ export class TeamService {
         usedAt: null,
         revokedAt: null,
         expiresAt: { gt: new Date() },
-        staff: { isActive: true },
+        staff: { isActive: true, role: { not: 'owner' } },
       },
       select: {
         id: true,
