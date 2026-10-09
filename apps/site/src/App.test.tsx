@@ -16,8 +16,8 @@ function section(id: string): HTMLElement {
 }
 
 describe.each([
-  ['/', es],
-  ['/en/', en],
+  ['/', en],
+  ['/es/', es],
 ] as const)('home %s', (path, t) => {
   it('hero: un solo h1 y los dos CTA a contacto y soluciones', () => {
     render(<App path={path} />);
@@ -83,7 +83,7 @@ describe.each([
       within(footer).getByRole('link', { name: config.contactEmail }).getAttribute('href'),
     ).toBe(`mailto:${config.contactEmail}`);
     expect(within(footer).getByRole('link', { name: t.footer.privacy }).getAttribute('href')).toBe(
-      t.locale === 'es' ? '/politica-de-privacidad' : '/en/privacy',
+      t.locale === 'es' ? '/es/politica-de-privacidad' : '/privacy',
     );
     expect(within(footer).getByRole('link', { name: t.products.marketing.name })).toBeTruthy();
     for (const service of t.services.items) {
@@ -120,25 +120,25 @@ describe('Proyectos', () => {
 
 describe('otras rutas', () => {
   it('privacidad ES y EN', () => {
-    render(<App path="/politica-de-privacidad" />);
+    render(<App path="/es/politica-de-privacidad" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Política de privacidad' })).toBeTruthy();
     expect(document.body.textContent).toMatch(/no usa cookies/);
     expect(document.body.textContent).toMatch(/proveedor que aloja nuestro buzón/);
   });
 
   it('privacy EN', () => {
-    render(<App path="/en/privacy" />);
+    render(<App path="/privacy" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Privacy policy' })).toBeTruthy();
     expect(document.body.textContent).toMatch(/does not set cookies/);
   });
 
   it('404 en el idioma de la ruta', () => {
-    render(<App path="/en/nope" />);
+    render(<App path="/nope" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
   });
 
   it('prerender: el HTML del servidor trae el contenido (sin JS) y el hero', () => {
-    const html = renderToString(<App path="/" />);
+    const html = renderToString(<App path="/es/" />);
     expect(html).toContain(es.hero.title);
     expect(html).toContain(es.services.items[4]!.title);
     expect(html).toContain('id="contacto"');

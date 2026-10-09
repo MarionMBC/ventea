@@ -7,7 +7,7 @@ import type { Dict } from './types';
  */
 export const es: Dict = {
   locale: 'es',
-  ogLocale: 'es_LA',
+  ogLocale: 'es_ES',
   meta: {
     home: {
       title: 'Ventea · Desarrollo de software a medida y arquitectura de software',

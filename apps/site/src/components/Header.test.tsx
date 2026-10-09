@@ -13,7 +13,7 @@ function menu() {
 
 describe('menú móvil', () => {
   it('abre y cierra con el botón; aria-expanded y hidden acompañan', () => {
-    render(<App path="/" />);
+    render(<App path="/es/" />);
     const button = toggle();
     expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(button.getAttribute('aria-controls')).toBe('mobile-menu');
@@ -38,7 +38,7 @@ describe('menú móvil', () => {
   });
 
   it('Esc cierra y devuelve el foco al botón', () => {
-    render(<App path="/" />);
+    render(<App path="/es/" />);
     fireEvent.click(toggle());
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(menu().hidden).toBe(true);
@@ -46,7 +46,7 @@ describe('menú móvil', () => {
   });
 
   it('el foco queda atrapado entre el botón y el menú (Tab y Shift+Tab)', () => {
-    render(<App path="/" />);
+    render(<App path="/es/" />);
     fireEvent.click(toggle());
     const focusables = [...menu().querySelectorAll<HTMLElement>('a[href], button')];
     const last = focusables[focusables.length - 1]!;
@@ -58,14 +58,14 @@ describe('menú móvil', () => {
   });
 
   it('elegir un link cierra el menú', () => {
-    render(<App path="/" />);
+    render(<App path="/es/" />);
     fireEvent.click(toggle());
     fireEvent.click(within(menu()).getByRole('link', { name: /servicios/i }));
     expect(menu().hidden).toBe(true);
   });
 
   it('navegación ES/EN con anclas por idioma y CTA de propuesta', () => {
-    render(<App path="/en/" />);
+    render(<App path="/" />);
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!;
     const links = within(nav).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual([
@@ -75,16 +75,16 @@ describe('menú móvil', () => {
       'About',
       'Contact',
     ]);
-    expect(links[0]!.getAttribute('href')).toBe('/en/#services');
+    expect(links[0]!.getAttribute('href')).toBe('/#services');
     expect(
       screen.getAllByRole('link', { name: 'Request a proposal' })[0]!.getAttribute('href'),
-    ).toBe('/en/#contact');
+    ).toBe('/#contact');
   });
 
   it('selector de idioma: misma página en el otro idioma, con hreflang', () => {
-    render(<App path="/politica-de-privacidad" />);
+    render(<App path="/es/politica-de-privacidad" />);
     const lang = screen.getAllByRole('link', { name: 'English version' })[0]!;
-    expect(lang.getAttribute('href')).toBe('/en/privacy');
+    expect(lang.getAttribute('href')).toBe('/privacy');
     expect(lang.getAttribute('hreflang')).toBe('en');
     expect(lang.textContent).toContain('EN');
   });

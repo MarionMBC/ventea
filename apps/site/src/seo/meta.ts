@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { dict, LOCALES, type Dict, type Locale } from '../i18n';
+import { DEFAULT_LOCALE, dict, LOCALES, type Dict, type Locale } from '../i18n';
 import { alternatePath, PATHS, ROUTES, type Route } from '../routes';
 
 /**
@@ -29,14 +29,14 @@ export function canonicalUrl(route: Route): string {
   return absoluteUrl(isIndexable(route) ? route.path : PATHS.home[route.locale]);
 }
 
-/** `hreflang` de la ruta: es, en y x-default (= español, el idioma de la raíz). */
+/** `hreflang` de la ruta: en, es y x-default (= inglés, el idioma de la raíz). */
 export function alternates(route: Route): { hreflang: string; href: string }[] {
   return [
     ...LOCALES.map((locale) => ({
       hreflang: locale,
       href: absoluteUrl(alternatePath(route, locale)),
     })),
-    { hreflang: 'x-default', href: absoluteUrl(alternatePath(route, 'es')) },
+    { hreflang: 'x-default', href: absoluteUrl(alternatePath(route, DEFAULT_LOCALE)) },
   ];
 }
 

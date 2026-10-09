@@ -6,7 +6,7 @@ import { alternatePath, otherLocale, type Route } from '@/routes';
 
 /**
  * Link al mismo contenido en el otro idioma. Sin JS lleva a la página equivalente; con JS además
- * conserva la sección (`/#servicios` → `/en/#services`).
+ * conserva la sección (`/#services` → `/es/#servicios`).
  */
 export function LanguageSwitch({ route, className }: { route: Route; className?: string }) {
   const t = dict(route.locale);
