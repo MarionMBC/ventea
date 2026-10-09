@@ -218,6 +218,10 @@ describe('Mi marca, app por marca y credenciales push (TASK-016)', () => {
         .post('/api/staff/brand/app-request')
         .expect(403);
       expect((response.body as { message: string }).message).toMatch(/Pro y Cadena/);
+      expect(response.body).toMatchObject({
+        code: 'plan_limit',
+        limit: { resource: 'branded_app', plan: 'basic', max: null },
+      });
       expect(
         (await ownerOf(basicOwner, basic.slug).get('/api/staff/brand').expect(200)).body,
       ).toMatchObject({

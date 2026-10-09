@@ -100,9 +100,11 @@ export class BrandService {
   async requestApp(tenantId: string, staffId: string, base: string): Promise<Brand> {
     const plan = await this.apps.plan(tenantId);
     if (!plan.brandedApp) {
-      throw new ForbiddenException(
-        `Tu plan${plan.name ? ` ${plan.name}` : ''} no incluye app propia: está en los planes Pro y Cadena`,
-      );
+      throw new ForbiddenException({
+        message: `Tu plan${plan.name ? ` ${plan.name}` : ''} no incluye app propia: está en los planes Pro y Cadena`,
+        code: 'plan_limit',
+        limit: { resource: 'branded_app', plan: plan.code, planName: plan.name, max: null },
+      });
     }
 
     await this.prisma.$transaction(async (tx) => {

@@ -4,6 +4,7 @@ export * from './contracts/auth.js';
 export * from './contracts/billing.js';
 export * from './contracts/brand.js';
 export * from './contracts/catalog.js';
+export * from './contracts/errors.js';
 export * from './contracts/media.js';
 export * from './contracts/menu-admin.js';
 export * from './contracts/orders.js';
