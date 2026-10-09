@@ -29,6 +29,9 @@ export interface PushPlugin {
   checkPermissions: () => Promise<PermissionStatus>;
   requestPermissions: () => Promise<PermissionStatus>;
   register: () => Promise<void>;
+  /** Invalidates this install's token locally (FCM then reports it as gone). */
+  unregister: () => Promise<void>;
+  removeAllDeliveredNotifications: () => Promise<void>;
   addListener: ((
     event: 'registration',
     listener: (token: Token) => void,
@@ -55,21 +58,33 @@ export interface PushDeps {
   isSignedIn: () => boolean;
   register: (input: RegisterDeviceInput) => Promise<Device>;
   unregister: (id: string) => Promise<void>;
+  /** How long sign-out waits for the API before giving up. Default 3 s. */
+  signOutTimeoutMs?: number;
 }
 
 export interface PushController {
   readonly available: boolean;
-  /** Installs the listeners once; `onOpenOrder` receives a validated order id. */
+  /**
+   * Installs the listeners once and sets where a tapped notification goes.
+   * Calling it again only replaces `onOpenOrder` (a remounted router passes
+   * its new `navigate`): the listener always calls the latest one.
+   */
   init: (onOpenOrder: (orderId: string) => void) => Promise<void>;
   /** After an order: asks once, registers when granted. */
   afterOrderPlaced: () => Promise<PushPermission | 'already-asked'>;
   /** After sign-in: re-registers if permission was granted before. */
   afterSignIn: () => Promise<void>;
-  /** Before the session is cleared: forgets this device on the API. */
-  beforeSignOut: () => void;
+  /**
+   * Before the session is cleared: deletes this device on the API (with the
+   * normal refresh, so an expired access token still works), invalidates the
+   * local token and clears delivered notifications. Waits at most
+   * `signOutTimeoutMs`; never throws.
+   */
+  beforeSignOut: () => Promise<void>;
 }
 
-const ORDER_ID = /^[A-Za-z0-9-]{1,64}$/;
+/** Order ids are UUIDs; anything else in a notification is ignored. */
+const ORDER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Order id from a notification's data, or null when absent or malformed. */
 export const orderIdFromNotification = (
@@ -100,6 +115,8 @@ const write = (storage: KeyValueStorage | null, key: string, value: string | nul
 
 export const createPushController = (deps: PushDeps): PushController => {
   let initialised = false;
+  let openOrder: (orderId: string) => void = () => undefined;
+  const timeoutMs = deps.signOutTimeoutMs ?? 3000;
 
   const registerToken = async (token: string) => {
     if (!deps.isSignedIn() || !token) return;
@@ -120,6 +137,7 @@ export const createPushController = (deps: PushDeps): PushController => {
     available: deps.available,
 
     init: async (onOpenOrder) => {
+      openOrder = onOpenOrder;
       if (!deps.available || initialised) return;
       initialised = true;
       try {
@@ -127,7 +145,7 @@ export const createPushController = (deps: PushDeps): PushController => {
         await deps.plugin.addListener('registrationError', () => undefined);
         await deps.plugin.addListener('pushNotificationActionPerformed', (action) => {
           const orderId = orderIdFromNotification(action);
-          if (orderId) onOpenOrder(orderId);
+          if (orderId) openOrder(orderId);
         });
       } catch {
         /* A plugin that fails to attach leaves the app without push, not broken. */
@@ -166,14 +184,28 @@ export const createPushController = (deps: PushDeps): PushController => {
       }
     },
 
-    beforeSignOut: () => {
+    beforeSignOut: async () => {
       const id = read(deps.storage, deps.keys.deviceId);
       write(deps.storage, deps.keys.deviceId, null);
-      if (!id || !deps.available) return;
-      /* Fired before the session is cleared: the request picks up the
-         current token synchronously. Best effort — a failure leaves a stale
-         token the API cleans up when FCM rejects it. */
-      deps.unregister(id).catch(() => undefined);
+      if (!deps.available) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      });
+      const cleanUp = async () => {
+        /* Still signed in here: the DELETE goes with the session (and its
+           refresh, if the access token expired) of the person leaving. */
+        if (id) await deps.unregister(id).catch(() => undefined);
+        /* Even if the API was unreachable, the token dies on the device: FCM
+           answers UNREGISTERED and the API drops it on the next send. */
+        await deps.plugin.unregister().catch(() => undefined);
+        await deps.plugin.removeAllDeliveredNotifications().catch(() => undefined);
+      };
+      try {
+        await Promise.race([cleanUp(), deadline]);
+      } finally {
+        clearTimeout(timer);
+      }
     },
   };
 };
