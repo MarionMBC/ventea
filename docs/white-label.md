@@ -176,3 +176,144 @@ el idioma de Mi marca (`es` · `en`).
 
 **Versionado**: una versión del código produce N binarios. El número de versión es
 compartido; el build number, por marca.
+
+## Generador de apps y publicación (TASK-019)
+
+`tools/brand-app` saca el binario de una marca de la plantilla sin tocarla: copia el proyecto
+nativo a `dist-apps/.work/<slug>/` (gitignored), le aplica la marca y compila ahí. Dos marcas
+nunca comparten copia, y `apps/mobile/android|ios` queda siempre como está en git.
+
+### Android
+
+```bash
+# desde la plataforma (lo normal): token de admin de plataforma en el entorno, nunca en la línea
+export VENTEA_PLATFORM_TOKEN=…            # POST /api/platform/auth/login, dura 1 h
+npm run brand:app -- --tenant demo-burgers --release --api-url https://api.ventea.tech
+
+# sin token, desde un archivo de apps/mobile/brands (desarrollo)
+npm run brand:app -- --tenant demo-burgers --config-from file --release
+```
+
+Pasos: lee `GET /api/platform/tenants/:slug/app/build-config` (o el archivo) → escribe
+`brand.config.json` y `capacitor.config.json` de la copia → íconos (legacy, redondo y
+adaptativo en 5 densidades) y splash con sharp, desde el ícono de Mi marca o, si no hay, la
+inicial sobre el primario con el mismo criterio AA del tema → `applicationId`, `strings.xml`,
+`versionCode`/`versionName` → reserva el `buildNumber` en la plataforma → `vite build` →
+`cap sync` → `gradlew bundleRelease assembleRelease` → verifica el APK con `aapt2 dump badging`
+(paquete, versión, nombre) y `apksigner verify --print-certs` (y que el AAB tenga el mismo
+certificado) → deja todo en `dist-apps/<slug>/<versión>+<build>/`:
+
+| Archivo              | Qué es                                                         |
+| -------------------- | -------------------------------------------------------------- |
+| `<slug>-<v>+<b>.aab` | Lo que se sube a Play Console                                  |
+| `<slug>-<v>+<b>.apk` | Para instalar a mano y probar (`adb install`)                  |
+| `metadata.json`      | Commit, badging, SHA-256 de cada archivo y del certificado     |
+| `store-listing.md`   | Borrador de textos de tienda desde el branding (`‹completar›`) |
+| `icon-1024.png`      | Ícono para la ficha de la tienda                               |
+
+Al terminar, si la app estaba `not_requested` o `requested`, la pasa a `building`.
+`--prepare-only` arma la copia sin compilar; `--version` y `--build-number` pisan los de la
+plataforma. Sin `--release` sale un APK debug. `--app-api-url` cambia la API que usará la app
+(p. ej. con la configuración leída de una API local).
+
+Requisitos: JDK 21, `ANDROID_HOME` con build-tools, `npm ci`.
+
+### Keystores: respaldarlos
+
+Una marca nueva estrena keystore la primera vez que se compila en release:
+`~/.ventea/keystores/<slug>.jks` y, al lado, `<slug>.properties` con su contraseña aleatoria
+(solo el usuario: `0600`; en Windows, ACL sin herencia). **Respaldar los dos en el gestor de
+secretos apenas se crean**: sin ellos Play no acepta actualizaciones de esa app. El generador
+nunca imprime la contraseña ni la copia a la copia de trabajo: gradle recibe solo las rutas
+(`VENTEA_KEYSTORE_FILE`, `VENTEA_KEYSTORE_PROPERTIES`).
+
+Una marca que **ya tiene app publicada** sigue con su keystore, leído donde está:
+
+```bash
+npm run brand:app -- --tenant carolina-hot-chicken --config-from file --release \
+  --keystore-props /ruta/segura/keystore.properties   # [--keystore /ruta/al.jks]
+```
+
+Su `applicationId`, versión y build mínimo van en la plataforma (`PATCH
+/api/platform/tenants/:slug/app` con `bundleId`, `version`, `buildNumber`) o en su archivo de
+`brands/` (`brand.carolina.json`: `com.carolinahotchicken.app`, `1.2.0`, `buildNumber: 4`). El
+SHA-256 del certificado queda en `metadata.json` para compararlo con el de Play Console.
+
+Si la app anterior guardaba la sesión con otro prefijo, `legacyStoragePrefix` (o
+`--legacy-storage-prefix chc.`) migra `session`, `favourites` y `checkout.attempt` a
+`ventea.<slug>.*` en el primer arranque, así nadie pierde la sesión al actualizar.
+
+### Push en el build
+
+Si existe `~/.ventea/brands/<slug>/google-services.json` (o bajo `VENTEA_BRAND_SECRETS_DIR`), se
+copia a la copia de trabajo y el build sale con `push.enabled: true`. En iOS sigue apagado hasta
+sumar Firebase Messaging al proyecto de Xcode (ver [Push](#push)).
+
+### iOS
+
+En una Mac (Xcode 16+, Node 22):
+
+```bash
+npm ci
+npm run brand:app -- --tenant demo-burgers --platform ios --api-url https://api.ventea.tech
+open dist-apps/.work/demo-burgers/ios/App/App.xcodeproj
+# Signing & Capabilities: Team de la cuenta que publica · Product → Archive → Distribute
+```
+
+Sin Mac: workflow **Brand app (iOS)** (`.github/workflows/brand-app-ios.yml`, manual con el
+slug). Cada marca es un _Environment_ de GitHub con su nombre y los secrets
+`IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROFILE_BASE64`, `IOS_TEAM_ID` y
+`VENTEA_PLATFORM_TOKEN`. Con firma exporta el `.ipa` para App Store Connect; sin ella compila
+sin firmar, para validar. El `.ipa` se sube con Transporter o `xcrun altool`.
+
+### Fotos de una app anterior
+
+```bash
+VENTEA_API_URL=https://api.ventea.tech VENTEA_OWNER_EMAIL=… VENTEA_OWNER_PASSWORD=… \
+  npm run brand:import-images -- --tenant carolina-hot-chicken \
+  --dir ../carolina-hot-chicken/src/assets            # mapa: tools/brand-app/maps/<slug>.json
+```
+
+El mapa es `{ "items": { "<producto>": "<archivo>" }, "brand": { "logo": …, "icon": … } }`, con
+rutas relativas a `--dir`. Empareja por nombre normalizado (como la app vieja), sube una imagen a
+la vez (reintenta los 503 del límite de procesamiento) y no toca lo que ya tiene imagen salvo
+`--force`. `--dry-run` muestra qué haría. Cada subida cuenta para el cupo de 60 por hora.
+
+### Publicar en las tiendas
+
+Antes, la [checklist](#checklist-de-publicación). Luego, según `publisher`
+([ADR 0008](adr/0008-publicacion-apps-por-marca.md)):
+
+**Google Play Console** (cuenta de Ventea, o la del cliente con acceso de administrador para
+Ventea):
+
+1. _Crear app_: nombre de `store-listing.md`, idioma por defecto el de la marca, gratuita.
+2. _Firma de apps de Play_: Google guarda la clave de firma; el keystore de la marca queda como
+   **clave de subida**. En una app que ya existe, no cambia nada.
+3. Ficha principal: textos de `store-listing.md`, ícono 512×512 (reducir `icon-1024.png`),
+   gráfico de funciones 1024×500 y al menos 2 capturas de teléfono de la marca.
+4. _Contenido de la app_: política de privacidad (URL), acceso a la app (cuenta de prueba),
+   anuncios: no, clasificación de contenido, público objetivo (no niños), seguridad de datos
+   (email, nombre, pedidos, token de dispositivo; cifrado en tránsito; borrado de cuenta).
+5. Categoría «Comida y bebida», email de soporte y sitio.
+6. _Pruebas internas_ → subir el `.aab` → probar en un teléfono → _Producción_.
+7. Plataforma: `status: in_review`; al aprobarse, `published` y `storeUrls.android`.
+
+**App Store Connect** (cuenta de Ventea, o la del cliente con rol App Manager para Ventea):
+
+1. _Certificates, IDs & Profiles_: App ID con el `bundleId` (capacidad Push Notifications) y
+   perfil de distribución App Store; cargarlos como secrets del environment de la marca.
+2. _Mis apps → +_: nombre (≤ 30), idioma, bundle id, SKU = slug.
+3. Información: subtítulo (≤ 30), categoría Comida y bebida, URL de privacidad y de soporte,
+   etiquetas de privacidad (contacto, identificadores, compras; vinculados al usuario, sin
+   rastreo), clasificación por edad.
+4. Capturas de 6.9" y 6.5" (y 13" de iPad si se publica para iPad), propias de la marca.
+5. Subir el `.ipa` (workflow o Xcode) → TestFlight interno → probar.
+6. Revisión: cuenta de prueba con la que se pueda pedir y la **nota de `store-listing.md`**
+   (app oficial del restaurante, contenido propio, programa de puntos, push de estado).
+7. **4.2.6** (apps de plantilla): si rechazan, no insistir desde la cuenta de Ventea; mover la
+   marca a su propia cuenta (`publisher = client`) y volver a enviar (ADR 0008).
+8. Plataforma: `in_review` → `published` con `storeUrls.ios`.
+
+Pendiente por marca, fuera del repo: cuentas de developer (Google, pago único; Apple, anual),
+proyecto de Firebase, política de privacidad publicada y capturas reales.
