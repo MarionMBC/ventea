@@ -270,10 +270,10 @@ export const en = {
     /** Dashboard users (active + pending invitations, TASK-022). */
     staff: (max: number | null) =>
       max === null
-        ? 'Unlimited team members'
+        ? 'Unlimited dashboard users'
         : max === 1
-          ? '1 team member'
-          : `Up to ${max} team members`,
+          ? '1 dashboard user (you)'
+          : `Up to ${max} dashboard users (you included)`,
     features: {
       ownAddress: 'Orders at your own address on ventea.tech',
       board: 'Order panel with sound alert',

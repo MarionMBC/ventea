@@ -11,23 +11,25 @@ afterEach(() => {
 });
 
 /** Usuarios del panel por plan (TASK-022): lo que el panel aplica se publica en precios. */
-describe('Precios: usuarios del equipo por plan', () => {
+describe('Precios: usuarios del panel por plan (dueño incluido)', () => {
   it('español: hasta 3, hasta 10 e ilimitados', async () => {
     mockFetch(() => json(PLANS));
     renderEs(<LandingPage />);
     await screen.findByTestId('price-basic');
     expect(
       within(screen.getByRole('listitem', { name: 'Básico' })).getByText(
-        'Hasta 3 usuarios del equipo',
+        'Hasta 3 usuarios del panel (usted incluido)',
       ),
     ).toBeTruthy();
     expect(
       within(screen.getByRole('listitem', { name: 'Pro' })).getByText(
-        'Hasta 10 usuarios del equipo',
+        'Hasta 10 usuarios del panel (usted incluido)',
       ),
     ).toBeTruthy();
     expect(
-      within(screen.getByRole('listitem', { name: 'Cadena' })).getByText('Usuarios ilimitados'),
+      within(screen.getByRole('listitem', { name: 'Cadena' })).getByText(
+        'Usuarios del panel ilimitados',
+      ),
     ).toBeTruthy();
   });
 
@@ -36,13 +38,19 @@ describe('Precios: usuarios del equipo por plan', () => {
     renderEn(<LandingPage />);
     await screen.findByTestId('price-basic');
     expect(
-      within(screen.getByRole('listitem', { name: 'Basic' })).getByText('Up to 3 team members'),
+      within(screen.getByRole('listitem', { name: 'Basic' })).getByText(
+        'Up to 3 dashboard users (you included)',
+      ),
     ).toBeTruthy();
     expect(
-      within(screen.getByRole('listitem', { name: 'Pro' })).getByText('Up to 10 team members'),
+      within(screen.getByRole('listitem', { name: 'Pro' })).getByText(
+        'Up to 10 dashboard users (you included)',
+      ),
     ).toBeTruthy();
     expect(
-      within(screen.getByRole('listitem', { name: 'Chain' })).getByText('Unlimited team members'),
+      within(screen.getByRole('listitem', { name: 'Chain' })).getByText(
+        'Unlimited dashboard users',
+      ),
     ).toBeTruthy();
   });
 
