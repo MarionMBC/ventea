@@ -100,7 +100,7 @@
   height: var(--vt-touch-min);
   border-radius: var(--vt-radius-lg);
   border: 0;
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
   display: inline-flex;
   align-items: center;
@@ -194,7 +194,7 @@
 }
 
 .vt-category--selected .vt-category__icon {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
 }
 

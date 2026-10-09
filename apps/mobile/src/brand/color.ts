@@ -85,6 +85,27 @@ export const readableOn = (background: Rgb): string => {
   return white >= contrastRatio(BLACK_RGB, background) ? WHITE : BLACK;
 };
 
+/** Darkening steps tried for a filled surface: 2% each, up to 20%. */
+export const FILL_STEP = 0.02;
+export const FILL_MAX_DARKEN = 0.2;
+
+/**
+ * Tone for a FILLED surface (button, badge, chip) and the text on it. Brands
+ * expect white on their colour, so the colour is darkened towards black in 2%
+ * steps until white reaches AA — a bright red #E23B2E becomes #D9392C (−4%),
+ * indistinguishable at a glance. If AA needs more than 20% the brand would
+ * visibly change (a yellow would turn mustard): then the original colour
+ * stays and the text goes dark instead.
+ */
+export const filledTone = (color: Rgb): { fill: Rgb; on: string } => {
+  const steps = Math.round(FILL_MAX_DARKEN / FILL_STEP);
+  for (let step = 0; step <= steps; step += 1) {
+    const fill = mix(color, BLACK_RGB, step * FILL_STEP);
+    if (contrastRatio(WHITE_RGB, fill) >= AA_TEXT) return { fill, on: WHITE };
+  }
+  return { fill: color, on: readableOn(color) };
+};
+
 /**
  * The brand colour used AS text or as a thin line on dark `surfaces`: lightened
  * in small steps (towards white) until it reaches `target` against every

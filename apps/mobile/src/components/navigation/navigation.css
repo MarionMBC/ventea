@@ -95,7 +95,7 @@
   height: 18px;
   padding-inline: 4px;
   border-radius: var(--vt-radius-full);
-  background: var(--vt-brand-accent);
+  background: var(--vt-brand-accent-filled);
   color: var(--vt-on-accent);
   font-family: var(--vt-font-body);
   font-size: 11px;
@@ -133,7 +133,7 @@
 }
 
 .vt-segment__option--selected {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
 }
 
@@ -164,7 +164,7 @@
 }
 
 .vt-chip--selected {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   border-color: transparent;
   color: var(--vt-on-primary);
 }

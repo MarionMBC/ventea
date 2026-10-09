@@ -3,7 +3,7 @@ import {
   contrastRatio,
   parseHex,
   readableAsText,
-  readableOn,
+  filledTone,
   shade,
   tint,
   toHex,
@@ -19,8 +19,9 @@ import {
  * selections, badges and accents. For each brand colour two derived values
  * are computed, not hand-picked:
  *
- * - `--vt-on-*`: the text drawn on top of the colour (white or ink), the one
- *   with more contrast — always ≥ 4.5:1;
+ * - `--vt-*-filled` + `--vt-on-*`: the tone for filled surfaces and its text —
+ *   white on the colour darkened ≤ 20% when that reaches 4.5:1, else dark text
+ *   on the original;
  * - `--vt-*-text`: the colour used as text on the dark surfaces, lightened
  *   just enough to reach 4.5:1 on every surface.
  */
@@ -58,8 +59,10 @@ export const deriveTheme = (colors: BrandColors): ThemeVariables => {
   const accent = pickAccent(colors, primary);
   const primaryText = readableAsText(primary, SURFACE_RGB);
   const accentText = readableAsText(accent, SURFACE_RGB);
-  const onPrimary = readableOn(primary);
-  const onAccent = readableOn(accent);
+  /* Filled surfaces use a tone that carries white text whenever the brand
+     colour allows it (see `filledTone`); the pure colour stays for accents. */
+  const { fill: primaryFill, on: onPrimary } = filledTone(primary);
+  const { fill: accentFill, on: onAccent } = filledTone(accent);
   /* Hover and pressed move AWAY from the text colour, so the label keeps (and
      gains) contrast: darker under white text, lighter under dark text. */
   const step = (color: Rgb, on: string, amount: number) =>
@@ -70,13 +73,15 @@ export const deriveTheme = (colors: BrandColors): ThemeVariables => {
     '--vt-brand-primary': toHex(primary),
     '--vt-brand-primary-rgb': toRgbTriplet(primary),
     /* -tint = hover, -shade = pressed (names kept from the design system). */
-    '--vt-brand-primary-tint': toHex(step(primary, onPrimary, 0.08)),
-    '--vt-brand-primary-shade': toHex(step(primary, onPrimary, 0.16)),
+    '--vt-brand-primary-filled': toHex(primaryFill),
+    '--vt-brand-primary-tint': toHex(step(primaryFill, onPrimary, 0.08)),
+    '--vt-brand-primary-shade': toHex(step(primaryFill, onPrimary, 0.16)),
     '--vt-on-primary': onPrimary,
     '--vt-primary-text': toHex(primaryText),
     '--vt-brand-accent': toHex(accent),
     '--vt-brand-accent-rgb': toRgbTriplet(accent),
-    '--vt-brand-accent-shade': toHex(step(accent, onAccent, 0.16)),
+    '--vt-brand-accent-filled': toHex(accentFill),
+    '--vt-brand-accent-shade': toHex(step(accentFill, onAccent, 0.16)),
     '--vt-on-accent': onAccent,
     '--vt-accent-text': toHex(accentText),
     '--ion-color-primary-contrast-rgb': onRgb(onPrimary),

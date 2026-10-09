@@ -10,14 +10,14 @@
   /* ── Ionic color roles ─────────────────────────────────────────────────
      Primary and secondary follow the brand (see src/brand/theme.ts, which
      also writes the -rgb triplets at runtime). */
-  --ion-color-primary: var(--vt-brand-primary);
+  --ion-color-primary: var(--vt-brand-primary-filled);
   --ion-color-primary-rgb: var(--vt-brand-primary-rgb);
   --ion-color-primary-contrast: var(--vt-on-primary);
   --ion-color-primary-contrast-rgb: 255, 255, 255;
   --ion-color-primary-shade: var(--vt-brand-primary-shade);
   --ion-color-primary-tint: var(--vt-brand-primary-tint);
 
-  --ion-color-secondary: var(--vt-brand-accent);
+  --ion-color-secondary: var(--vt-brand-accent-filled);
   --ion-color-secondary-rgb: var(--vt-brand-accent-rgb);
   --ion-color-secondary-contrast: var(--vt-on-accent);
   --ion-color-secondary-contrast-rgb: 255, 255, 255;

@@ -68,8 +68,8 @@
 
 .vt-badge__icon { font-size: 13px; }
 
-.vt-badge--brand { background: var(--vt-brand-primary); color: var(--vt-on-primary); }
-.vt-badge--accent { background: var(--vt-brand-accent); color: var(--vt-on-accent); }
+.vt-badge--brand { background: var(--vt-brand-primary-filled); color: var(--vt-on-primary); }
+.vt-badge--accent { background: var(--vt-brand-accent-filled); color: var(--vt-on-accent); }
 .vt-badge--light { background: var(--vt-surface-inverse); color: var(--vt-text-inverse); }
 .vt-badge--neutral { background: var(--vt-surface-muted); color: var(--vt-text-secondary); }
 

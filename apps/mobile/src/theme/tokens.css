@@ -12,12 +12,14 @@
      contrast, never by hand. */
   --vt-brand-primary: #2e6fe2;
   --vt-brand-primary-rgb: 46, 111, 226;
+  --vt-brand-primary-filled: #2e6fe2; /* filled surfaces: carries --vt-on-primary at AA */
   --vt-brand-primary-shade: #2862c7;
   --vt-brand-primary-tint: #437de5;
   --vt-on-primary: #ffffff;
   --vt-primary-text: #7fa6ec; /* primary lightened to >= 4.5:1 on surfaces */
   --vt-brand-accent: #e23b2e;
   --vt-brand-accent-rgb: 226, 59, 46;
+  --vt-brand-accent-filled: #d9392c;
   --vt-brand-accent-shade: #c73429;
   --vt-on-accent: #ffffff;
   --vt-accent-text: #ec8279;
