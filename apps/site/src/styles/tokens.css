@@ -1,96 +1,76 @@
 /*
- * Tokens del sitio corporativo (TASK-008). Identidad sobria y técnica, distinta de la landing de
- * restaurantes: tinta azul-grafito, papel frío y un acento teal propio. Todos los pares
- * texto/fondo usados cumplen AA (≥ 4.5:1) en claro y en oscuro. Sin fuentes web: pila del
- * sistema y monoespaciada del sistema para los detalles técnicos.
+ * Tokens de diseño de ventea.tech (TASK-009). Colores oficiales de la identidad Ventea
+ * (marketing.ventea.tech, app.css «Identidad Ventea (TASK-047)»):
+ *   navy #0B1E3A · teal #03ADAE · gris #5F6670 · CTA #007F80 · teal-ink #00696B.
+ * Regla AA: el teal #03ADAE NUNCA es texto sobre blanco (solo decorativo o sobre navy); el texto
+ * turquesa sobre claro es #00696B (6,5:1) y los botones con texto blanco van en #007F80 (4,8:1).
+ * Solo tema claro: los momentos de impacto (hero, proceso, CTA, pie) son superficies navy.
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
+  /* Marca */
+  --navy: #0b1e3a;
+  --navy-2: #14315c;
+  --navy-deep: #06182c;
+  --teal: #03adae;
+  --teal-ink: #00696b;
+  --teal-btn: #007f80;
+  --teal-btn-hover: #00696b;
+  --teal-soft: #e2f4f4;
+  --focus: #008f90;
+  --gray: #5f6670;
+
+  /* Superficies y texto (claro) */
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --text: #14202e;
+  --text-muted: #4f5a67;
+  --border: #e3e7ec;
+  --border-strong: #c5d0dc;
+  --border-input: #7b8794;
+  --error: #b42318;
+  --error-soft: #fef3f2;
+
+  /* Sobre navy */
+  --on-dark: #ffffff;
+  --on-dark-muted: #b9c6d6;
+  --on-dark-subtle: #8fa2b8;
+  --line-dark: rgb(255 255 255 / 0.12);
+  --line-dark-strong: rgb(255 255 255 / 0.28);
+
+  /* Tipografía */
   --font-sans:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    'Geist Variable', 'Geist Fallback', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono:
-    ui-monospace, 'SF Mono', 'Cascadia Code', 'Cascadia Mono', Consolas, 'Liberation Mono', Menlo,
-    monospace;
+    'Geist Mono Variable', ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, monospace;
 
   --fs-xs: 0.8125rem;
   --fs-sm: 0.9375rem;
   --fs-md: 1.0625rem;
-  --fs-lg: 1.1875rem;
-  --fs-xl: clamp(1.625rem, 1.25rem + 1.6vw, 2.25rem);
-  --fs-hero: clamp(2.125rem, 1.35rem + 3.4vw, 3.5rem);
+  --fs-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.3125rem);
+  --fs-xl: clamp(1.375rem, 1.2rem + 0.8vw, 1.875rem);
+  --fs-h2: clamp(2rem, 1.35rem + 2.8vw, 3.5rem);
+  --fs-statement: clamp(2.25rem, 1.3rem + 4.1vw, 4.75rem);
+  --fs-display: clamp(2.625rem, 1.55rem + 4.7vw, 5.75rem);
   --lh: 1.6;
+  --tracking-tight: -0.035em;
 
-  /* Superficies */
-  --ink: #0b1220; /* hero y footer */
-  --ink-2: #16213a;
-  --paper: #f6f7f9;
-  --surface: #ffffff;
-  --tint: #eef1f5;
-  --line: #dde2ea;
-  --line-strong: #c3cad6;
-  --grid: rgb(148 163 184 / 0.09);
+  /* Espacio y layout */
+  --container: 1280px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --header-h: 72px;
+  --section-y: clamp(80px, 6vw + 48px, 152px);
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-lg: 8px;
 
-  /* Texto */
-  --text: #0b1220;
-  --text-muted: #4a5565; /* 7.3:1 sobre --paper, 6.7:1 sobre --tint */
-  --on-ink: #f6f7f9;
-  --on-ink-muted: #b4bfd0; /* 10:1 sobre --ink */
+  /* Movimiento */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur: 0.8s;
 
-  /* Acento */
-  --accent: #0f766e; /* teal: 5.5:1 con blanco, 5.1:1 sobre --paper */
-  --accent-hover: #115e59;
-  --accent-soft: #d5f5ef;
-  --accent-bright: #2dd4bf; /* sobre --ink: 10:1 */
-  --link: var(--accent);
-  --btn-bg: var(--accent);
-  --btn-bg-hover: var(--accent-hover);
-  --btn-text: #ffffff;
-  --logo-bg: #0b1220;
-  --danger: #b42318;
-
-  --focus: #1d4ed8;
-  --focus-ring: 0 0 0 3px var(--paper), 0 0 0 6px var(--focus);
-
-  /* Medidas */
-  --tap: 48px;
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 18px;
-  --gutter: 16px;
-  --container: 1160px;
-  --shadow: 0 1px 2px rgb(11 18 32 / 0.05), 0 6px 20px rgb(11 18 32 / 0.06);
-}
-
-@media (min-width: 768px) {
-  :root {
-    --gutter: 32px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #060a14;
-    --ink-2: #111a2b;
-    --paper: #0b1220;
-    --surface: #111a2b;
-    --tint: #0e1726;
-    --line: #24304a;
-    --line-strong: #34425f;
-    --grid: rgb(148 163 184 / 0.07);
-
-    --text: #e8edf5;
-    --text-muted: #a3afc2; /* 7.6:1 sobre --surface */
-
-    --accent-soft: #123b3a;
-    --link: #5eead4; /* 11:1 sobre --paper */
-    --btn-bg: #2dd4bf;
-    --btn-bg-hover: #5eead4;
-    --btn-text: #0b1220;
-    --logo-bg: #16213a;
-    --danger: #fca5a5;
-
-    --focus: #93c5fd;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
-  }
+  --shadow-sm: 0 1px 2px rgb(11 30 58 / 0.06);
+  --shadow: 0 1px 2px rgb(11 30 58 / 0.06), 0 12px 32px -12px rgb(11 30 58 / 0.18);
+  --shadow-lg: 0 2px 4px rgb(11 30 58 / 0.06), 0 32px 64px -24px rgb(11 30 58 / 0.32);
 }
