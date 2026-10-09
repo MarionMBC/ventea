@@ -107,6 +107,16 @@ export interface RewardProgram {
   signupBonusPoints: number;
 }
 
+/** A catalog reward (TASK-023): redeemed at the counter for points. */
+export interface RewardCatalogEntry {
+  id: string;
+  name: string;
+  pointsCost: number;
+  kind: 'item' | 'discount';
+  menuItemId: string | null;
+  discountCents: number | null;
+}
+
 export interface Tenant {
   slug: string;
   name: string;
@@ -123,6 +133,8 @@ export interface Tenant {
     appDisplayName: string | null;
   };
   rewardProgram: RewardProgram;
+  /** Active catalog rewards (TASK-023); missing on older APIs, empty with the programme off. */
+  rewards?: RewardCatalogEntry[];
 }
 
 export interface OpeningHours {

@@ -221,6 +221,15 @@ export const en = {
   'points.reason.adjustment': 'Adjustment',
   'points.reason.expiration': 'Expired',
   'points.reason.signup': 'Welcome bonus',
+  'points.reason.reward': 'Reward: {name}',
+  'points.earnRate': 'You earn {points} points per {amount} spent.',
+  'rewards.title': 'Rewards',
+  'rewards.howTo': 'Redeem them at the counter: show your account to the team.',
+  'rewards.item': 'Free product',
+  'rewards.discount': '{amount} off',
+  'rewards.cost': '{points} pts',
+  'rewards.ready': 'You can redeem it',
+  'rewards.toGo': '{points} points to go',
 
   // Forms
   'form.optional': '(optional)',
