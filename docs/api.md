@@ -347,8 +347,8 @@ Públicos (quien recibe el enlace), token SIEMPRE en el cuerpo, rate limit por I
   `/admin/reset-password#…`). Sin correo todavía: el dueño copia el enlace (`TeamService.deliver`,
   `TODO(TASK-021)`).
 - **Dueños y auditoría:** el listado trae `invitedByName` en cada invitación; desactivar o quitar el
-  rol a un dueño revoca sus invitaciones pendientes. Cada invitación, revocación, cambio de miembro y
-  enlace de contraseña deja una línea `TeamAudit` en el log (ids, nunca emails ni tokens).
+  rol a un dueño revoca sus invitaciones y enlaces de contraseña pendientes. Cada invitación, revocación, cambio de miembro y
+  enlace de contraseña (creado, aceptado/confirmado) deja una línea `TeamAudit` en el log (ids, nunca emails ni tokens).
 - **Sesiones:** el JWT de staff lleva `ver` (`StaffMember.tokenVersion`); el guard compara contra la
   base en cada request y toma el rol de la base. Cambio de rol, desactivación y contraseña nueva lo
   suben: las sesiones vivas del miembro mueren en el acto (`401`).
