@@ -1,3 +1,6 @@
+import { reportsEn } from '@/features/reports/i18n';
+import { rewardsEn } from '@/features/rewards/i18n';
+
 /**
  * English: the panel's primary language. Every other dictionary must have exactly these keys
  * (`Messages`). Plurals use the `_one` / `_other` suffixes (see `translate`). `{name}` is an
@@ -265,6 +268,8 @@ export const en = {
     'Your {plan} plan allows {count} active locations. Upgrade your plan to add more.',
   'errors.planLimitBrandedApp':
     'Your {plan} plan doesn’t include your own app. It’s included in the Pro and Chain plans.',
+  'errors.planLimitReports':
+    'Your {plan} plan doesn’t include sales reports. They’re included in the Chain plan.',
   'errors.yourPlan': 'current',
 
   'upload.choose': 'Choose image',
@@ -492,6 +497,9 @@ export const en = {
   'appStatusBody.published': 'Your app is live. Share these links with your customers.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Your developer account',
+
+  ...rewardsEn,
+  ...reportsEn,
 };
 
 /** Shape every dictionary must satisfy: same keys as English, string values. */

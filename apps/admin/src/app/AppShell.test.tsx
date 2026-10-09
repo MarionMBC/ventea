@@ -57,13 +57,21 @@ describe('Shell del panel', () => {
     const links = within(nav())
       .getAllByRole('link')
       .map((link) => link.textContent);
-    expect(links).toEqual(['Orders', 'History', 'Menu', 'My brand', 'Billing']);
+    expect(links).toEqual([
+      'Orders',
+      'History',
+      'Menu',
+      'Reports',
+      'Rewards',
+      'My brand',
+      'Billing',
+    ]);
     expect(within(nav()).getByRole('link', { name: 'Orders' }).getAttribute('aria-current')).toBe(
       'page',
     );
 
     const soon = within(nav()).getByRole('list', { name: 'Coming soon' });
-    for (const name of ['Locations', 'Rewards', 'Team', 'Reports']) {
+    for (const name of ['Locations', 'Team']) {
       expect(within(soon).getByText(name)).toBeTruthy();
     }
     expect(within(soon).queryAllByRole('link')).toHaveLength(0);
@@ -78,10 +86,20 @@ describe('Shell del panel', () => {
     expect(screen.getByText('Powered by Ventea')).toBeTruthy();
     expect(within(nav()).queryByRole('link', { name: 'Billing' })).toBeNull();
     expect(within(nav()).queryByRole('link', { name: 'My brand' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'Reports' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'Rewards' })).toBeNull();
     // El menú lo ve todo el equipo (solo lectura para staff).
     expect(within(nav()).getByRole('link', { name: 'Menu' })).toBeTruthy();
     // Marca del tenant: nombre e inicial (sin logo).
     expect(screen.getAllByText('Carolina Hot Chicken').length).toBeGreaterThan(0);
+  });
+
+  it('el gerente ve Reportes pero no Puntos ni la facturación (TASK-023)', async () => {
+    renderPanel([makeOrder()], { role: 'manager' });
+    await screen.findByText('Ana Pérez');
+    expect(within(nav()).getByRole('link', { name: 'Reports' })).toBeTruthy();
+    expect(within(nav()).queryByRole('link', { name: 'Rewards' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'Billing' })).toBeNull();
   });
 
   it('el menú de móvil abre el cajón y Escape lo cierra', async () => {

@@ -1,3 +1,6 @@
+import { reportsEs } from '@/features/reports/i18n';
+import { rewardsEs } from '@/features/rewards/i18n';
+
 import type { Messages } from './en';
 
 /** Español (Honduras / LatAm). Tiene que cumplir `Messages`: mismas claves que el inglés. */
@@ -262,6 +265,8 @@ export const es: Messages = {
     'Tu plan {plan} permite {count} sucursales activas. Sube de plan para agregar más.',
   'errors.planLimitBrandedApp':
     'Tu plan {plan} no incluye app propia. Está en los planes Pro y Cadena.',
+  'errors.planLimitReports':
+    'Tu plan {plan} no incluye reportes de ventas. Están en el plan Cadena.',
   'errors.yourPlan': 'actual',
 
   'upload.choose': 'Elegir imagen',
@@ -489,4 +494,7 @@ export const es: Messages = {
   'appStatusBody.published': 'Tu app ya está publicada. Comparte estos links con tus clientes.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Tu cuenta de desarrollador',
+
+  ...rewardsEs,
+  ...reportsEs,
 };
