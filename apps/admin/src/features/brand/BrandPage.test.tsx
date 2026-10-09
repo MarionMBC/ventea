@@ -328,6 +328,28 @@ describe('Mi marca: subidas y guardado sin perder cambios', () => {
     expect(name.value).toBe('Otro');
   });
 
+  it('mientras guarda no se puede soltar ni elegir una imagen (no revierte lo guardado)', async () => {
+    let release: (response: Response) => void = () => {};
+    const { api } = renderBrand({
+      before: (req) =>
+        req.method === 'PATCH' && req.path === '/api/staff/brand'
+          ? new Promise<Response>((resolve) => (release = resolve))
+          : undefined,
+    });
+    const name = (await screen.findByLabelText('App name')) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Otro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(name.matches(':disabled')).toBe(true));
+    const logo = screen.getByRole('group', { name: 'Logo' });
+    const file = new File(['x'], 'logo.png', { type: 'image/png' });
+    fireEvent.drop(logo.querySelector('.upload__zone')!, { dataTransfer: { files: [file] } });
+    pick('App icon');
+    await act(async () => release(json(makeBrand({ appDisplayName: 'Otro' }))));
+    await screen.findByText('Brand saved. Your app and online menu now use it.');
+    expect(api.calls.some((c) => c.path === '/api/staff/media')).toBe(false);
+    expect(name.value).toBe('Otro');
+  });
+
   it('la vista previa pinta los botones como la app: Carolina #e23b2e → #d9392c con blanco', async () => {
     renderBrand();
     const figure = (await screen.findByRole('img', { name: /Preview/ })).closest('figure')!;
