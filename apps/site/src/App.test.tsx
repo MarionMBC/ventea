@@ -1,10 +1,13 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { App } from './App';
 import { config } from './config';
-import { FAQ, SERVICES } from './content';
-import { Contact } from './home/HomePage';
+import { PROJECTS } from './content';
+import { Projects } from './home/Projects';
+import { en } from './i18n/en';
+import { es } from './i18n/es';
 
 function section(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -12,101 +15,132 @@ function section(id: string): HTMLElement {
   return element;
 }
 
-describe('home page', () => {
-  it('renders the hero with both CTAs', () => {
-    render(<App path="/" />);
-    expect(
-      screen.getByRole('heading', { level: 1, name: /design and build software/i }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('link', { name: /talk about your project/i }).getAttribute('href'),
-    ).toBe('#contact');
-    expect(screen.getByRole('link', { name: /see services/i }).getAttribute('href')).toBe(
-      '#services',
+describe.each([
+  ['/', es],
+  ['/en/', en],
+] as const)('home %s', (path, t) => {
+  it('hero: un solo h1 y los dos CTA a contacto y soluciones', () => {
+    render(<App path={path} />);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(t.hero.title);
+    const home = path;
+    expect(screen.getByRole('link', { name: t.hero.primary }).getAttribute('href')).toBe(
+      `${home}#${t.anchors.contact}`,
+    );
+    expect(screen.getByRole('link', { name: t.hero.secondary }).getAttribute('href')).toBe(
+      `${home}#${t.anchors.solutions}`,
     );
   });
 
-  it('renders every key section with its heading', () => {
-    render(<App path="/" />);
-    for (const id of ['services', 'process', 'product', 'stack', 'why', 'faq', 'contact']) {
-      expect(within(section(id)).getAllByRole('heading', { level: 2 })).toHaveLength(1);
+  it('todas las secciones con su ancla del idioma y un h2', () => {
+    render(<App path={path} />);
+    for (const key of ['services', 'solutions', 'process', 'about', 'contact'] as const) {
+      expect(within(section(t.anchors[key])).getAllByRole('heading', { level: 2 })).toHaveLength(1);
+    }
+    expect(screen.getByRole('heading', { level: 2, name: t.intro.title })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: t.cta.title })).toBeTruthy();
+  });
+
+  it('productos reales con su link: Ventea Marketing y Ventea para restaurantes', () => {
+    render(<App path={path} />);
+    const products = section(t.anchors.solutions);
+    expect(
+      within(products).getByRole('link', { name: new RegExp(t.products.marketing.cta) }),
+    ).toHaveProperty('href', `${config.marketingUrl}/`);
+    expect(
+      within(products).getByRole('link', { name: new RegExp(t.products.restaurants.cta) }),
+    ).toHaveProperty('href', `${config.restaurantsUrl}/`);
+    // Capturas reales con alt y tamaño fijo (sin CLS).
+    const images = within(products).getAllByRole('img');
+    expect(images).toHaveLength(3);
+    for (const image of images) {
+      expect(image.getAttribute('alt')?.length).toBeGreaterThan(20);
+      expect(image.getAttribute('width')).toBeTruthy();
+      expect(image.getAttribute('height')).toBeTruthy();
+      expect(image.getAttribute('loading')).toBe('lazy');
     }
   });
 
-  it('lists the six services and the FAQ', () => {
-    render(<App path="/" />);
-    expect(SERVICES).toHaveLength(6);
-    for (const service of SERVICES) {
-      expect(
-        within(section('services')).getByRole('heading', { name: service.title }),
-      ).toBeTruthy();
-    }
-    expect(document.querySelectorAll('.faq__item')).toHaveLength(FAQ.length);
+  it('sin «Proyectos» mientras no haya casos: ni sección ni link', () => {
+    expect(PROJECTS).toHaveLength(0);
+    render(<App path={path} />);
+    expect(document.getElementById(t.anchors.projects)).toBeNull();
+    expect(screen.queryByRole('link', { name: t.nav.projects })).toBeNull();
   });
 
-  it('links the only real case, Ventea for restaurants, to app.ventea.tech', () => {
-    render(<App path="/" />);
-    const link = within(section('product')).getByRole('link', {
-      name: /visit ventea for restaurants/i,
-    });
-    expect(link.getAttribute('href')).toBe('https://app.ventea.tech');
-  });
-
-  it('does not show invented social proof', () => {
-    render(<App path="/" />);
+  it('sin prueba social inventada, certificaciones ni promesas absolutas', () => {
+    render(<App path={path} />);
     const text = document.body.textContent ?? '';
-    expect(text).not.toMatch(/\+\s?\d+|\d+\+|testimonial|our clients|trusted by|award|certified/i);
+    expect(text).not.toMatch(
+      /testimoni|nuestros clientes|our clients|trusted by|confían en|award|premio|certificad|certified|garantizad|guaranteed|100 ?%|\+\s?\d+ (clientes|clients|proyectos|projects)/i,
+    );
   });
 
-  it('does not promise a fixed cadence or deadline', () => {
-    render(<App path="/" />);
-    const text = document.body.textContent ?? '';
-    expect(text).not.toMatch(/every (day|week|month)|weekly|monthly|\d+\s*(days?|weeks?|months?)/i);
-  });
-
-  it('footer links to the product, the email and the privacy notice', () => {
-    render(<App path="/" />);
+  it('pie: logo, servicios, productos, correo y privacidad del idioma', () => {
+    render(<App path={path} />);
     const footer = screen.getByRole('contentinfo');
-    expect(within(footer).getByRole('link', { name: /ventea for restaurants/i })).toBeTruthy();
     expect(
       within(footer).getByRole('link', { name: config.contactEmail }).getAttribute('href'),
     ).toBe(`mailto:${config.contactEmail}`);
-    expect(
-      within(footer)
-        .getByRole('link', { name: /privacy/i })
-        .getAttribute('href'),
-    ).toBe('/privacy');
-  });
-});
-
-describe('WhatsApp link', () => {
-  it('is hidden when config.whatsapp is empty (the shipped config)', () => {
-    expect(config.whatsapp).toBe('');
-    render(<App path="/" />);
-    expect(screen.queryByRole('link', { name: /whatsapp/i })).toBeNull();
-    expect(document.querySelector('a[href*="wa.me"]')).toBeNull();
-  });
-
-  it('shows when a number is configured', () => {
-    render(<Contact whatsapp="50499998888" />);
-    expect(screen.getByRole('link', { name: /whatsapp/i }).getAttribute('href')).toMatch(
-      /^https:\/\/wa\.me\/50499998888\?text=/,
+    expect(within(footer).getByRole('link', { name: t.footer.privacy }).getAttribute('href')).toBe(
+      t.locale === 'es' ? '/politica-de-privacidad' : '/en/privacy',
     );
+    expect(within(footer).getByRole('link', { name: t.products.marketing.name })).toBeTruthy();
+    for (const service of t.services.items) {
+      expect(within(footer).getByRole('link', { name: service.title })).toBeTruthy();
+    }
   });
 });
 
-describe('other routes', () => {
-  it('/privacy renders the site privacy notice', () => {
-    render(<App path="/privacy" />);
-    expect(screen.getByRole('heading', { level: 1, name: /privacy notice/i })).toBeTruthy();
-    expect(document.body.textContent).toMatch(/does not set cookies/);
-    // El correo pasa por los proveedores de correo: no se promete "nadie más lo ve".
-    expect(document.body.textContent).toMatch(/provider that hosts our mailbox/);
-    expect(document.body.textContent).not.toMatch(/share them with third parties/);
+describe('Proyectos', () => {
+  it('con lista vacía no renderiza nada', () => {
+    const { container } = render(<Projects t={es} projects={[]} />);
+    expect(container.innerHTML).toBe('');
   });
 
-  it('unknown paths render the 404 page', () => {
-    render(<App path="/nope" />);
-    expect(screen.getByRole('heading', { level: 1, name: /page not found/i })).toBeTruthy();
+  it('con un caso renderiza la sección (estructura lista para cuando haya casos)', () => {
+    render(
+      <Projects
+        t={es}
+        projects={[
+          {
+            id: 'x',
+            client: 'Cliente',
+            title: { es: 'Título', en: 'Title' },
+            summary: { es: 'Resumen', en: 'Summary' },
+            services: ['SaaS'],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'Proyectos' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 3, name: 'Título' })).toBeTruthy();
+  });
+});
+
+describe('otras rutas', () => {
+  it('privacidad ES y EN', () => {
+    render(<App path="/politica-de-privacidad" />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Política de privacidad' })).toBeTruthy();
+    expect(document.body.textContent).toMatch(/no usa cookies/);
+    expect(document.body.textContent).toMatch(/proveedor que aloja nuestro buzón/);
+  });
+
+  it('privacy EN', () => {
+    render(<App path="/en/privacy" />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Privacy policy' })).toBeTruthy();
+    expect(document.body.textContent).toMatch(/does not set cookies/);
+  });
+
+  it('404 en el idioma de la ruta', () => {
+    render(<App path="/en/nope" />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
+  });
+
+  it('prerender: el HTML del servidor trae el contenido (sin JS) y el hero', () => {
+    const html = renderToString(<App path="/" />);
+    expect(html).toContain(es.hero.title);
+    expect(html).toContain(es.services.items[4]!.title);
+    expect(html).toContain('id="contacto"');
   });
 });
