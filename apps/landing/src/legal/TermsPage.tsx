@@ -43,8 +43,8 @@ const SECTIONS: LegalSection[] = [
         </p>
         <p>
           Lo que incluye cada plan (sucursales, app propia, dominio propio, reportes, soporte) es el
-          que se publica en <a href={`${SITE_URL}/#precios`}>la sección de precios</a> al momento de
-          contratarlo.
+          que se publica en <a href={`${SITE_URL}/es/#precios`}>la sección de precios</a> al momento
+          de contratarlo.
         </p>
       </>
     ),

@@ -7,14 +7,16 @@ import type { Plugin, ResolvedConfig } from 'vite';
 import { OG_IMAGE, ROUTES, robotsTxt, sitemapXml, withRouteHead } from './src/seo/meta';
 
 /**
- * SEO de la landing en el build (TASK-007), sin prerender de React:
+ * SEO de la landing en el build (TASK-007, idiomas en TASK-012):
  *
- * - `index.html` recibe el `<head>` de `/` (title, description, canonical, Open Graph, JSON-LD)
- *   también en desarrollo.
- * - Al terminar el build escribe `<ruta>/index.html` para `/registro`, `/terminos` y
- *   `/privacidad` con su propio `<head>` (nginx ya resuelve `try_files $uri $uri/`), más
- *   `sitemap.xml`, `robots.txt` y `og.png` (1200×630) rasterizado desde `og/og.svg`. El SVG
- *   no usa `<text>`: la imagen de build no tiene fuentes, el texto está en trazos.
+ * - `index.html` recibe el `<head>` de `/` (inglés: title, description, canonical, hreflang,
+ *   Open Graph, JSON-LD) también en desarrollo.
+ * - Al terminar el build escribe `<ruta>/index.html` para cada otra ruta (`/es/`, `/signup`,
+ *   `/registro`, `/terminos`, `/privacidad`) con su propio `<head>`, su `<html lang>` y su
+ *   `<noscript>` (nginx ya resuelve `try_files $uri $uri/index.html`), más `sitemap.xml`,
+ *   `robots.txt` y `og.png` (1200×630) rasterizado desde `og/og.svg`. El SVG no usa `<text>`:
+ *   la imagen de build no tiene fuentes, el texto está en trazos. `scripts/prerender.mjs`
+ *   después mete el HTML de React en `/` y `/es/`.
  */
 export function seoPlugin(): Plugin {
   let config: ResolvedConfig;

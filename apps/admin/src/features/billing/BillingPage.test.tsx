@@ -5,10 +5,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App, createQueryClient } from '@/app/App';
 import { createApiClient } from '@/lib/api';
 import { createSessionStore } from '@/lib/session';
-import { formatDay } from '@/features/platform/labels';
+import { createI18n } from '@/i18n';
 import { apiError, createFakeApi, json, STAFF_SESSION } from '@/test/fixtures';
 
 const text = (el: Element | null) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+const formatDay = (date: Date) => createI18n('en').day(date);
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 9, 8, 15);
@@ -124,20 +126,20 @@ afterEach(() => {
 describe('Facturación del dueño', () => {
   it('el dueño ve la sección: plan, estado, prueba, tarjeta y movimientos', async () => {
     renderBilling();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Facturación' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Facturación' })).toBeTruthy();
-    expect(screen.getByText('Pro mensual')).toBeTruthy();
-    expect(screen.getByText('$59.00 USD / mes')).toBeTruthy();
-    expect(screen.getAllByText('En prueba').length).toBeGreaterThan(0);
-    expect(screen.getByText('Prueba gratis hasta')).toBeTruthy();
-    expect(screen.getByText('Sin tarjeta')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Billing' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Billing' })).toBeTruthy();
+    expect(screen.getByText('Pro monthly')).toBeTruthy();
+    expect(screen.getByText('$59.00 USD / month')).toBeTruthy();
+    expect(screen.getAllByText('Trial').length).toBeGreaterThan(0);
+    expect(screen.getByText('Free trial until')).toBeTruthy();
+    expect(screen.getByText('No card')).toBeTruthy();
     expect(screen.getByText('Prueba gratis iniciada')).toBeTruthy();
     expect(screen.getByText('Pago registrado')).toBeTruthy();
     expect(document.body.textContent).not.toContain('TRF-SECRETA');
     expect(document.body.textContent).not.toContain('admin@ventea.tech');
-    const note = screen.getByText(/El pago se coordina con el equipo de Ventea/);
+    const note = screen.getByText(/Payments are coordinated with the Ventea team/);
     expect(note.querySelector('a')?.getAttribute('href')).toBe('mailto:hola@ventea.tech');
-    expect(screen.queryByText(/Pronto vas a poder registrar tu tarjeta/)).toBeNull();
+    expect(screen.queryByText(/add your card here for automatic billing/)).toBeNull();
   });
 
   it('con cobro por tarjeta (no manual) avisa que el alta en el panel llega después', async () => {
@@ -148,52 +150,54 @@ describe('Facturación del dueño', () => {
       }),
     });
     expect(await screen.findByText('visa ••••4242')).toBeTruthy();
-    expect(screen.getByText(/Pronto vas a poder registrar tu tarjeta/)).toBeTruthy();
-    expect(screen.getByText(/El pago se coordina con el equipo de Ventea/)).toBeTruthy();
+    expect(screen.getByText(/add your card here for automatic billing/)).toBeTruthy();
+    expect(screen.getByText(/Payments are coordinated with the Ventea team/)).toBeTruthy();
   });
 
   it.each(['manager', 'staff'] as const)('%s no ve la sección ni puede entrar', async (role) => {
     const { api } = renderBilling({ role });
     await waitFor(() => expect(window.location.pathname).toBe('/admin/orders'));
-    expect(screen.queryByRole('link', { name: 'Facturación' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Billing' })).toBeNull();
     expect(api.calls.some((c) => c.path === '/api/billing')).toBe(false);
   });
 
   it('marca suspendida: aviso arriba y la página funciona', async () => {
     renderBilling({ billing: overview({ status: 'suspended', trialEndsAt: null }) });
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('Tu servicio está suspendido');
-    expect(screen.getByText('Pro mensual')).toBeTruthy();
+    expect(alert.textContent).toContain('Your service is suspended');
+    expect(screen.getByText('Pro monthly')).toBeTruthy();
   });
 
   it('cancelar y reanudar, con confirmación', async () => {
     const { api } = renderBilling();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar suscripción' }));
-    const dialog = screen.getByRole('dialog', { name: '¿Cancelar tu suscripción?' });
-    expect(dialog.textContent).toContain('sigue funcionando hasta el');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, cancelar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel subscription' }));
+    const dialog = screen.getByRole('dialog', { name: 'Cancel your subscription?' });
+    expect(dialog.textContent).toContain('keeps working until');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, cancel' }));
 
-    expect((await screen.findByRole('status')).textContent).toContain('tu servicio sigue hasta');
-    expect(screen.getByText(/Se cancela el/)).toBeTruthy();
+    expect((await screen.findByRole('status')).textContent).toContain(
+      'your service continues until',
+    );
+    expect(screen.getByText(/Cancels on/)).toBeTruthy();
     expect(api.count('POST', '/api/billing/cancel')).toBe(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reanudar suscripción' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reanudar' }));
-    expect((await screen.findByRole('status')).textContent).toBe('Suscripción reanudada.');
-    expect(screen.getByText('Automática')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume subscription' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Resume' }));
+    expect((await screen.findByRole('status')).textContent).toBe('Subscription resumed.');
+    expect(screen.getByText('Automatic')).toBeTruthy();
   });
 
   it('cambiar plan agenda el cambio para el próximo período', async () => {
     const { api } = renderBilling();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar plan' }));
-    const dialog = screen.getByRole('dialog', { name: 'Cambiar plan' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Change plan' }));
+    const dialog = screen.getByRole('dialog', { name: 'Change plan' });
     await within(dialog).findByRole('option', { name: 'Básico' });
     fireEvent.change(within(dialog).getByLabelText('Plan'), { target: { value: 'basic' } });
-    expect(dialog.textContent).toContain('$25.00 USD / mes');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Agendar cambio' }));
+    expect(dialog.textContent).toContain('$25.00 USD / month');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedule change' }));
 
-    expect((await screen.findByRole('status')).textContent).toContain('Cambio de plan agendado');
-    expect(screen.getByText(/Básico mensual desde el/)).toBeTruthy();
+    expect((await screen.findByRole('status')).textContent).toContain('Plan change scheduled');
+    expect(screen.getByText(/Basic monthly starting/)).toBeTruthy();
     expect(api.calls.find((c) => c.path === '/api/billing/change-plan')?.body).toEqual({
       planCode: 'basic',
       interval: 'month',
@@ -202,7 +206,7 @@ describe('Facturación del dueño', () => {
 
   it('cambiar plan con 409 muestra el mensaje en el diálogo', async () => {
     const { api } = renderBilling();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar plan' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Change plan' }));
     const dialog = screen.getByRole('dialog');
     await within(dialog).findByRole('option', { name: 'Básico' });
     api.setOverride((req) => {
@@ -212,7 +216,7 @@ describe('Facturación del dueño', () => {
       return undefined;
     });
     fireEvent.change(within(dialog).getByLabelText('Plan'), { target: { value: 'basic' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Agendar cambio' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Schedule change' }));
     expect((await within(dialog).findByRole('alert')).textContent).toContain(
       'plan Básico permite 1',
     );
@@ -248,34 +252,34 @@ describe('Pago pendiente en gracia (TASK-007)', () => {
 
   it('Facturación: el servicio sigue activo hasta el fin de la gracia, con días restantes', async () => {
     renderBilling({ billing: pastDue() });
-    await screen.findByRole('heading', { level: 1, name: 'Facturación' });
-    const banner = screen.getAllByRole('alert').find((el) => /pago está pendiente/.test(text(el)))!;
+    await screen.findByRole('heading', { level: 1, name: 'Billing' });
+    const banner = screen.getAllByRole('alert').find((el) => /payment is pending/.test(text(el)))!;
     expect(text(banner)).toContain(
-      `Tu pago está pendiente. Tu servicio sigue activo hasta el ${formatDay(graceEndsAt)}; luego se suspenderá.`,
+      `Your payment is pending. Your service stays active until ${formatDay(graceEndsAt)}; after that it will be suspended.`,
     );
-    expect(text(banner)).toContain('Quedan 3 días.');
+    expect(text(banner)).toContain('3 days left.');
     expect(banner.querySelector('a')?.getAttribute('href')).toBe('mailto:hola@ventea.tech');
   });
 
   it('panel de staff: el dueño ve el aviso también en Pedidos', async () => {
     renderBilling({ billing: pastDue(), path: '/admin/orders' });
-    const banner = await screen.findByText(/Tu pago está pendiente/);
-    expect(text(banner)).toContain(`sigue activo hasta el ${formatDay(graceEndsAt)}`);
+    const banner = await screen.findByText(/Your payment is pending/);
+    expect(text(banner)).toContain(`stays active until ${formatDay(graceEndsAt)}`);
   });
 
   it('prueba vencida sin pago (past_due sin gracia): avisa que el servicio está pausado', async () => {
     renderBilling({ billing: overview({ status: 'past_due', graceEndsAt: null }) });
-    await screen.findByRole('heading', { level: 1, name: 'Facturación' });
+    await screen.findByRole('heading', { level: 1, name: 'Billing' });
     expect(document.body.textContent).toContain(
-      'Tu prueba terminó y tu servicio está pausado: tus clientes no pueden ver el menú ni hacer pedidos.',
+      'Your trial ended and your service is paused: customers can’t see your menu or place orders.',
     );
-    expect(document.body.textContent).not.toContain('sigue activo');
+    expect(document.body.textContent).not.toContain('stays active');
   });
 
   it('una API sin graceEndsAt (anterior a TASK-007) no rompe la página', async () => {
     const legacy = overview({ status: 'active', trialEndsAt: null });
     delete legacy.graceEndsAt;
     renderBilling({ billing: legacy });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Facturación' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Billing' })).toBeTruthy();
   });
 });

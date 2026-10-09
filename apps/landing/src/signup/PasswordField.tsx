@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 
-import { MIN_PASSWORD_LENGTH, passwordStrength, STRENGTH_LABEL } from '@/lib/format';
+import { useT } from '@/i18n';
+import { MIN_PASSWORD_LENGTH, passwordStrength } from '@/lib/format';
 
 /** Contraseña con mostrar/ocultar y medidor de fuerza (mínimo 10, como la API). */
 export function PasswordField({
@@ -12,6 +13,7 @@ export function PasswordField({
   onChange: (value: string) => void;
   error?: string;
 }) {
+  const p = useT().password;
   const id = useId();
   const [visible, setVisible] = useState(false);
   const strength = passwordStrength(value);
@@ -20,7 +22,7 @@ export function PasswordField({
   return (
     <div className="field">
       <label className="field__label" htmlFor={id}>
-        Contraseña
+        {p.label}
       </label>
       <div className="password">
         <input
@@ -44,7 +46,7 @@ export function PasswordField({
           aria-controls={id}
           onClick={() => setVisible((v) => !v)}
         >
-          {visible ? 'Ocultar' : 'Mostrar'}
+          {visible ? p.hide : p.show}
         </button>
       </div>
       <div className="meter" data-strength={strength} aria-hidden="true">
@@ -54,10 +56,10 @@ export function PasswordField({
       </div>
       <p className="field__hint" id={`${id}-hint`} aria-live="polite">
         {value.length === 0
-          ? `Mínimo ${MIN_PASSWORD_LENGTH} caracteres. Mezcla mayúsculas, números y símbolos.`
+          ? p.hintEmpty(MIN_PASSWORD_LENGTH)
           : missing > 0
-            ? `Faltan ${missing} ${missing === 1 ? 'carácter' : 'caracteres'}.`
-            : `Seguridad: ${STRENGTH_LABEL[strength]}.`}
+            ? p.missing(missing)
+            : p.strength(p.strengthLabels[strength])}
       </p>
       {error && (
         <p className="field__error" role="alert">

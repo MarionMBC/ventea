@@ -1,12 +1,18 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { TERMS_VERSIONS } from '@ventea/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TERMS_VERSION } from '@/config';
+import { es } from '@/i18n';
 import { callsTo, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs } from '@/test/render';
 
-import { READY_MESSAGE, SignupPage, TERMS_ERROR } from './SignupPage';
+import { SignupPage } from './SignupPage';
 import { READY_POLL_MS, READY_SLOW_MS } from './useTenantReady';
+
+const READY_MESSAGE = es.signup.ready;
+const TERMS_ERROR = es.signup.errors.terms;
+const render = (ui: Parameters<typeof renderEs>[0]) => renderEs(ui, '/registro');
 
 afterEach(() => {
   vi.useRealTimers();
