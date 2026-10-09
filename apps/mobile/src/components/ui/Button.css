@@ -62,7 +62,7 @@
 
 /* ── Variants ──────────────────────────────────────────────────────────── */
 .vt-btn--primary {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
 }
 
@@ -84,7 +84,7 @@
 }
 
 .vt-btn--danger {
-  background: var(--vt-brand-accent);
+  background: var(--vt-brand-accent-filled);
   color: var(--vt-on-accent);
 }
 
@@ -177,7 +177,7 @@
 }
 
 .vt-icon-btn--accent {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   border-color: transparent;
   color: var(--vt-on-primary);
 }
@@ -224,7 +224,7 @@
   height: var(--vt-control-lg);
   border-radius: 50%;
   border: 0;
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
   display: inline-flex;
   align-items: center;
@@ -239,7 +239,7 @@
 }
 
 .vt-fab--danger {
-  background: var(--vt-brand-accent);
+  background: var(--vt-brand-accent-filled);
   color: var(--vt-on-accent);
 }
 

@@ -3,6 +3,7 @@ import {
   AA_TEXT,
   BLACK,
   contrastRatio,
+  filledTone,
   INK,
   parseHex,
   readableAsText,
@@ -63,6 +64,44 @@ describe('colour maths', () => {
   });
 });
 
+describe('filled surfaces', () => {
+  test('a bright red keeps white text, darkened just enough (−4%)', () => {
+    const theme = deriveTheme({ primary: '#E23B2E' });
+    expect(theme['--vt-brand-primary-filled']).toBe('#d9392c');
+    expect(theme['--vt-on-primary']).toBe(WHITE);
+    expect(theme['--vt-brand-primary']).toBe('#e23b2e');
+    expect(ratio(WHITE, '#d9392c')).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  test('a colour that already passes with white is untouched', () => {
+    const theme = deriveTheme({ primary: '#2E6FE2' });
+    expect(theme['--vt-brand-primary-filled']).toBe('#2e6fe2');
+    expect(theme['--vt-on-primary']).toBe(WHITE);
+  });
+
+  test('beyond 20% the brand would change: original colour, dark text', () => {
+    const yellow = filledTone(rgb('#FDB913'));
+    expect(toHex(yellow.fill)).toBe('#fdb913');
+    expect(yellow.on).toBe(INK);
+    const green = filledTone(rgb('#22C55E'));
+    expect(toHex(green.fill)).toBe('#22c55e');
+    expect(green.on).not.toBe(WHITE);
+  });
+
+  test('never darkens more than 20%', () => {
+    for (const hex of ['#E23B2E', '#FF6A00', '#00A3E0', '#D81E20', '#8E44AD']) {
+      const { fill, on } = filledTone(rgb(hex));
+      expect(ratio(on, toHex(fill))).toBeGreaterThanOrEqual(AA_TEXT);
+      const source = rgb(hex);
+      if (on === WHITE && (source.r || source.g || source.b)) {
+        const max = Math.max(source.r, source.g, source.b);
+        const fillMax = Math.max(fill.r, fill.g, fill.b);
+        expect(fillMax / max).toBeGreaterThanOrEqual(0.79);
+      }
+    }
+  });
+});
+
 describe('deriveTheme', () => {
   const brands = [
     { primary: '#E23B2E', secondary: '#1F1D1B', accent: '#FDB913' },
@@ -74,8 +113,8 @@ describe('deriveTheme', () => {
 
   test.each(brands)('every text pair passes AA for %o', (colors) => {
     const theme = deriveTheme(colors);
-    const primary = theme['--vt-brand-primary'] as string;
-    const accent = theme['--vt-brand-accent'] as string;
+    const primary = theme['--vt-brand-primary-filled'] as string;
+    const accent = theme['--vt-brand-accent-filled'] as string;
     expect(ratio(theme['--vt-on-primary'] as string, primary)).toBeGreaterThanOrEqual(AA_TEXT);
     expect(ratio(theme['--vt-on-accent'] as string, accent)).toBeGreaterThanOrEqual(AA_TEXT);
     /* Hover and pressed states keep the label readable too. */

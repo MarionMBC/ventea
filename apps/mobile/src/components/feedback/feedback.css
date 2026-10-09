@@ -115,7 +115,7 @@
 }
 
 .vt-progress-steps__dot--done {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
 }
 
@@ -130,7 +130,7 @@
 }
 
 .vt-progress-steps__line--done {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
 }
 
 .vt-progress-labels {
@@ -166,7 +166,7 @@
 .vt-progress-bar__fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   transition: width var(--vt-duration-card) var(--vt-ease-out);
 }
 

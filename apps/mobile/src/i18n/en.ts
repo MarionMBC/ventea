@@ -4,6 +4,11 @@
  * concept of any particular restaurant appears here.
  */
 export const en = {
+  // Host without a brand (web)
+  'noBrand.title': 'Restaurant not found',
+  'noBrand.description':
+    'This address does not belong to any restaurant. Check the link you were given.',
+
   // Tabs and shared actions
   'tab.home': 'Home',
   'tab.menu': 'Menu',

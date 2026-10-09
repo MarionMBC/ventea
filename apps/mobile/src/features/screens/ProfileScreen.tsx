@@ -173,8 +173,7 @@ export const ProfileScreen = ({
               icon: 'logOutOutline',
               danger: true,
               onSelect: () => {
-                signOut();
-                onSignedOut?.();
+                void signOut().then(() => onSignedOut?.());
               },
             },
           ]}

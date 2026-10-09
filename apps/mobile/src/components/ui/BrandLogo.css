@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
   font-family: var(--vt-font-condensed);
   font-weight: 700;

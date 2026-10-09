@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { getTenant } from '../api/endpoints';
 import { brandStore } from './brandStore';
+import { HAS_BRAND } from './runtime';
 import type { BrandState } from './runtime';
 
 /** The brand as it is right now; re-renders when `/api/tenant` changes it. */
@@ -14,6 +15,7 @@ export const useBrand = (): BrandState =>
  */
 export const useTenantRefresh = (): void => {
   useEffect(() => {
+    if (!HAS_BRAND) return undefined;
     const controller = new AbortController();
     getTenant(controller.signal).then(
       (tenant) => brandStore.applyTenant(tenant),

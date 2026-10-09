@@ -76,6 +76,23 @@ describe('api client', () => {
     });
   });
 
+  test('on a brand subdomain (no slug configured) no tenant header is sent', async () => {
+    const store = createSessionStore(memoryStorage());
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(json(200, {}));
+    const client = createApiClient({
+      baseUrl: '',
+      tenantSlug: '',
+      session: store,
+      fetch: fetchMock,
+    });
+
+    await client.get('/api/menu', { auth: false });
+
+    const [url] = callOf(fetchMock, 0);
+    expect(url).toBe('/api/menu');
+    expect(headersOf(callOf(fetchMock, 0))['X-Tenant-Slug']).toBeUndefined();
+  });
+
   test('public calls carry the tenant but no bearer', async () => {
     const { client, fetchMock } = setup();
     fetchMock.mockResolvedValueOnce(json(200, { categories: [] }));
@@ -269,11 +286,11 @@ describe('api client', () => {
     const { client, fetchMock } = setup();
     fetchMock.mockResolvedValueOnce(json(201, { id: 'o-1' }));
 
-    await client.post(
-      '/api/orders',
-      {},
-      { headers: { 'Idempotency-Key': 'key-12345678', 'X-Tenant-Slug': 'other' } },
-    ); // gitleaks:allow — clave de prueba
+    const testHeaders = {
+      'Idempotency-Key': 'key-12345678', // gitleaks:allow — clave de prueba
+      'X-Tenant-Slug': 'other',
+    };
+    await client.post('/api/orders', {}, { headers: testHeaders });
 
     expect(headersOf(fetchMock.mock.calls[0])).toMatchObject({
       'Idempotency-Key': 'key-12345678', // gitleaks:allow — clave de prueba

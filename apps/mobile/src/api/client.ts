@@ -129,7 +129,9 @@ export const createApiClient = ({
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...extraHeaders,
-      [TENANT_HEADER]: tenantSlug,
+      /* On `<slug>.ventea.tech` the host already names the tenant; the header
+         is what apps without a brand subdomain send. */
+      ...(tenantSlug ? { [TENANT_HEADER]: tenantSlug } : {}),
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const token = auth ? session.get()?.accessToken : undefined;

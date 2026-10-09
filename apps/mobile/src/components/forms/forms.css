@@ -213,7 +213,7 @@
 }
 
 .vt-choice__native:checked + .vt-choice__box {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   border-color: var(--vt-primary-text);
 }
 
@@ -229,7 +229,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   display: none;
 }
 
@@ -285,7 +285,7 @@
 }
 
 .vt-toggle__native:checked + .vt-toggle__track {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
 }
 
 .vt-toggle__native:checked + .vt-toggle__track .vt-toggle__thumb {
@@ -336,7 +336,7 @@
 }
 
 .vt-qty__btn--accent {
-  background: var(--vt-brand-primary);
+  background: var(--vt-brand-primary-filled);
   color: var(--vt-on-primary);
 }
 

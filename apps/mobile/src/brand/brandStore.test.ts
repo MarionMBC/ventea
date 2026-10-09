@@ -4,7 +4,7 @@ import type { Tenant } from '../api/types';
 import { brandFromTenant, createBrandStore } from './brandStore';
 import { resolveMediaUrl } from './media';
 import type { BrandState } from './runtime';
-import { resolveApiUrl, resolveTenantSlug } from './runtime';
+import { resolveApiUrl, resolveTenantSlug, slugFromHostname } from './runtime';
 
 const API = 'https://api.test';
 
@@ -73,6 +73,27 @@ describe('brand from /api/tenant', () => {
     expect(state.iconUrl).toBeNull();
   });
 
+  test('the panel removing logo, icon or accent (null) clears them; absent fields keep', () => {
+    const withAll: BrandState = {
+      ...previous,
+      logoUrl: 'https://cdn.test/logo.webp',
+      iconUrl: 'https://cdn.test/icon.webp',
+      colors: { ...previous.colors, accent: '#FDB913' },
+    };
+    const removed = brandFromTenant(
+      withAll,
+      tenant({ logoUrl: null, iconUrl: null, accentColor: null }),
+      API,
+    );
+    expect(removed.logoUrl).toBeNull();
+    expect(removed.iconUrl).toBeNull();
+    expect(removed.colors.accent).toBeNull();
+    /* An API without the TASK-016 fields (no iconUrl/accentColor keys) keeps them. */
+    const old = brandFromTenant(withAll, tenant(), API);
+    expect(old.iconUrl).toBe('https://cdn.test/icon.webp');
+    expect(old.colors.accent).toBe('#FDB913');
+  });
+
   test('never takes an unsafe logo URL', () => {
     expect(
       brandFromTenant(previous, tenant({ logoUrl: 'javascript:alert(1)' }), API).logoUrl,
@@ -114,52 +135,113 @@ describe('brand store', () => {
   });
 });
 
-describe('runtime', () => {
-  test('a native build always uses its own brand', () => {
+describe('runtime: which brand', () => {
+  const base = {
+    baseDomain: 'ventea.tech',
+    hostname: 'carolina-hot-chicken.ventea.tech',
+    search: '',
+    fallback: 'demo-burgers',
+  };
+
+  test('a native build always uses its own brand, whatever the host or query', () => {
     expect(
       resolveTenantSlug({
+        ...base,
         native: true,
+        dev: false,
         search: '?tenant=other',
         storage: memoryStorage(),
-        fallback: 'mine',
       }),
-    ).toBe('mine');
+    ).toBe('demo-burgers');
   });
 
-  test('the web preview takes ?tenant= and remembers it', () => {
+  test('production web: the brand is the subdomain, never the build brand', () => {
+    expect(
+      resolveTenantSlug({ ...base, native: false, dev: false, storage: memoryStorage() }),
+    ).toBe('carolina-hot-chicken');
+  });
+
+  test('production web ignores ?tenant= (no re-branding someone else’s host)', () => {
+    const storage = memoryStorage();
+    storage.setItem('ventea.preview.tenant', 'other-brand');
+    expect(
+      resolveTenantSlug({ ...base, native: false, dev: false, search: '?tenant=evil', storage }),
+    ).toBe('carolina-hot-chicken');
+  });
+
+  test.each([
+    'ventea.tech',
+    'app.ventea.tech',
+    'www.ventea.tech',
+    'api.ventea.tech',
+    'a.b.ventea.tech',
+    'evilventea.tech',
+    'carolina.ventea.tech.evil.com',
+    'localhost',
+    '127.0.0.1',
+  ])('production web on %s → no brand', (hostname) => {
+    expect(
+      resolveTenantSlug({ ...base, hostname, native: false, dev: false, storage: memoryStorage() }),
+    ).toBe('');
+  });
+
+  test('slugFromHostname is case-insensitive and tolerates a trailing dot', () => {
+    expect(slugFromHostname('Demo-Burgers.Ventea.Tech.', 'ventea.tech')).toBe('demo-burgers');
+  });
+
+  test('vite dev previews ?tenant= and remembers it', () => {
     const storage = memoryStorage();
     expect(
       resolveTenantSlug({
+        ...base,
+        hostname: 'localhost',
         native: false,
+        dev: true,
         search: '?tenant=demo-burgers',
         storage,
-        fallback: 'mine',
       }),
     ).toBe('demo-burgers');
-    expect(resolveTenantSlug({ native: false, search: '', storage, fallback: 'mine' })).toBe(
-      'demo-burgers',
-    );
+    expect(
+      resolveTenantSlug({ ...base, hostname: 'localhost', native: false, dev: true, storage }),
+    ).toBe('demo-burgers');
   });
 
-  test('an invalid ?tenant= is ignored', () => {
+  test('vite dev: an invalid ?tenant= falls back to the build brand', () => {
     expect(
       resolveTenantSlug({
+        ...base,
+        hostname: 'localhost',
         native: false,
+        dev: true,
         search: '?tenant=../x',
         storage: memoryStorage(),
-        fallback: 'mine',
       }),
-    ).toBe('mine');
+    ).toBe('demo-burgers');
+  });
+});
+
+describe('runtime: which API', () => {
+  const brandUrl = 'https://api.ventea.tech';
+
+  test('production web is always same-origin, env or not', () => {
+    expect(resolveApiUrl({ native: false, dev: false, envUrl: undefined, brandUrl })).toBe('');
+    expect(
+      resolveApiUrl({ native: false, dev: false, envUrl: 'https://api.ventea.tech', brandUrl }),
+    ).toBe('');
   });
 
-  test('API URL: env wins, dev uses the proxy, builds use the brand', () => {
-    expect(
-      resolveApiUrl({ envUrl: 'http://localhost:3000/', dev: true, brandUrl: 'https://b' }),
-    ).toBe('http://localhost:3000');
-    expect(resolveApiUrl({ envUrl: undefined, dev: true, brandUrl: 'https://b' })).toBe('');
-    expect(resolveApiUrl({ envUrl: undefined, dev: false, brandUrl: 'https://b' })).toBe(
-      'https://b',
+  test('native: env, else the brand API', () => {
+    expect(resolveApiUrl({ native: true, dev: false, envUrl: undefined, brandUrl })).toBe(brandUrl);
+    expect(resolveApiUrl({ native: true, dev: false, envUrl: 'https://x.test/', brandUrl })).toBe(
+      'https://x.test',
     );
+  });
+
+  test('vite dev: env, else the dev server proxy', () => {
+    expect(resolveApiUrl({ native: false, dev: true, envUrl: undefined, brandUrl })).toBe('');
+    expect(
+      resolveApiUrl({ native: false, dev: true, envUrl: 'http://localhost:3000/', brandUrl }),
+    ).toBe('http://localhost:3000');
   });
 });
 

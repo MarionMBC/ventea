@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import type { PermissionStatus } from '@capacitor/push-notifications';
+import { createApiClient } from '../api/client';
+import { createSessionStore } from '../api/session';
 import { memoryStorage } from '../api/storage';
 import type { PushDeps, PushPlugin } from './push';
 import { createPushController, orderIdFromNotification, push } from './push';
@@ -21,6 +23,8 @@ const fakePlugin = (
     register: vi.fn(async () => {
       listeners.get('registration')?.({ value: 'token-1' });
     }),
+    unregister: vi.fn(async () => undefined),
+    removeAllDeliveredNotifications: vi.fn(async () => undefined),
     addListener: vi.fn(async (event: string, listener: Listener) => {
       listeners.set(event, listener);
       return { remove: async () => undefined };
@@ -58,7 +62,7 @@ describe('push', () => {
   test('the app-wide controller is off in a build without push (tests, web, no Firebase)', async () => {
     expect(push.available).toBe(false);
     await expect(push.afterOrderPlaced()).resolves.toBe('unavailable');
-    expect(() => push.beforeSignOut()).not.toThrow();
+    await expect(push.beforeSignOut()).resolves.toBeUndefined();
   });
 
   test('unavailable: never touches the native plugin', async () => {
@@ -122,12 +126,75 @@ describe('push', () => {
     await flush();
   });
 
-  test('sign-out deletes the device on the API and forgets it', async () => {
-    const { controller, storage, unregister } = setup();
+  test('sign-out deletes the device, kills the local token and clears notifications', async () => {
+    const { controller, storage, unregister, plugin } = setup();
     storage.setItem('device', 'device-9');
-    controller.beforeSignOut();
+    await controller.beforeSignOut();
     expect(unregister).toHaveBeenCalledWith('device-9');
     expect(storage.getItem('device')).toBeNull();
+    expect(plugin.unregister).toHaveBeenCalledTimes(1);
+    expect(plugin.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  test('sign-out with an expired access token: DELETE goes through after a refresh', async () => {
+    const store = createSessionStore(memoryStorage());
+    store.set({
+      accessToken: 'expired',
+      refreshToken: 'refresh-1',
+      customer: { id: 'c-1', email: 'a@b.test', firstName: null, lastName: null, phone: null },
+    });
+    const json = (status: number, body?: unknown) =>
+      new Response(body === undefined ? null : JSON.stringify(body), { status });
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(json(401, { message: 'Unauthorized' }))
+      .mockResolvedValueOnce(json(200, { accessToken: 'fresh', refreshToken: 'refresh-2' }))
+      .mockResolvedValueOnce(json(204));
+    const client = createApiClient({
+      baseUrl: '',
+      tenantSlug: 't',
+      session: store,
+      fetch: fetchMock,
+    });
+    const { controller, storage } = setup({
+      unregister: (id) => client.delete<void>(`/api/devices/${id}`),
+    });
+    storage.setItem('device', 'device-9');
+
+    await controller.beforeSignOut();
+    store.clear('signed-out');
+
+    const calls = fetchMock.mock.calls.map(([url, init]) => `${init?.method} ${String(url)}`);
+    expect(calls).toEqual([
+      'DELETE /api/devices/device-9',
+      'POST /api/auth/refresh',
+      'DELETE /api/devices/device-9',
+    ]);
+    const lastHeaders = (fetchMock.mock.calls[2]?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(lastHeaders.Authorization).toBe('Bearer fresh');
+  });
+
+  test('sign-out never hangs on a dead API', async () => {
+    const { controller, storage } = setup({
+      unregister: () => new Promise<void>(() => undefined),
+      signOutTimeoutMs: 20,
+    });
+    storage.setItem('device', 'device-9');
+    await expect(controller.beforeSignOut()).resolves.toBeUndefined();
+  });
+
+  test('a remounted router replaces where a tapped notification goes', async () => {
+    const { controller, listeners } = setup();
+    const first = vi.fn();
+    const second = vi.fn();
+    await controller.init(first);
+    await controller.init(second);
+    listeners.get('pushNotificationActionPerformed')?.({
+      actionId: 'tap',
+      notification: { id: '1', data: { orderId: 'b3c1f7e2-0000-4000-8000-000000000001' } },
+    });
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 
   test('after sign-in a previously granted device registers again', async () => {
@@ -155,7 +222,9 @@ describe('push', () => {
     [{ orderId: 42 }, null],
     [{}, null],
     [undefined, null],
-    [{ orderId: 'abc-123' }, 'abc-123'],
+    [{ orderId: 'abc-123' }, null],
+    [{ orderId: 'b3c1f7e2-0000-4000-8000-00000000000g' }, null],
+    [{ orderId: 'B3C1F7E2-0000-4000-8000-000000000001' }, 'B3C1F7E2-0000-4000-8000-000000000001'],
   ])('notification data %o → %s', (data, expected) => {
     expect(orderIdFromNotification({ notification: { id: '1', data } } as never)).toBe(expected);
   });

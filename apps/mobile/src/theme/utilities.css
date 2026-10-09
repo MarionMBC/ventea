@@ -157,3 +157,17 @@ select:focus-visible {
 .vt-safe-top {
   padding-top: calc(var(--vt-space-4) + var(--vt-safe-top));
 }
+
+/* Host that is no brand's subdomain (see App.tsx). */
+.vt-no-brand {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vt-space-3);
+  padding: var(--vt-space-6);
+  text-align: center;
+  background: var(--vt-surface-primary);
+  color: var(--vt-text-primary);
+}

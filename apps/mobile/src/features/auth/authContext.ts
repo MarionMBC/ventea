@@ -7,7 +7,8 @@ export interface AuthValue {
   isAuthenticated: boolean;
   signIn: (input: LoginInput) => Promise<void>;
   signUp: (input: RegisterInput) => Promise<void>;
-  signOut: () => void;
+  /** Resolves once the device is forgotten (≤ ~3 s) and the session cleared. */
+  signOut: () => Promise<void>;
   /** Replaces the cached customer after `/api/me` answers. */
   updateCustomer: (customer: Customer) => void;
 }

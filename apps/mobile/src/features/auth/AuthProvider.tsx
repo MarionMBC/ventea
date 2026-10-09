@@ -47,9 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     void push.afterSignIn();
   }, []);
 
-  const signOut = useCallback(() => {
-    /* The device is forgotten on the API while the token is still valid. */
-    push.beforeSignOut();
+  const signOut = useCallback(async () => {
+    /* The device is forgotten on the API while the session still exists
+       (a stale access token is refreshed as usual), within a few seconds at
+       most; only then is the session cleared. */
+    await push.beforeSignOut();
     sessionStore.clear('signed-out');
   }, []);
   const updateCustomer = useCallback((next: Customer) => sessionStore.setCustomer(next), []);
