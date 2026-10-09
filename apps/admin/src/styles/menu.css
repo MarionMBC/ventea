@@ -150,6 +150,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   min-height: 24px;
   padding: 2px 9px;
   border-radius: 999px;
@@ -463,11 +465,13 @@
 
 .menu-tree {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .menu-cat {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 8px 8px 12px;
   border: 1px solid var(--border);
@@ -540,11 +544,17 @@
 
 .menu-cat__add {
   justify-self: start;
+  max-width: calc(100% - 8px);
   margin: 4px 4px 0;
+  /* «Agregar producto a <categoría>»: el nombre puede ser largo; corta en vez de desbordar. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .menu-items {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /*
@@ -634,6 +644,7 @@
 
 .item-row__desc {
   display: -webkit-box;
+  overflow-wrap: anywhere;
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -700,6 +711,7 @@
 /* Grupos de modificadores */
 .group-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -711,6 +723,7 @@
 
 .group-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 12px;
   padding: 16px;
@@ -727,7 +740,12 @@
   gap: 8px;
 }
 
+.group-card__head > :first-child {
+  min-width: 0;
+}
+
 .group-card__name {
+  overflow-wrap: anywhere;
   font-size: var(--fs-md);
   font-weight: 800;
 }

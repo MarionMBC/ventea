@@ -1,6 +1,9 @@
 /* Páginas de contenido del panel de la marca (Facturación): tarjetas, datos, tablas, avisos. */
 .page {
   display: grid;
+  /* Una columna que nunca crece con el contenido: sin esto un texto largo o un botón que no
+     corta ensancha la página entera (desborde horizontal en el teléfono). */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   width: 100%;
   max-width: 1120px;
