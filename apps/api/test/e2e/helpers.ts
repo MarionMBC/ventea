@@ -18,6 +18,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PAYMENT_GATEWAY, type PaymentGateway } from '@/modules/billing/gateway/payment-gateway';
 import { importMenu, type MenuImportOptions } from '@/modules/catalog/menu-import';
+import { MAIL_TRANSPORT, type MailTransport } from '@/modules/mail/mail-transport';
 import { PUSH_TRANSPORT, type PushTransport } from '@/modules/push/push-transport';
 
 export const STAFF_PASSWORD = 'staff-password-123';
@@ -26,14 +27,16 @@ export const CUSTOMER_PASSWORD = 'customer-password-123';
 /**
  * La app completa, configurada como en main.ts (prefijo `api`). `gateway` reemplaza la
  * pasarela de cobro (FakeGateway); sin él rige `BILLING_MODE` (manual en env.cjs). `push`
- * reemplaza el transporte de notificaciones (FakePushTransport, TASK-016).
+ * reemplaza el transporte de notificaciones (FakePushTransport, TASK-016). `mail` reemplaza el
+ * transporte de correo (FakeMailTransport, TASK-021); sin él rige `SMTP_URL` (vacía: no-op).
  */
 export async function createApp(
-  options: { gateway?: PaymentGateway; push?: PushTransport } = {},
+  options: { gateway?: PaymentGateway; push?: PushTransport; mail?: MailTransport } = {},
 ): Promise<INestApplication> {
   const builder = Test.createTestingModule({ imports: [AppModule] });
   if (options.gateway) builder.overrideProvider(PAYMENT_GATEWAY).useValue(options.gateway);
   if (options.push) builder.overrideProvider(PUSH_TRANSPORT).useValue(options.push);
+  if (options.mail) builder.overrideProvider(MAIL_TRANSPORT).useValue(options.mail);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
