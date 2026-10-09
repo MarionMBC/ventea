@@ -36,7 +36,6 @@ const DONE_MESSAGE: Record<DialogKind, string> = {
   'resolve-payment': 'Cobro resuelto.',
 };
 
-/** Precio del plan e intervalo actuales, para precargar un pago manual. */
 /**
  * Topes del plan, solo lectura (los fija una migración; no hay edición de planes): sucursales
  * activas y usuarios del panel (TASK-022).
@@ -54,6 +53,7 @@ export function planLimitsLabel(plan: { maxLocations: number | null; maxStaff?: 
   return `${locations} · ${staff}`;
 }
 
+/** Precio del plan e intervalo actuales, para precargar un pago manual. */
 function currentPriceCents(
   plans: { code: string; priceMonthlyCents: number; priceYearlyCents: number }[] | undefined,
   sub: { planCode: string; interval: BillingInterval } | null,
