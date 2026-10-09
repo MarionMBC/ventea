@@ -30,7 +30,23 @@ const IMAGE = opt('image', 'ventea-web:smoke');
 const PORT = Number(opt('port', '8095'));
 const NAME = `ventea-nginx-smoke-${process.pid}`;
 
-const docker = (...cmd) => execFileSync('docker', cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const docker = (...cmd) =>
+  execFileSync('docker', cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+/** Cuerpo `Transfer-Encoding: chunked` → texto plano (las marcas de tamaño cortan etiquetas). */
+function dechunk(text) {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const eol = text.indexOf('\r\n', i);
+    if (eol < 0) break;
+    const size = Number.parseInt(text.slice(i, eol), 16);
+    if (!size) break;
+    out += text.slice(eol + 2, eol + 2 + size);
+    i = eol + 2 + size + 2;
+  }
+  return out;
+}
 
 /** Pedido HTTP/1.1 con bytes exactos (sin normalizar la ruta). */
 function raw(host, target, method = 'GET') {
@@ -57,9 +73,16 @@ function raw(host, target, method = 'GET') {
       for (const line of lines) {
         const i = line.indexOf(':');
         const key = line.slice(0, i).trim().toLowerCase();
-        headers[key] = headers[key] ? `${headers[key]}\n${line.slice(i + 1).trim()}` : line.slice(i + 1).trim();
+        headers[key] = headers[key]
+          ? `${headers[key]}\n${line.slice(i + 1).trim()}`
+          : line.slice(i + 1).trim();
       }
-      resolve({ status: Number(statusLine.split(' ')[1]), headers, body: rest.join('\r\n\r\n') });
+      const body = rest.join('\r\n\r\n');
+      resolve({
+        status: Number(statusLine.split(' ')[1]),
+        headers,
+        body: /chunked/i.test(headers['transfer-encoding'] ?? '') ? dechunk(body) : body,
+      });
     });
   });
 }
@@ -77,7 +100,11 @@ const resolveLocation = (location, base = 'https://ventea.tech/') => new URL(loc
 async function expectPage(host, path, status, lang) {
   const r = await raw(host, path);
   const gotLang = /<html lang="([a-z]+)"/.exec(r.body)?.[1];
-  check(`${host}${path} → ${status}${lang ? ` lang=${lang}` : ''}`, r.status === status && (!lang || gotLang === lang), `got ${r.status} lang=${gotLang}`);
+  check(
+    `${host}${path} → ${status}${lang ? ` lang=${lang}` : ''}`,
+    r.status === status && (!lang || gotLang === lang),
+    `got ${r.status} lang=${gotLang}`,
+  );
   return r;
 }
 
@@ -96,7 +123,9 @@ async function expectRedirect(host, path, status, location, { maxAge = false } =
 async function main() {
   if (BUILD) {
     console.log(`docker build -f deploy/Dockerfile.web -t ${IMAGE} .`);
-    execFileSync('docker', ['build', '-f', 'deploy/Dockerfile.web', '-t', IMAGE, '.'], { stdio: 'inherit' });
+    execFileSync('docker', ['build', '-f', 'deploy/Dockerfile.web', '-t', IMAGE, '.'], {
+      stdio: 'inherit',
+    });
   }
   docker('run', '-d', '--rm', '--name', NAME, '-p', `${PORT}:80`, IMAGE);
   try {
@@ -129,7 +158,10 @@ async function main() {
     // /en/privacy NO redirige (ver bucle abajo): misma página EN, canonical a /privacy.
     for (const path of ['/en/privacy', '/en/privacy/']) {
       const r = await expectPage(A, path, 200, 'en');
-      check(`${A}${path} canonical → /privacy`, r.body.includes('<link rel="canonical" href="https://ventea.tech/privacy" />'));
+      check(
+        `${A}${path} canonical → /privacy`,
+        r.body.includes('<link rel="canonical" href="https://ventea.tech/privacy" />'),
+      );
     }
 
     // ── Redirecciones de TASK-014 (301 + query + max-age de 1 día) ────────────────────────
@@ -140,7 +172,13 @@ async function main() {
     await expectRedirect(A, '/en/?utm=a&b=2', 301, '/?utm=a&b=2', R);
     await expectRedirect(A, '/en/nope', 301, '/nope', R);
     await expectRedirect(A, '/politica-de-privacidad', 301, '/es/politica-de-privacidad', R);
-    await expectRedirect(A, '/politica-de-privacidad/?x=1', 301, '/es/politica-de-privacidad?x=1', R);
+    await expectRedirect(
+      A,
+      '/politica-de-privacidad/?x=1',
+      301,
+      '/es/politica-de-privacidad?x=1',
+      R,
+    );
     await expectRedirect(A, '/POLITICA-DE-PRIVACIDAD', 301, '/es/politica-de-privacidad', R);
     await expectRedirect(A, '/es', 301, '/es/', R);
     await expectRedirect(A, '/es?x=1', 301, '/es/?x=1', R);
@@ -162,8 +200,15 @@ async function main() {
       const location = r.headers.location ?? '';
       const target = location ? resolveLocation(location) : null;
       const sameHost = !target || target.host === 'ventea.tech';
-      const noInjection = !/\r|\n/.test(location) && !r.headers['set-cookie'] && (r.headers.location ?? '').split('\n').length <= 1;
-      check(`${A}${path} → se queda en ventea.tech`, sameHost && noInjection, `got ${r.status} ${JSON.stringify(location)} → ${target?.href ?? '-'}`);
+      const noInjection =
+        !/\r|\n/.test(location) &&
+        !r.headers['set-cookie'] &&
+        (r.headers.location ?? '').split('\n').length <= 1;
+      check(
+        `${A}${path} → se queda en ventea.tech`,
+        sameHost && noInjection,
+        `got ${r.status} ${JSON.stringify(location)} → ${target?.href ?? '-'}`,
+      );
     }
 
     // ── Sin bucles con los 301 que producción (507b9b6) ya publicó sin Cache-Control ──────
@@ -194,7 +239,11 @@ async function main() {
         final = r.status;
         break;
       }
-      check(`sin bucle con caché vieja desde ${start}`, final === 200, `final=${final} camino=${[...seen].join(' → ')}`);
+      check(
+        `sin bucle con caché vieja desde ${start}`,
+        final === 200,
+        `final=${final} camino=${[...seen].join(' → ')}`,
+      );
     }
 
     // ── Sin regresión: SaaS en el apex, www, app., marca ──────────────────────────────────
@@ -250,7 +299,58 @@ async function main() {
       check('bundle del panel sin sourceMappingURL', js.status === 200 && !js.body.includes('sourceMappingURL='), `got ${js.status}`);
     }
     await expectPage('carolina.ventea.tech', '/', 200);
-    await expectRedirect('carolina.ventea.tech', '/admin/plataforma', 301, 'https://app.ventea.tech/admin/plataforma');
+    await expectRedirect(
+      'carolina.ventea.tech',
+      '/admin/plataforma',
+      301,
+      'https://app.ventea.tech/admin/plataforma',
+    );
+
+    // ── Menú público (apps/mobile) en una marca, TASK-018 ────────────────────────────────
+    // La app saca la marca del host y llama a /api del mismo origen: la CSP del header
+    // (connect-src 'self') y la del <meta> del build tienen que dejarla funcionar.
+    {
+      const B = 'demo-burgers.ventea.tech';
+      const r = await raw(B, '/');
+      const header = r.headers['content-security-policy'] ?? '';
+      const meta = (
+        /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(r.body)?.[1] ?? ''
+      ).replaceAll('&#39;', "'");
+      check(
+        `${B}/ sirve la app (#root)`,
+        r.status === 200 && r.body.includes('id="root"'),
+        `${r.status}`,
+      );
+      check(
+        `${B}/ CSP header connect-src 'self'`,
+        header.includes("connect-src 'self'") && header.includes("script-src 'self'"),
+        header,
+      );
+      check(
+        `${B}/ CSP meta del build: scripts propios, sin unsafe-eval`,
+        meta.includes("script-src 'self'") && !meta.includes('unsafe-eval'),
+        meta,
+      );
+      check(
+        `${B}/ sin <script> inline (CSP script-src 'self')`,
+        !/<script(?![^>]*\bsrc=)[^>]*>/i.test(r.body),
+      );
+      const deep = await raw(B, '/menu');
+      check(
+        `${B}/menu → index de la SPA`,
+        deep.status === 200 && deep.body.includes('id="root"'),
+        `${deep.status}`,
+      );
+      const js = /<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(r.body)?.[1];
+      const bundle = js ? await raw(B, js) : { status: 0, body: '' };
+      check(`${B}${js ?? '/assets/*.js'} bundle 200`, bundle.status === 200, `${bundle.status}`);
+      const map = js ? await raw(B, `${js}.map`) : { status: 0 };
+      check(
+        `${B}${js ?? '/assets/*.js'}.map → 404 (sin sourcemaps públicos)`,
+        map.status === 404,
+        `${map.status}`,
+      );
+    }
 
     // ── Headers ────────────────────────────────────────────────────────────────────────────
     for (const path of ['/', '/es/', '/en/', '/nope', '/es/nada', '/en/privacy']) {
@@ -259,11 +359,18 @@ async function main() {
       const csp = (h['content-security-policy'] ?? '').includes("script-src 'self'");
       check(
         `${A}${path} headers de seguridad`,
-        csp && h['x-frame-options'] === 'DENY' && h['x-content-type-options'] === 'nosniff' && Boolean(h['strict-transport-security']),
+        csp &&
+          h['x-frame-options'] === 'DENY' &&
+          h['x-content-type-options'] === 'nosniff' &&
+          Boolean(h['strict-transport-security']),
         `${r.status}`,
       );
       if (r.status === 200 || r.status === 404) {
-        check(`${A}${path} Cache-Control no-cache`, h['cache-control'] === 'no-cache', JSON.stringify(h['cache-control']));
+        check(
+          `${A}${path} Cache-Control no-cache`,
+          h['cache-control'] === 'no-cache',
+          JSON.stringify(h['cache-control']),
+        );
       }
     }
   } finally {

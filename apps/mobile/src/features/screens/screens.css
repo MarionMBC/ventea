@@ -1,0 +1,146 @@
+/* ============================================================================
+   Screen composition. These rules only lay out sections on a page; anything
+   with a visual identity of its own lives in its component stylesheet.
+   ========================================================================= */
+
+.vt-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--vt-surface-primary);
+}
+
+.vt-screen__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.vt-screen__inner {
+  /* Container for the component-level @container rules (promo card, grids):
+     components must size to this column, not to the browser window. */
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-6);
+  padding: var(--vt-space-4);
+  padding-bottom: var(--vt-space-10);
+  max-width: var(--vt-content-max);
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Hero used by the product detail screen ────────────────────────────── */
+.vt-hero {
+  position: relative;
+}
+
+.vt-hero__actions {
+  position: absolute;
+  top: var(--vt-space-3);
+  inset-inline: var(--vt-space-3);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.vt-hero__actions > * {
+  pointer-events: auto;
+}
+
+/* Keeps the headline legible over the bottom of the photo without a texture. */
+.vt-hero::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 96px;
+  background: linear-gradient(to top, var(--vt-surface-primary), transparent);
+  pointer-events: none;
+}
+
+/* ── Totals block (cart / checkout) ────────────────────────────────────── */
+.vt-totals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+  background: var(--vt-surface-secondary);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  border-radius: var(--vt-radius-xl);
+  padding: var(--vt-space-4);
+}
+
+.vt-totals__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vt-space-4);
+  font-size: 15px;
+  color: var(--vt-text-secondary);
+}
+
+.vt-totals__row--total {
+  color: var(--vt-text-primary);
+  font-weight: 600;
+  align-items: center;
+}
+
+/* ── Profile header ────────────────────────────────────────────────────── */
+.vt-profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-4);
+  background: var(--vt-surface-secondary);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  border-radius: var(--vt-radius-xl);
+  padding: var(--vt-space-4);
+}
+
+.vt-profile-head__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--vt-surface-muted);
+  color: var(--vt-primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  flex: none;
+}
+
+.vt-profile-head__points {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--vt-primary-text);
+  line-height: 1;
+}
+
+/* ── Tracking map placeholder ──────────────────────────────────────────── */
+.vt-track-map {
+  height: 160px;
+  border-radius: var(--vt-radius-xl);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  background: var(--vt-photo-placeholder);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vt-text-secondary);
+  font-size: 13px;
+}
+
+/* ── Two column layout from tablet up ──────────────────────────────────── */
+@media (min-width: 768px) {
+  .vt-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--vt-space-4);
+    align-items: start;
+  }
+}

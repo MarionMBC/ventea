@@ -1,0 +1,113 @@
+/* ── Price ─────────────────────────────────────────────────────────────── */
+.vt-price-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--vt-space-2);
+}
+
+.vt-price {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  color: var(--vt-primary-text);
+  line-height: 1;
+}
+
+.vt-price--sm { font-size: 18px; }
+.vt-price--md { font-size: 22px; }
+.vt-price--lg { font-size: 30px; }
+.vt-price--muted { color: var(--vt-text-secondary); }
+
+.vt-price-previous {
+  font-family: var(--vt-font-body);
+  font-size: 14px;
+  color: var(--vt-text-secondary);
+  text-decoration: line-through;
+}
+
+/* ── Rating ────────────────────────────────────────────────────────────── */
+.vt-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-1);
+  font-family: var(--vt-font-body);
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+}
+
+.vt-rating__stars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.vt-rating__star {
+  color: var(--vt-primary-text);
+  font-size: 15px;
+}
+
+.vt-rating__value {
+  font-weight: 600;
+  color: var(--vt-text-primary);
+}
+
+/* ── Badge ─────────────────────────────────────────────────────────────── */
+.vt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-1);
+  font-family: var(--vt-font-condensed);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: var(--vt-radius-xs);
+  border: var(--vt-border-width) solid transparent;
+  white-space: nowrap;
+}
+
+.vt-badge__icon { font-size: 13px; }
+
+.vt-badge--brand { background: var(--vt-brand-primary-filled); color: var(--vt-on-primary); }
+.vt-badge--accent { background: var(--vt-brand-accent-filled); color: var(--vt-on-accent); }
+.vt-badge--light { background: var(--vt-surface-inverse); color: var(--vt-text-inverse); }
+.vt-badge--neutral { background: var(--vt-surface-muted); color: var(--vt-text-secondary); }
+
+.vt-badge--subtle.vt-badge--success {
+  background: rgba(var(--vt-success-rgb), 0.16);
+  border-color: rgba(var(--vt-success-rgb), 0.4);
+  color: var(--vt-success);
+}
+.vt-badge--subtle.vt-badge--warning {
+  background: rgba(var(--vt-warning-rgb), 0.16);
+  border-color: rgba(var(--vt-warning-rgb), 0.4);
+  color: var(--vt-warning);
+}
+.vt-badge--subtle.vt-badge--info {
+  background: rgba(var(--vt-info-rgb), 0.16);
+  border-color: rgba(var(--vt-info-rgb), 0.4);
+  color: var(--vt-info);
+}
+.vt-badge--subtle.vt-badge--danger {
+  background: rgba(var(--vt-danger-rgb), 0.16);
+  border-color: rgba(var(--vt-danger-rgb), 0.4);
+  color: var(--vt-danger-text);
+}
+.vt-badge--subtle.vt-badge--neutral {
+  background: var(--vt-surface-elevated);
+  border-color: var(--vt-border-default);
+  color: var(--vt-text-secondary);
+}
+
+/* ── Skeleton ──────────────────────────────────────────────────────────── */
+.vt-skeleton {
+  display: block;
+  background: var(--vt-shimmer);
+  background-size: 320px 100%;
+  animation: vt-shimmer var(--vt-duration-shimmer) linear infinite;
+}
+
+.vt-skeleton--xs { border-radius: var(--vt-radius-xs); }
+.vt-skeleton--md { border-radius: var(--vt-radius-md); }
+.vt-skeleton--xl { border-radius: var(--vt-radius-xl); }
+.vt-skeleton--full { border-radius: var(--vt-radius-full); }

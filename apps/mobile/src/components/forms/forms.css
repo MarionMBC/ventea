@@ -1,0 +1,379 @@
+/* ── Field shell ───────────────────────────────────────────────────────── */
+.vt-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+}
+
+.vt-field__label {
+  font-family: var(--vt-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--vt-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-1);
+}
+
+.vt-field__optional {
+  font-weight: 400;
+  color: var(--vt-text-secondary);
+}
+
+.vt-field__hint {
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+}
+
+/* ── Control ───────────────────────────────────────────────────────────── */
+.vt-control {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-3);
+  min-height: var(--vt-field-height);
+  background: var(--vt-surface-secondary);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  border-radius: var(--vt-radius-md);
+  padding-inline: 14px;
+  color: var(--vt-text-primary);
+  box-sizing: border-box;
+  transition:
+    border-color var(--vt-duration-press) var(--vt-ease-out),
+    box-shadow var(--vt-duration-press) var(--vt-ease-out);
+}
+
+.vt-control--textarea {
+  align-items: stretch;
+  padding-block: var(--vt-space-3);
+}
+
+.vt-control:focus-within {
+  border-color: var(--vt-primary-text);
+  box-shadow: 0 0 0 3px rgba(var(--vt-brand-primary-rgb), 0.18);
+}
+
+.vt-control--invalid {
+  border-color: var(--vt-danger);
+}
+
+.vt-control--invalid:focus-within {
+  box-shadow: 0 0 0 3px rgba(var(--vt-danger-rgb), 0.18);
+}
+
+.vt-control--valid {
+  border-color: rgba(var(--vt-success-rgb), 0.7);
+}
+
+.vt-control--disabled {
+  opacity: var(--vt-disabled-opacity);
+  pointer-events: none;
+}
+
+.vt-control--pill {
+  border-radius: var(--vt-radius-full);
+  min-height: var(--vt-touch-min);
+}
+
+.vt-control__input,
+.vt-control__textarea {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--vt-text-primary);
+  font-family: var(--vt-font-body);
+  /* 16px keeps iOS from zooming the viewport on focus. */
+  font-size: 16px;
+  padding: 0;
+  width: 100%;
+}
+
+.vt-control__textarea {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.45;
+}
+
+.vt-control__input::placeholder,
+.vt-control__textarea::placeholder {
+  color: var(--vt-text-secondary);
+}
+
+.vt-control__input:focus-visible,
+.vt-control__textarea:focus-visible {
+  box-shadow: none;
+}
+
+.vt-control__icon {
+  font-size: var(--vt-icon-sm);
+  color: var(--vt-text-secondary);
+  flex: none;
+}
+
+.vt-control__affix {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--vt-primary-text);
+  flex: none;
+}
+
+.vt-control__suffix {
+  font-size: 13px;
+  color: var(--vt-text-secondary);
+  flex: none;
+}
+
+.vt-control__reveal {
+  width: var(--vt-touch-min);
+  height: var(--vt-touch-min);
+  margin-inline-end: -10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--vt-text-secondary);
+  cursor: pointer;
+  flex: none;
+}
+
+/* Native select keeps its keyboard and platform picker; only the chrome is ours. */
+.vt-control__select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--vt-text-primary);
+  font-family: var(--vt-font-body);
+  font-size: 16px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.vt-control__select option {
+  background: var(--vt-surface-elevated);
+  color: var(--vt-text-primary);
+}
+
+/* ── Validation message ────────────────────────────────────────────────── */
+.vt-validation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-1);
+  font-size: 13px;
+}
+
+.vt-validation--error { color: var(--vt-danger-text); }
+.vt-validation--success { color: var(--vt-success); }
+.vt-validation--info { color: var(--vt-text-secondary); }
+
+/* ── Selection controls ────────────────────────────────────────────────── */
+.vt-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-3);
+  min-height: var(--vt-touch-min);
+  cursor: pointer;
+  color: var(--vt-text-primary);
+  font-size: 16px;
+}
+
+.vt-choice--disabled {
+  opacity: var(--vt-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.vt-choice__native {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.vt-choice__box {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--vt-radius-xs);
+  border: var(--vt-border-width-strong) solid var(--vt-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vt-on-primary);
+  flex: none;
+  box-sizing: border-box;
+}
+
+.vt-choice__box--radio {
+  border-radius: 50%;
+}
+
+.vt-choice__native:checked + .vt-choice__box {
+  background: var(--vt-brand-primary-filled);
+  border-color: var(--vt-primary-text);
+}
+
+.vt-choice__native:checked + .vt-choice__box--radio {
+  background: transparent;
+}
+
+.vt-choice__native:focus-visible + .vt-choice__box {
+  box-shadow: var(--vt-focus-ring);
+}
+
+.vt-choice__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--vt-brand-primary-filled);
+  display: none;
+}
+
+.vt-choice__native:checked + .vt-choice__box .vt-choice__dot {
+  display: block;
+}
+
+.vt-choice__check {
+  font-size: 16px;
+  display: none;
+}
+
+.vt-choice__native:checked + .vt-choice__box .vt-choice__check {
+  display: block;
+}
+
+.vt-choice__meta {
+  margin-inline-start: auto;
+  color: var(--vt-text-secondary);
+  font-size: 15px;
+}
+
+/* ── Toggle ────────────────────────────────────────────────────────────── */
+.vt-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vt-space-4);
+  min-height: var(--vt-touch-min);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.vt-toggle__track {
+  width: 52px;
+  height: 30px;
+  border-radius: var(--vt-radius-full);
+  background: var(--vt-surface-muted);
+  padding: 3px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex: none;
+  transition: background-color var(--vt-duration-press) var(--vt-ease-out);
+}
+
+.vt-toggle__thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--vt-text-secondary);
+  transition: transform var(--vt-duration-press) var(--vt-ease-out);
+}
+
+.vt-toggle__native:checked + .vt-toggle__track {
+  background: var(--vt-brand-primary-filled);
+}
+
+.vt-toggle__native:checked + .vt-toggle__track .vt-toggle__thumb {
+  background: var(--vt-on-primary);
+  transform: translateX(22px);
+}
+
+.vt-toggle__native:focus-visible + .vt-toggle__track {
+  box-shadow: var(--vt-focus-ring);
+}
+
+.vt-toggle--disabled {
+  opacity: var(--vt-disabled-opacity);
+  pointer-events: none;
+}
+
+/* ── Quantity selector ─────────────────────────────────────────────────── */
+.vt-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  background: var(--vt-surface-elevated);
+  border-radius: var(--vt-radius-md);
+  padding: 2px;
+}
+
+.vt-qty--bordered {
+  background: var(--vt-surface-secondary);
+  border: var(--vt-border-width) solid var(--vt-border-default);
+  padding: var(--vt-space-2);
+  justify-content: space-between;
+  display: flex;
+  width: 100%;
+}
+
+.vt-qty__btn {
+  width: var(--vt-touch-min);
+  height: var(--vt-touch-min);
+  border-radius: var(--vt-radius-sm);
+  border: 0;
+  background: transparent;
+  color: var(--vt-text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+}
+
+.vt-qty__btn--accent {
+  background: var(--vt-brand-primary-filled);
+  color: var(--vt-on-primary);
+}
+
+.vt-qty--bordered .vt-qty__btn:not(.vt-qty__btn--accent) {
+  background: var(--vt-surface-muted);
+}
+
+.vt-qty__btn:disabled {
+  opacity: var(--vt-disabled-opacity);
+  pointer-events: none;
+}
+
+.vt-qty__value {
+  font-family: var(--vt-font-display);
+  font-weight: 700;
+  font-size: 20px;
+  min-width: 32px;
+  text-align: center;
+}
+
+.vt-qty--bordered .vt-qty__value {
+  font-size: 22px;
+  min-width: 40px;
+}
+
+/* ── Promo code ────────────────────────────────────────────────────────── */
+.vt-promo-row {
+  display: flex;
+  gap: var(--vt-space-3);
+  align-items: stretch;
+}
+
+.vt-promo-row .vt-control {
+  flex: 1;
+}
+
+.vt-promo-row .vt-btn {
+  height: var(--vt-field-height);
+  min-height: var(--vt-field-height);
+}
