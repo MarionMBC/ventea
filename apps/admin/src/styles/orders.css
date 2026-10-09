@@ -6,10 +6,16 @@
   padding: 16px var(--gutter) 24px;
 }
 
-/* Desde tablet el área principal tiene alto fijo y el tablero la llena: cada columna hace
-   scroll por su cuenta y su encabezado queda siempre a la vista. */
+/*
+ * Tablero (desde tablet): única vista con alto fijo. El área principal llena la pantalla y
+ * cada columna hace scroll por su cuenta (`data-scroll-pane`) con su encabezado a la vista.
+ * El resto del panel scrollea con el documento (regla en `apps/admin/LAYOUT.md`).
+ * `position: relative` contiene a los hijos absolutos (`.sr-only`): sin él quedan fuera del
+ * recorte de `main` y estiran el documento (la doble barra de TASK-020).
+ */
 @media (min-width: 768px) {
-  .app__main {
+  .app:has(.orders--board) > .app__main {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: calc(100vh - var(--topbar-h));
@@ -28,7 +34,7 @@
 }
 
 @media (min-width: 1024px) {
-  .app__main {
+  .app:has(.orders--board) > .app__main {
     height: 100vh;
     height: 100dvh;
   }
@@ -364,7 +370,10 @@
     position: static;
   }
 
+  /* `position: relative`: contiene a los `.sr-only` de las tarjetas (si no, estiran el
+     área principal y aparece una barra de más). */
   .column__list {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;

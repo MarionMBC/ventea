@@ -200,7 +200,7 @@ export function OrdersBoard() {
                       <p>{t(column.hint)}</p>
                     </div>
                   ) : (
-                    <ol className="column__list">
+                    <ol className="column__list" data-scroll-pane>
                       {items.map((order) => (
                         <li key={order.id}>
                           <OrderCard
