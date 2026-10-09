@@ -1,5 +1,5 @@
 import type { RewardCatalogInput, RewardCatalogItem, StaffMenu } from '@ventea/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { centsToInput, currencySymbol, parseMoneyInput } from '@/features/menu/money';
 import { describeError, useI18n } from '@/i18n';
@@ -50,6 +50,12 @@ export function RewardDrawer({
   const save = useSaveReward();
   const [draft, setDraft] = useState<Draft>(() => draftOf(reward));
   const [errors, setErrors] = useState<Errors>({});
+  const form = useRef<HTMLFormElement>(null);
+
+  // Un error al guardar re-habilita el botón, pero el foco ya cayó al <body>: vuelve al panel.
+  useEffect(() => {
+    if (!save.isPending && document.activeElement === document.body) form.current?.focus();
+  }, [save.isPending]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -118,7 +124,14 @@ export function RewardDrawer({
         </>
       }
     >
-      <form id={`${id}-form`} className="form-grid" onSubmit={onSubmit} noValidate>
+      <form
+        id={`${id}-form`}
+        ref={form}
+        tabIndex={-1}
+        className="form-grid"
+        onSubmit={onSubmit}
+        noValidate
+      >
         <div className="field">
           <label className="field__label" htmlFor={`${id}-name`}>
             {t('rewards.name')}

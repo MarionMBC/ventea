@@ -1,5 +1,5 @@
 import type { RewardCatalogItem, RewardCustomer, RewardLedgerReason } from '@ventea/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { describeError, useI18n, type TKey } from '@/i18n';
 import { Drawer } from '@/ui/Drawer';
@@ -49,6 +49,13 @@ export function CustomerDrawer({
 
   const current = detail.data?.customer ?? customer;
   const busy = adjust.isPending || redeem.isPending;
+  const content = useRef<HTMLDivElement>(null);
+
+  // Mientras guarda, el botón pulsado se deshabilita y el foco cae al <body>: al terminar se
+  // devuelve al panel (si no, Escape y el ciclo de Tab dejan de funcionar en el cajón).
+  useEffect(() => {
+    if (!busy && document.activeElement === document.body) content.current?.focus();
+  }, [busy]);
   const redeemable = rewards.filter(
     (reward) => reward.isActive && (reward.kind === 'discount' || reward.menuItemName !== null),
   );
@@ -101,7 +108,7 @@ export function CustomerDrawer({
 
   return (
     <Drawer title={customerLabel(current)} subtitle={current.email} busy={busy} onClose={onClose}>
-      <div className="rw-customer">
+      <div className="rw-customer" ref={content} tabIndex={-1}>
         <dl className="stats rw-customer__stats">
           <div className="stat">
             <dt>{t('rewards.balance')}</dt>

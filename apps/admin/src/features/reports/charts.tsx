@@ -92,7 +92,8 @@ export function ColumnChart({
           index % every === 0 ? (
             <span
               key={point.key}
-              className="chart__tick"
+              // En el teléfono se oculta una de cada dos etiquetas (no caben 8).
+              className={`chart__tick${(index / every) % 2 === 1 ? ' chart__tick--alt' : ''}`}
               style={{ left: `${((index + 0.5) / points.length) * 100}%` }}
             >
               {point.short}

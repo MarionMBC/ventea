@@ -667,3 +667,16 @@ section.rw-section {
 .reports-upsell .btn {
   margin-top: 4px;
 }
+
+/* Contenedores que reciben el foco por programa (tras guardar): sin anillo, no son controles. */
+.rw-customer:focus-visible,
+.drawer .form-grid:focus-visible,
+.rw-program .flash:focus-visible {
+  box-shadow: none;
+}
+
+@media (max-width: 599px) {
+  .chart__tick--alt {
+    display: none;
+  }
+}

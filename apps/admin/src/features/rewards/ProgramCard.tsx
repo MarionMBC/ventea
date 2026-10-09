@@ -1,5 +1,5 @@
 import type { RewardProgram, UpdateRewardProgramInput } from '@ventea/shared';
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
 import { centsToInput, parseMoneyInput } from '@/features/menu/money';
 import { describeError, useI18n } from '@/i18n';
@@ -76,6 +76,12 @@ export function ProgramCard({ program, currency }: { program: RewardProgram; cur
   const [draft, setDraft] = useState<Draft | null>(null);
   const [errors, setErrors] = useState<Partial<Record<Field, true>>>({});
   const [flash, setFlash] = useState<string | null>(null);
+  const flashRef = useRef<HTMLParagraphElement>(null);
+
+  // Tras guardar, los botones quedan deshabilitados (nada sin guardar): el foco va al aviso.
+  useEffect(() => {
+    if (flash && document.activeElement === document.body) flashRef.current?.focus();
+  }, [flash]);
   const current = draft ?? saved;
   const dirty = (Object.keys(saved) as (keyof Draft)[]).some((key) => current[key] !== saved[key]);
 
@@ -180,7 +186,7 @@ export function ProgramCard({ program, currency }: { program: RewardProgram; cur
       </div>
 
       {flash && (
-        <p className="flash" role="status">
+        <p className="flash" role="status" ref={flashRef} tabIndex={-1}>
           {flash}
         </p>
       )}

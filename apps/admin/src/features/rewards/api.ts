@@ -127,9 +127,10 @@ function useCustomerMutation<TVars>(id: string, path: string) {
         `/staff/rewards/customers/${encodeURIComponent(id)}/${path}`,
         { method: 'POST', body, schema: rewardCustomerDetailSchema },
       ),
-    onSuccess: async (detail) => {
+    onSuccess: (detail) => {
       queryClient.setQueryData(customerKey(id), detail);
-      await queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
+      // Sin esperar: el panel del cliente ya tiene su saldo nuevo y no queda «guardando».
+      void queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
     },
   });
 }
