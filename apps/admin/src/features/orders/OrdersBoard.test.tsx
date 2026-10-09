@@ -64,24 +64,24 @@ describe('Tablero de pedidos', () => {
     renderPanel([nuevo, makeOrder({ status: 'preparing' }), makeOrder({ status: 'preparing' })]);
 
     expect(await screen.findByText('CHC-1234')).toBeTruthy();
-    expect(within(column('Nuevos')).getByText('1 pedido')).toBeTruthy();
-    expect(within(column('En cocina')).getByText('2 pedidos')).toBeTruthy();
-    expect(within(column('Listos')).getByText('Sin pedidos')).toBeTruthy();
+    expect(within(column('New')).getByText('1 order')).toBeTruthy();
+    expect(within(column('In the kitchen')).getByText('2 orders')).toBeTruthy();
+    expect(within(column('Ready')).getByText('No orders')).toBeTruthy();
 
     const c = within(card('CHC-1234'));
     expect(c.getByText('Ana Pérez')).toBeTruthy();
     expect(c.getByRole('link', { name: '+504 9999-0000' }).getAttribute('href')).toBe(
       'tel:+504 9999-0000',
     );
-    expect(c.getByText('Comer aquí')).toBeTruthy();
-    expect(c.getByText('hace 3 min')).toBeTruthy();
+    expect(c.getByText('Dine-in')).toBeTruthy();
+    expect(c.getByText('3 min')).toBeTruthy();
     expect(c.getByText('2×')).toBeTruthy();
     expect(c.getByText('Hot, Extra salsa')).toBeTruthy();
-    expect(c.getByText('Nota: sin pepinillos')).toBeTruthy();
+    expect(c.getByText('Note: sin pepinillos')).toBeTruthy();
     expect(c.getByText(/paso en 10 min/)).toBeTruthy();
     expect(c.getByText('120 pts (−$1.20)')).toBeTruthy();
     expect(c.getByText('$24.60')).toBeTruthy();
-    expect(c.getByRole('button', { name: 'Empezar' })).toBeTruthy();
+    expect(c.getByRole('button', { name: 'Start' })).toBeTruthy();
   });
 
   it('pide los tres estados activos por separado', async () => {
@@ -105,13 +105,15 @@ describe('Tablero de pedidos', () => {
       return undefined; // sigue al handler normal, que aplica el cambio
     });
 
-    fireEvent.click(within(card('CHC-2000')).getByRole('button', { name: 'Empezar' }));
+    fireEvent.click(within(card('CHC-2000')).getByRole('button', { name: 'Start' }));
 
-    await waitFor(() => expect(within(column('En cocina')).queryByText('CHC-2000')).toBeTruthy());
-    expect(within(column('Nuevos')).queryByText('CHC-2000')).toBeNull();
+    await waitFor(() =>
+      expect(within(column('In the kitchen')).queryByText('CHC-2000')).toBeTruthy(),
+    );
+    expect(within(column('New')).queryByText('CHC-2000')).toBeNull();
     // Mientras está en vuelo, la tarjeta no admite otro cambio.
     expect(
-      (within(card('CHC-2000')).getByRole('button', { name: 'Listo' }) as HTMLButtonElement)
+      (within(card('CHC-2000')).getByRole('button', { name: 'Ready' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
 
@@ -121,11 +123,11 @@ describe('Tablero de pedidos', () => {
     expect(patch?.body).toEqual({ status: 'preparing' });
     await waitFor(() =>
       expect(
-        (within(card('CHC-2000')).getByRole('button', { name: 'Listo' }) as HTMLButtonElement)
+        (within(card('CHC-2000')).getByRole('button', { name: 'Ready' }) as HTMLButtonElement)
           .disabled,
       ).toBe(false),
     );
-    expect(within(column('En cocina')).getByText('CHC-2000')).toBeTruthy();
+    expect(within(column('In the kitchen')).getByText('CHC-2000')).toBeTruthy();
   });
 
   it('si la API falla, la tarjeta vuelve a su columna y se avisa', async () => {
@@ -133,13 +135,11 @@ describe('Tablero de pedidos', () => {
     await screen.findByText('CHC-3000');
     api.setOverride((req) => (req.method === 'PATCH' ? apiError(500, 'Error interno') : undefined));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
-    expect(
-      await screen.findByText('No se pudo actualizar el pedido CHC-3000. Error interno'),
-    ).toBeTruthy();
-    expect(within(column('Nuevos')).getByText('CHC-3000')).toBeTruthy();
-    expect(within(column('En cocina')).queryByText('CHC-3000')).toBeNull();
+    expect(await screen.findByText('Couldn’t update order CHC-3000. Error interno')).toBeTruthy();
+    expect(within(column('New')).getByText('CHC-3000')).toBeTruthy();
+    expect(within(column('In the kitchen')).queryByText('CHC-3000')).toBeNull();
   });
 
   it('un 409 (otro staff ya lo movió) avisa y recarga el tablero con el estado real', async () => {
@@ -154,16 +154,16 @@ describe('Tablero de pedidos', () => {
       api.state.orders[0]!.status = 'ready';
       return apiError(409, 'El pedido cambió de estado; recarga e intenta de nuevo');
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
     expect(
       await screen.findByText(
-        'Otra persona ya cambió el pedido CHC-4000. Actualizamos el tablero.',
+        'Someone else already updated order CHC-4000. The board has been refreshed.',
       ),
     ).toBeTruthy();
-    await waitFor(() => expect(within(column('Listos')).queryByText('CHC-4000')).toBeTruthy());
+    await waitFor(() => expect(within(column('Ready')).queryByText('CHC-4000')).toBeTruthy());
     expect(api.count('GET', '/api/staff/orders')).toBeGreaterThan(loadsBefore);
-    expect(within(column('Nuevos')).getByText('Sin pedidos')).toBeTruthy();
+    expect(within(column('New')).getByText('No orders')).toBeTruthy();
   });
 
   it('cancelar pide confirmación y avisa la devolución de puntos', async () => {
@@ -171,69 +171,69 @@ describe('Tablero de pedidos', () => {
     const { api } = renderPanel([order]);
     await screen.findByText('CHC-5000');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido CHC-5000' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel order CHC-5000' }));
     expect(api.count('PATCH', `/api/staff/orders/${order.id}/status`)).toBe(0);
-    expect(screen.getByText(/Se devuelven 150 puntos al cliente/)).toBeTruthy();
+    expect(screen.getByText(/150 points will be returned to the customer/)).toBeTruthy();
 
     // "No, volver" deja todo como estaba.
-    fireEvent.click(screen.getByRole('button', { name: 'No, volver' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido CHC-5000' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No, go back' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel order CHC-5000' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, cancel' }));
 
     expect(
-      await screen.findByText('Pedido CHC-5000 cancelado. Se devolvieron 150 puntos al cliente.'),
+      await screen.findByText(
+        'Order CHC-5000 cancelled. 150 points were returned to the customer.',
+      ),
     ).toBeTruthy();
     expect(api.calls.find((c) => c.method === 'PATCH')?.body).toEqual({ status: 'cancelled' });
     await waitFor(() => expect(screen.queryByTestId('order-CHC-5000')).toBeNull());
     // Era el último pedido: el foco no se pierde en <body>, lo toma el estado vacío.
-    expect(document.activeElement?.textContent).toBe('No hay pedidos activos');
+    expect(document.activeElement?.textContent).toBe('No active orders');
   });
 
   it('tras cancelar, el foco queda en el título de la columna', async () => {
     renderPanel([makeOrder({ code: 'CHC-5100' }), makeOrder({ code: 'CHC-5101' })]);
     await screen.findByText('CHC-5100');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar pedido CHC-5100' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel order CHC-5100' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, cancel' }));
     await waitFor(() => expect(screen.queryByTestId('order-CHC-5100')).toBeNull());
-    expect(document.activeElement?.textContent).toBe('Nuevos');
+    expect(document.activeElement?.textContent).toBe('New');
   });
 
   it('un pedido nuevo en la siguiente carga se resalta y suma al título', async () => {
     const { api } = renderPanel([makeOrder({ code: 'CHC-6000' })]);
     await screen.findByText('CHC-6000');
-    await waitFor(() => expect(document.title).toBe('Pedidos · Carolina Hot Chicken'));
-    expect(screen.queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
+    await waitFor(() => expect(document.title).toBe('Orders · Carolina Hot Chicken'));
+    expect(screen.queryByRole('button', { name: /^New:/ })).toBeNull();
 
     api.state.orders.push(makeOrder({ code: 'CHC-6001' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await screen.findByText('CHC-6001');
     expect(
-      within(card('CHC-6001')).getByRole('button', { name: 'Nuevo: marcar CHC-6001 como visto' }),
+      within(card('CHC-6001')).getByRole('button', { name: 'New: mark CHC-6001 as seen' }),
     ).toBeTruthy();
-    expect(screen.getByText('1 pedido nuevo')).toBeTruthy();
-    expect(within(card('CHC-6000')).queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
-    await waitFor(() => expect(document.title).toBe('(1) Pedidos · Carolina Hot Chicken'));
+    expect(screen.getByText('1 new order')).toBeTruthy();
+    expect(within(card('CHC-6000')).queryByRole('button', { name: /^New:/ })).toBeNull();
+    await waitFor(() => expect(document.title).toBe('(1) Orders · Carolina Hot Chicken'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar vistos (1)' }));
-    await waitFor(() => expect(document.title).toBe('Pedidos · Carolina Hot Chicken'));
-    expect(screen.queryByRole('button', { name: /^Nuevo:/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all seen (1)' }));
+    await waitFor(() => expect(document.title).toBe('Orders · Carolina Hot Chicken'));
+    expect(screen.queryByRole('button', { name: /^New:/ })).toBeNull();
   });
 
   it('el sonido arranca apagado y el toggle recuerda la elección', async () => {
     renderPanel([makeOrder()]);
-    const toggle = await screen.findByRole('button', { name: 'Sonido: apagado' });
+    const toggle = await screen.findByRole('button', { name: 'Sound' });
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(toggle);
-    expect(
-      screen.getByRole('button', { name: 'Sonido: activado' }).getAttribute('aria-pressed'),
-    ).toBe('true');
+    expect(screen.getByRole('button', { name: 'Sound' }).getAttribute('aria-pressed')).toBe('true');
     expect(window.localStorage.getItem('ventea.admin.sound')).toBe('on');
   });
 
   it('estado vacío', async () => {
     renderPanel([]);
-    expect(await screen.findByText('No hay pedidos activos')).toBeTruthy();
+    expect(await screen.findByText('No active orders')).toBeTruthy();
   });
 
   it('error con reintento', async () => {
@@ -247,10 +247,10 @@ describe('Tablero de pedidos', () => {
         ),
     });
 
-    expect(await screen.findByText('No pudimos cargar los pedidos')).toBeTruthy();
+    expect(await screen.findByText('We couldn’t load orders')).toBeTruthy();
     expect(screen.getByText('Servicio no disponible')).toBeTruthy();
     fail = false;
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('CHC-7000')).toBeTruthy();
   });
 
@@ -267,9 +267,9 @@ describe('Tablero de pedidos', () => {
     expect(await screen.findByText('CHC-8001')).toBeTruthy();
     expect(screen.getByText('CHC-8002')).toBeTruthy();
     expect(screen.queryByText('CHC-8003')).toBeNull();
-    expect(screen.getByText('Entregado')).toBeTruthy();
-    expect(screen.getByText('Cancelado')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Empezar|Listo|Cancelar pedido/ })).toBeNull();
+    expect(screen.getByText('Delivered', { selector: '.status-chip' })).toBeTruthy();
+    expect(screen.getByText('Cancelled', { selector: '.status-chip' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Start|Ready|Cancel order/ })).toBeNull();
 
     const historyCalls = api.calls.filter(
       (c) => c.path === '/api/staff/orders' && c.query.get('since'),
@@ -287,16 +287,16 @@ describe('Tablero de pedidos', () => {
 describe('Login y sesión', () => {
   it('sin sesión manda al login; clave incorrecta muestra el error de la API', async () => {
     const { api } = renderPanel([], { loggedIn: false });
-    expect(await screen.findByRole('heading', { name: 'Panel del local' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Restaurant dashboard' })).toBeTruthy();
 
     api.setOverride((req) =>
       req.path === '/api/staff/auth/login' ? apiError(401, 'Credenciales inválidas') : undefined,
     );
-    fireEvent.change(screen.getByLabelText('Correo'), { target: { value: 'owner@chc.test' } });
-    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'mala' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@chc.test' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'mala' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect((await screen.findByRole('alert')).textContent).toBe('Credenciales inválidas');
+    expect((await screen.findByRole('alert')).textContent).toBe('Incorrect email or password.');
   });
 
   it('login correcto guarda la sesión y abre el tablero; cerrar sesión vuelve al login', async () => {
@@ -308,13 +308,13 @@ describe('Login y sesión', () => {
       req.path === '/api/staff/auth/login' ? json(STAFF_SESSION) : undefined,
     );
 
-    fireEvent.change(await screen.findByLabelText('Correo'), {
+    fireEvent.change(await screen.findByLabelText('Email'), {
       target: { value: ' Owner@chc.test ' },
     });
-    fireEvent.change(screen.getByLabelText('Contraseña'), {
+    fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'staff-password-123' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText('CHC-9000')).toBeTruthy();
     expect(api.calls.find((c) => c.path === '/api/staff/auth/login')?.body).toEqual({
@@ -324,8 +324,8 @@ describe('Login y sesión', () => {
     expect(session.get()?.staff.name).toBe('Marta López');
     expect(window.location.pathname).toBe('/admin/orders');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-    expect(await screen.findByRole('heading', { name: 'Panel del local' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('heading', { name: 'Restaurant dashboard' })).toBeTruthy();
     expect(session.get()).toBeNull();
   });
 
@@ -342,7 +342,7 @@ describe('Login y sesión', () => {
         }),
     });
 
-    expect(await screen.findByRole('heading', { name: 'Panel del local' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Restaurant dashboard' })).toBeTruthy();
     expect(session.get()).toBeNull();
   });
 });
