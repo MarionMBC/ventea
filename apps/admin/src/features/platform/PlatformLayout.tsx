@@ -45,6 +45,7 @@ export function PlatformLayout() {
           </NavLink>
           <NavLink to="/plataforma/apps">Apps</NavLink>
           <NavLink to="/plataforma/embudo">Embudo de registro</NavLink>
+          <NavLink to="/plataforma/correos">Correos</NavLink>
         </nav>
         <div className="pf__user">
           <span className="pf__who">{current.admin.name}</span>

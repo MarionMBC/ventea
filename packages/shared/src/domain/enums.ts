@@ -40,6 +40,10 @@ export const REWARD_LEDGER_REASON = [
 ] as const;
 export type RewardLedgerReason = (typeof REWARD_LEDGER_REASON)[number];
 
+/** Recompensa del catálogo (TASK-023): un producto del menú o un descuento fijo. */
+export const REWARD_CATALOG_KIND = ['item', 'discount'] as const;
+export type RewardCatalogKind = (typeof REWARD_CATALOG_KIND)[number];
+
 /**
  * Suscripción del SaaS (ADR 0007). `trialing` y `active` atienden; el resto deja la API
  * pública de la marca en 402 (el staff sigue entrando al panel para pagar).

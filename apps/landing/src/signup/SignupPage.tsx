@@ -1,4 +1,6 @@
 import type { BillingInterval, PlanCode, SignupResponse } from '@ventea/shared';
+// Subpath sin zod: la misma regla que aplica la API al nombre (TASK-021).
+import { hasUnambiguousLink } from '@ventea/shared/links';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import { BASE_DOMAIN, CONTACT_EMAIL, TERMS_VERSION, TRIAL_DAYS } from '@/config';
@@ -85,11 +87,21 @@ export function SignupPage({ search = window.location.search }: { search?: strin
   const availablePlans = plans.status === 'ready' ? plans.plans : [];
   const selectedPlan = availablePlans.find((p) => p.code === planCode) ?? availablePlans[0];
 
-  const nameError = restaurantName.trim().length < 2 ? s.errors.name : undefined;
+  const nameError =
+    restaurantName.trim().length < 2
+      ? s.errors.name
+      : hasUnambiguousLink(restaurantName)
+        ? s.errors.nameLink
+        : undefined;
   const slugBlocking = ['empty', 'checking', 'taken', 'reserved', 'invalid'].includes(
     slugCheck.status,
   );
-  const ownerNameError = ownerName.trim().length < 2 ? s.errors.owner : undefined;
+  const ownerNameError =
+    ownerName.trim().length < 2
+      ? s.errors.owner
+      : hasUnambiguousLink(ownerName)
+        ? s.errors.ownerLink
+        : undefined;
   const emailError = EMAIL_RE.test(ownerEmail.trim()) ? undefined : s.errors.email;
   const passwordError =
     ownerPassword.length < MIN_PASSWORD_LENGTH ? s.errors.password(MIN_PASSWORD_LENGTH) : undefined;
@@ -156,7 +168,11 @@ export function SignupPage({ search = window.location.search }: { search?: strin
       if (status === 409) {
         slugCheck.markTaken();
         goTo(2);
-      } else if (error instanceof ApiError && error.status === 400 && isSlugError(error)) {
+      } else if (
+        error instanceof ApiError &&
+        error.status === 400 &&
+        (isSlugError(error) || error.fields.includes('restaurantName'))
+      ) {
         goTo(2);
       }
     } finally {
@@ -599,11 +615,7 @@ function Success({
 
 /** 400 por la dirección: subdominio reservado o formato inválido (`issues[].path`). */
 function isSlugError(error: ApiError): boolean {
-  return (
-    error.fields.includes('slug') ||
-    error.fields.includes('restaurantName') ||
-    /subdominio/i.test(error.message)
-  );
+  return error.fields.includes('slug') || /subdominio/i.test(error.message);
 }
 
 /**
@@ -621,6 +633,13 @@ function describeError(error: unknown, t: Messages): SubmitError {
     case 409:
       return { kind: 'message', message: e.taken, step: 2 };
     case 400:
+      // Nombre rechazado (link, «@» o «/»): mensaje del campo, en el paso donde está el campo.
+      if (error.fields.includes('restaurantName') && !error.fields.includes('slug')) {
+        return { kind: 'message', message: e.nameLink, step: 2 };
+      }
+      if (error.fields.includes('ownerName')) {
+        return { kind: 'message', message: e.ownerLink, step: 3 };
+      }
       return isSlugError(error)
         ? {
             kind: 'message',

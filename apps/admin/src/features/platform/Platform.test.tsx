@@ -833,3 +833,75 @@ describe('topes del plan (solo lectura, TASK-022)', () => {
     expect(planLimitsLabel({ maxLocations: 3 })).toBe('3 sucursales');
   });
 });
+
+describe('correos (TASK-021)', () => {
+  const FAILED = {
+    id: uuid(900),
+    kind: 'app_request',
+    to: 'ops@ventea.tech',
+    subject: 'Solicitud de app: Marca 1 (marca-01)',
+    status: 'failed',
+    attempts: 5,
+    error: 'connect ETIMEDOUT' as string | null,
+    tenant: { slug: 'marca-01', name: 'Marca 1' } as { slug: string; name: string } | null,
+    createdAt: '2026-10-09T15:00:00.000Z',
+    sentAt: null,
+  };
+  const SENT = {
+    ...FAILED,
+    id: uuid(901),
+    kind: 'staff_invite',
+    status: 'sent',
+    attempts: 1,
+    error: null,
+    tenant: null,
+    sentAt: '2026-10-09T15:01:00.000Z',
+  };
+
+  it('lista los correos, muestra el error y reenvía solo los fallidos', async () => {
+    let failed = { ...FAILED };
+    const { api } = renderPlatform('/admin/plataforma/correos', {
+      before: (fake) =>
+        fake.setOverride((call) => {
+          if (call.method === 'GET' && call.path === '/api/platform/emails') {
+            return json({ transport: 'smtp', items: [failed, SENT] });
+          }
+          if (call.method === 'POST' && call.path === `/api/platform/emails/${FAILED.id}/resend`) {
+            failed = { ...failed, status: 'pending', attempts: 0, error: null };
+            return json(failed);
+          }
+          return undefined;
+        }),
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Correos' })).toBeTruthy();
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Solicitud de app')).toBeTruthy();
+    // Un tipo que el panel no conoce se muestra tal cual.
+    expect(within(table).getByText('staff_invite')).toBeTruthy();
+    expect(within(table).getByText(/connect ETIMEDOUT/)).toBeTruthy();
+    expect(within(table).getAllByRole('button', { name: 'Reenviar' })).toHaveLength(1);
+
+    fireEvent.click(within(table).getByRole('button', { name: 'Reenviar' }));
+    await waitFor(() =>
+      expect(
+        api.calls.some((c) => c.method === 'POST' && c.path.endsWith(`${FAILED.id}/resend`)),
+      ).toBe(true),
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Reenviar' })).toBeNull());
+    expect(within(screen.getByRole('table')).getByText('En cola')).toBeTruthy();
+  });
+
+  it('sin SMTP avisa que los correos no salen; el filtro va a la API', async () => {
+    const { api } = renderPlatform('/admin/plataforma/correos?estado=skipped', {
+      before: (fake) =>
+        fake.setOverride((call) =>
+          call.path === '/api/platform/emails' ? json({ transport: 'none', items: [] }) : undefined,
+        ),
+    });
+    expect(await screen.findByText(/No hay SMTP configurado/)).toBeTruthy();
+    expect(screen.getByText('No hay correos en ese estado.')).toBeTruthy();
+    const call = api.calls.find((c) => c.path === '/api/platform/emails');
+    expect(call?.query.get('status')).toBe('skipped');
+  });
+});

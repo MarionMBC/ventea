@@ -144,3 +144,20 @@
     align-items: start;
   }
 }
+
+/* ── Rewards catalog (TASK-023) ───────────────────────────────────────── */
+.vt-rewards {
+  margin: 0;
+  list-style: none;
+}
+
+.vt-rewards__name {
+  color: var(--vt-text-primary);
+  font-weight: 600;
+}
+
+.vt-rewards__cost {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+}

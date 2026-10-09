@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { PastDueBanner, useBillingOverview } from '@/features/billing/SubscriptionBanner';
 import { useI18n, type TKey } from '@/i18n';
@@ -42,20 +42,15 @@ const NAV: readonly NavItem[] = [
   { to: '/locations', label: 'nav.locations', icon: IconLocation },
 ];
 
-/** Solo el dueño ve Mi marca, el equipo y la facturación (la API responde 403 al resto). */
+/** Dueño y gerente ven los reportes (TASK-023). */
+const MANAGER_NAV: readonly NavItem[] = [{ to: '/reports', label: 'nav.reports', icon: IconChart }];
+
+/** Solo el dueño ve Puntos, Mi marca, el equipo y la facturación (la API responde 403 al resto). */
 const OWNER_NAV: readonly NavItem[] = [
+  { to: '/rewards', label: 'nav.rewards', icon: IconStar },
   { to: '/brand', label: 'nav.brand', icon: IconPalette },
   { to: '/team', label: 'nav.staff', icon: IconUsers },
   { to: '/facturacion', label: 'nav.billing', icon: IconBilling },
-];
-
-/**
- * Secciones que todavía no existen. Se muestran como «Próximamente», deshabilitadas y sin
- * enlace; sus rutas siguen montadas (con un aviso) para no romper enlaces viejos.
- */
-const SOON: readonly { label: TKey; icon: Icon }[] = [
-  { label: 'nav.rewards', icon: IconStar },
-  { label: 'nav.reports', icon: IconChart },
 ];
 
 const SIDEBAR_KEY = 'ventea.admin.sidebar';
@@ -149,7 +144,12 @@ export function AppShell() {
   };
 
   const name = brandName(tenant);
-  const items = [...NAV, ...(current?.staff.role === 'owner' ? OWNER_NAV : [])];
+  const role = current?.staff.role;
+  const items = [
+    ...NAV,
+    ...(role === 'owner' || role === 'manager' ? MANAGER_NAV : []),
+    ...(role === 'owner' ? OWNER_NAV : []),
+  ];
 
   return (
     <div
@@ -209,21 +209,6 @@ export function AppShell() {
               </li>
             ))}
           </ul>
-
-          <div className="nav-soon">
-            <p className="nav-soon__title" id="nav-soon-title">
-              {t('nav.comingSoon')}
-            </p>
-            <ul className="nav-list" aria-labelledby="nav-soon-title">
-              {SOON.map(({ label, icon: ItemIcon }) => (
-                <li key={label} className="nav-item nav-item--soon">
-                  <ItemIcon size={20} />
-                  <span className="nav-item__label">{t(label)}</span>
-                  <span className="nav-item__tag">{t('nav.soon')}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
         </nav>
 
         <div className="sidebar__foot">
@@ -266,23 +251,6 @@ export function AppShell() {
         )}
         <Outlet />
       </main>
-    </div>
-  );
-}
-
-/** Secciones del scaffold que todavía no existen (las rutas siguen, fuera del menú). */
-export function Placeholder({ title }: { title: TKey }) {
-  const { t } = useI18n();
-  return (
-    <div className="state state--empty">
-      <span className="state__icon">
-        <IconSidebar size={28} />
-      </span>
-      <h1>{t(title)}</h1>
-      <p>{t('placeholder.body')}</p>
-      <Link className="btn btn--primary" to="/orders">
-        {t('placeholder.back')}
-      </Link>
     </div>
   );
 }

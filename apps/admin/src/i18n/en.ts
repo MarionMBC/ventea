@@ -1,3 +1,5 @@
+import { reportsEn } from '@/features/reports/i18n';
+import { rewardsEn } from '@/features/rewards/i18n';
 import { teamLocationsEn } from './team-locations';
 
 /**
@@ -16,8 +18,6 @@ export const en = {
   'nav.orders': 'Orders',
   'nav.history': 'History',
   'nav.billing': 'Billing',
-  'nav.comingSoon': 'Coming soon',
-  'nav.soon': 'Soon',
   'nav.menu': 'Menu',
   'nav.locations': 'Locations',
   'nav.rewards': 'Rewards',
@@ -33,9 +33,6 @@ export const en = {
   'role.owner': 'Owner',
   'role.manager': 'Manager',
   'role.staff': 'Staff',
-
-  'placeholder.body': 'This section isn’t available yet. We’re working on it.',
-  'placeholder.back': 'Go to orders',
 
   'login.pageTitle': 'Sign in · {brand}',
   'login.title': 'Restaurant dashboard',
@@ -267,6 +264,8 @@ export const en = {
     'Your {plan} plan allows {count} active locations. Upgrade your plan to add more.',
   'errors.planLimitBrandedApp':
     'Your {plan} plan doesn’t include your own app. It’s included in the Pro and Chain plans.',
+  'errors.planLimitReports':
+    'Your {plan} plan doesn’t include sales reports. They’re included in the Chain plan.',
   'errors.yourPlan': 'current',
 
   'upload.choose': 'Choose image',
@@ -494,6 +493,9 @@ export const en = {
   'appStatusBody.published': 'Your app is live. Share these links with your customers.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Your developer account',
+
+  ...rewardsEn,
+  ...reportsEn,
   ...teamLocationsEn,
 };
 

@@ -58,5 +58,6 @@ function planLimitMessage(limit: PlanLimit, t: I18n['t']): string {
   if (limit.resource === 'branded_app') return t('errors.planLimitBrandedApp', { plan });
   if (limit.resource === 'staff')
     return t('errors.planLimitStaff', { plan, count: limit.max ?? 0 });
+  if (limit.resource === 'reports') return t('errors.planLimitReports', { plan });
   return t('errors.planLimitLocations', { plan, count: limit.max ?? 0 });
 }

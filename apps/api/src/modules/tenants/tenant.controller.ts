@@ -5,6 +5,7 @@ import type { PublicTenant, TenantContext } from '@ventea/shared';
 import { PublicBaseUrl } from '@/common/decorators/public-base-url.decorator';
 import { CurrentTenant } from '@/common/tenant.context';
 import { absoluteMediaUrl } from '@/modules/media/media-url';
+import { StaffRewardsService, toProgram } from '@/modules/rewards/staff-rewards.service';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
@@ -12,7 +13,10 @@ import { PRISMA } from '@/prisma/prisma.module';
 @ApiTags('tenant')
 @Controller('tenant')
 export class TenantController {
-  constructor(@Inject(PRISMA) private readonly prisma: PrismaClientExtended) {}
+  constructor(
+    @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
+    private readonly rewards: StaffRewardsService,
+  ) {}
 
   @Get()
   async get(
@@ -26,6 +30,7 @@ export class TenantController {
     if (!tenant) throw new NotFoundException('Tenant no encontrado');
 
     const { branding, rewardProgram } = tenant;
+    const program = toProgram(rewardProgram);
     return {
       slug: tenant.slug,
       name: tenant.name,
@@ -40,13 +45,9 @@ export class TenantController {
         iconUrl: absoluteMediaUrl(branding?.iconUrl, base),
         appDisplayName: branding?.appDisplayName ?? tenant.name,
       },
-      rewardProgram: {
-        isEnabled: rewardProgram?.isEnabled ?? false,
-        pointsPerCurrencyUnit: rewardProgram?.pointsPerCurrencyUnit ?? 0,
-        redemptionValueCents: rewardProgram?.redemptionValueCents ?? 0,
-        minPointsToRedeem: rewardProgram?.minPointsToRedeem ?? 0,
-        signupBonusPoints: rewardProgram?.signupBonusPoints ?? 0,
-      },
+      rewardProgram: program,
+      // Catálogo de recompensas (TASK-023): lo que la app muestra para canjear en el local.
+      rewards: await this.rewards.publicCatalog(tenant.id, program.isEnabled),
     };
   }
 }

@@ -1,3 +1,6 @@
+import { reportsEs } from '@/features/reports/i18n';
+import { rewardsEs } from '@/features/rewards/i18n';
+
 import type { Messages } from './en';
 import { teamLocationsEs } from './team-locations';
 
@@ -13,8 +16,6 @@ export const es: Messages = {
   'nav.orders': 'Pedidos',
   'nav.history': 'Historial',
   'nav.billing': 'Facturación',
-  'nav.comingSoon': 'Próximamente',
-  'nav.soon': 'Pronto',
   'nav.menu': 'Menú',
   'nav.locations': 'Sucursales',
   'nav.rewards': 'Puntos',
@@ -30,9 +31,6 @@ export const es: Messages = {
   'role.owner': 'Dueño',
   'role.manager': 'Encargado',
   'role.staff': 'Staff',
-
-  'placeholder.body': 'Esta sección todavía no está disponible. Estamos trabajando en ella.',
-  'placeholder.back': 'Ir a pedidos',
 
   'login.pageTitle': 'Iniciar sesión · {brand}',
   'login.title': 'Panel del local',
@@ -263,6 +261,8 @@ export const es: Messages = {
     'Tu plan {plan} permite {count} sucursales activas. Sube de plan para agregar más.',
   'errors.planLimitBrandedApp':
     'Tu plan {plan} no incluye app propia. Está en los planes Pro y Cadena.',
+  'errors.planLimitReports':
+    'Tu plan {plan} no incluye reportes de ventas. Están en el plan Cadena.',
   'errors.yourPlan': 'actual',
 
   'upload.choose': 'Elegir imagen',
@@ -490,5 +490,8 @@ export const es: Messages = {
   'appStatusBody.published': 'Tu app ya está publicada. Comparte estos links con tus clientes.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Tu cuenta de desarrollador',
+
+  ...rewardsEs,
+  ...reportsEs,
   ...teamLocationsEs,
 };

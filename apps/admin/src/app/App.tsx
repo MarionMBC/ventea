@@ -20,16 +20,19 @@ import {
   PlatformProvider,
   type PlatformServices,
 } from '@/features/platform/services';
+import { Emails } from '@/features/platform/Emails';
 import { Funnel } from '@/features/platform/Funnel';
 import { TenantApp } from '@/features/platform/TenantApp';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
 import { JoinPage, ResetPasswordPage } from '@/features/team/LinkPages';
 import { TeamPage } from '@/features/team/TeamPage';
+import { ReportsPage } from '@/features/reports/ReportsPage';
+import { RewardsPage } from '@/features/rewards/RewardsPage';
 import { I18nProvider } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
-import { AppShell, Placeholder } from './AppShell';
+import { AppShell } from './AppShell';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ServicesProvider, useServices, type Services } from './services';
 
@@ -114,6 +117,7 @@ export function App({
                         <Route path="marcas/:slug/app" element={<TenantApp />} />
                         <Route path="apps" element={<AppRequests />} />
                         <Route path="embudo" element={<Funnel />} />
+                        <Route path="correos" element={<Emails />} />
                         <Route path="*" element={<Navigate to="/plataforma" replace />} />
                       </Route>
                     </>
@@ -133,11 +137,10 @@ export function App({
                       <Route path="/menu" element={<MenuPage />} />
                       <Route path="/brand" element={<BrandPage />} />
                       <Route path="/locations" element={<LocationsPage />} />
+                      <Route path="/rewards" element={<RewardsPage />} />
                       <Route path="/team" element={<TeamPage />} />
                       <Route path="/staff" element={<Navigate to="/team" replace />} />
-                      {/* TODO: rewards y reports. Fuera del menú (TASK-011). */}
-                      <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
-                      <Route path="/reports" element={<Placeholder title="nav.reports" />} />
+                      <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/facturacion" element={<BillingPage />} />
                     </Route>
                   </Route>
