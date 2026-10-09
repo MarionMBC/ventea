@@ -275,7 +275,7 @@ export const en: Dict = {
       facts: [
         { title: 'Architecture', text: 'Multi-tenant SaaS, one subdomain per restaurant' },
         { title: 'Apps', text: 'Web and mobile under each restaurant’s brand' },
-        { title: 'Operations', text: 'Containers, automated deployments and backups' },
+        { title: 'Operations', text: 'Containers, scripted deployments and database backups' },
       ],
       languageNote:
         'The product site and the kitchen board are in Spanish; the customer app in the screenshot is in English.',
@@ -301,7 +301,7 @@ export const en: Dict = {
     title: 'Engineering with business judgment',
     paragraphs: [
       'Ventea is a digital engineering company: we design, build and connect software for companies. We start with the architecture —how systems, data and integrations fit together— so that what we build can grow.',
-      'By default, the code, the infrastructure and the documentation are put in your name, and we state it in writing in the contract. You talk directly to the people who design and write the software.',
+      'We document the code, the infrastructure and the architecture decisions so your team can understand and operate them. You talk directly to the people who design and write the software.',
     ],
     principlesTitle: 'How it shows in the work',
     principles: [
