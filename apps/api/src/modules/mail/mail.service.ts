@@ -20,7 +20,7 @@ import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { parseRecipient } from './mail-address';
-import { renderEmail, type EmailTemplateData } from './mail-templates';
+import { renderEmail, SECRET_LINK_KINDS, type EmailTemplateData } from './mail-templates';
 import { MAIL_TRANSPORT, type MailTransport } from './mail-transport';
 import { MailSettings } from './mail.settings';
 
@@ -291,7 +291,7 @@ export class MailService implements BeforeApplicationShutdown {
     if (!this.transport.configured) {
       await this.prisma.emailMessage.update({
         where: { id },
-        data: { status: 'skipped', error: null },
+        data: { status: 'skipped', error: null, ...withoutSecretLink(message) },
       });
       this.logger.log(`Correo ${message.kind} ${id} registrado sin enviar: SMTP no configurado`);
       return;
@@ -326,7 +326,13 @@ export class MailService implements BeforeApplicationShutdown {
     }
     await this.prisma.emailMessage.update({
       where: { id },
-      data: { status: 'sent', attempts, sentAt: new Date(), error: null },
+      data: {
+        status: 'sent',
+        attempts,
+        sentAt: new Date(),
+        error: null,
+        ...withoutSecretLink(message),
+      },
     });
     this.logger.log(`Correo ${message.kind} ${id} enviado`);
   }
@@ -373,6 +379,20 @@ export class MailService implements BeforeApplicationShutdown {
     this.inFlight.add(task);
     void task.finally(() => this.inFlight.delete(task));
   }
+}
+
+/**
+ * Correo con un link secreto de un solo uso (TASK-022) que ya no se va a reenviar (`sent` o
+ * `skipped`): el payload guardado pierde el link, así la outbox no conserva tokens válidos. Un
+ * `failed` lo conserva porque la plataforma puede reenviarlo (vence igual a las 72 h).
+ */
+function withoutSecretLink(message: { kind: string; payload: Prisma.JsonValue }): {
+  payload?: Prisma.InputJsonValue;
+} {
+  const key = (SECRET_LINK_KINDS as Record<string, string | undefined>)[message.kind];
+  const payload = message.payload;
+  if (!key || !payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
+  return { payload: { ...payload, [key]: '[redacted]' } as Prisma.InputJsonValue };
 }
 
 /** Los logs no llevan direcciones (un rechazo SMTP suele citar al destinatario). */
