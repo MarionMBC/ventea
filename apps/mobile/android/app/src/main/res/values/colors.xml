@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Native chrome of the template. The brand generator (TASK-019) writes the
+         brand's primary here; the web UI themes itself at runtime. -->
+    <color name="colorPrimary">#2E6FE2</color>
+    <color name="colorPrimaryDark">#0B0908</color>
+    <color name="colorAccent">#2E6FE2</color>
+</resources>

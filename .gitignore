@@ -19,9 +19,8 @@ build/
 !.env.example
 !deploy/.env.production.example
 
-# capacitor / nativo
-apps/mobile/android/
-apps/mobile/ios/
+# capacitor / nativo — los proyectos android/ e ios/ de la plantilla SÍ se versionan
+# (TASK-018); su build, assets copiados y firma los ignora apps/mobile/.gitignore
 apps/mobile/dist/
 *.keystore
 *.jks
