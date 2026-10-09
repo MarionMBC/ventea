@@ -9,6 +9,7 @@ import { apiError, json } from '@/test/fixtures';
 
 import { createPlatformClient } from './client';
 import { isPlatformHost, isPlatformPath } from './host';
+import { planLimitsLabel } from './TenantDetail';
 import { formatUsdCents } from './labels';
 import { createPlatformSessionStore, PLATFORM_SESSION_KEY, type PlatformSession } from './session';
 
@@ -31,6 +32,7 @@ const PLANS = [
     priceYearlyCents: 59000,
     currency: 'USD',
     maxLocations: 3,
+    maxStaff: 10,
     features: { brandedApp: true, customDomain: true, reports: false, prioritySupport: false },
   },
 ];
@@ -819,5 +821,15 @@ describe('apps de las marcas', () => {
     expect(screen.getByRole('link', { name: 'Apps' }).getAttribute('href')).toBe(
       '/admin/plataforma/apps',
     );
+  });
+});
+
+describe('topes del plan (solo lectura, TASK-022)', () => {
+  it('sucursales y usuarios del panel; sin el dato de la API, solo sucursales', () => {
+    expect(planLimitsLabel({ maxLocations: 1, maxStaff: 3 })).toBe('1 sucursal · 3 usuarios');
+    expect(planLimitsLabel({ maxLocations: null, maxStaff: null })).toBe(
+      'sucursales ilimitadas · usuarios ilimitados',
+    );
+    expect(planLimitsLabel({ maxLocations: 3 })).toBe('3 sucursales');
   });
 });
