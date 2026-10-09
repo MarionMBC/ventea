@@ -6,7 +6,9 @@
  *
  * Pure functions, no DOM: the same code runs in tests and in the app. The
  * filled-surface rule (`filledTone`, `readableOn`) lives in `@ventea/shared`
- * so the dashboard's live preview paints exactly what the app paints.
+ * so the dashboard's live preview paints exactly what the app paints. Import
+ * the `@ventea/shared/tone` subpath, never the barrel: the barrel drags every
+ * zod contract into the public menu bundle (+29 KB gzip).
  */
 import {
   AA_TEXT,
@@ -23,7 +25,7 @@ import {
   rgbToHex,
   WHITE,
   type Rgb,
-} from '@ventea/shared';
+} from '@ventea/shared/tone';
 
 export type { Rgb };
 export { AA_TEXT, BLACK, FILL_MAX_DARKEN, FILL_STEP, filledTone, INK, readableOn, WHITE };

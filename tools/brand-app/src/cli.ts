@@ -33,6 +33,7 @@ import {
   writeIosAssets,
   writeSplashes,
 } from './icons';
+import { gitCommit } from './git';
 import { ensureOwnKeystore, externalKeystore, signingEnv, type Signing } from './keystore';
 import { log } from './log';
 import {
@@ -233,20 +234,6 @@ async function capSync(paths: BrandPaths, platform: string): Promise<void> {
   );
 }
 
-async function gitCommit(): Promise<string | null> {
-  try {
-    const head = (
-      await run('git', ['rev-parse', '--short', 'HEAD'], { cwd: REPO_ROOT, capture: true })
-    ).trim();
-    const dirty = (
-      await run('git', ['status', '--porcelain'], { cwd: REPO_ROOT, capture: true })
-    ).trim();
-    return dirty ? `${head}-dirty` : head;
-  } catch {
-    return null;
-  }
-}
-
 function listingExtras(buildConfig: BuildConfig | null): ListingExtras {
   return {
     storeShortDescription: buildConfig?.branding.storeShortDescription ?? null,
@@ -373,7 +360,7 @@ async function main(): Promise<void> {
     apiUrl: brand.apiUrl,
     pushEnabled: resolved.pushEnabled,
     legacyStoragePrefix: brand.legacyStoragePrefix ?? null,
-    commit: await gitCommit(),
+    commit: await gitCommit(REPO_ROOT),
     generatedAt: new Date().toISOString(),
     badging: info,
     signing: {

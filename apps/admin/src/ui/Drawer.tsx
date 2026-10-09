@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 're
 import { useT } from '@/i18n';
 
 import { IconClose } from './icons';
+import { useScrollLock } from './scrollLock';
 
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -32,16 +33,14 @@ export function Drawer({
   const t = useT();
   const titleId = useId();
   const panel = useRef<HTMLElement>(null);
+  useScrollLock();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const root = panel.current;
     const first = root?.querySelector<HTMLElement>('[data-autofocus]') ?? root;
     first?.focus();
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = overflow;
       // El que abrió puede haber desaparecido (p. ej. un ítem recién borrado).
       if (opener?.isConnected) opener.focus();
     };
