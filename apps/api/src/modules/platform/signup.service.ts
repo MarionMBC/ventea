@@ -19,6 +19,7 @@ import {
 } from '@ventea/shared';
 import argon2 from 'argon2';
 
+import { LifecycleMailer } from '@/modules/notifications/lifecycle-mailer.service';
 import { addDays, TRIAL_DAYS } from '@/modules/subscriptions/subscription-state';
 import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { isUniqueViolation } from '@/prisma/prisma-errors';
@@ -56,6 +57,7 @@ export class SignupService {
     private readonly regions: RegionService,
     private readonly config: ConfigService,
     private readonly analytics: AnalyticsService,
+    private readonly mailer: LifecycleMailer,
   ) {
     this.baseDomain = config.get<string>('TENANT_BASE_DOMAIN') || 'ventea.tech';
   }
@@ -115,8 +117,9 @@ export class SignupService {
     const now = new Date();
     const trialEndsAt = addDays(now, TRIAL_DAYS);
 
+    let tenantId: string;
     try {
-      await this.prisma.$transaction(async (tx) => {
+      tenantId = await this.prisma.$transaction(async (tx) => {
         await this.assertSignupQuota(tx, now);
         const tenant = await tx.tenant.create({
           data: {
@@ -168,6 +171,7 @@ export class SignupService {
             openingHours: [],
           },
         });
+        return tenant.id;
       });
     } catch (error) {
       // Dos registros simultáneos con el mismo slug: el segundo choca con el unique.
@@ -180,6 +184,9 @@ export class SignupService {
     void this.analytics.record('signup_complete').catch((error: unknown) => {
       this.logger.warn(`No se pudo contar signup_complete: ${(error as Error).message}`);
     });
+
+    // Bienvenida al dueño (TASK-021): en segundo plano, después del commit; nunca demora el 201.
+    this.mailer.welcome(tenantId);
 
     const url = `https://${input.slug}.${this.baseDomain}`;
     return {

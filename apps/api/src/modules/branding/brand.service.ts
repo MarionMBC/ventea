@@ -10,6 +10,7 @@ import type { Brand, UpdateBrandInput } from '@ventea/shared';
 
 import { MediaService } from '@/modules/media/media.service';
 import { absoluteMediaUrl } from '@/modules/media/media-url';
+import { LifecycleMailer } from '@/modules/notifications/lifecycle-mailer.service';
 import { brandLanguage } from '@/modules/push/push-messages';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
@@ -31,6 +32,7 @@ export class BrandService {
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly media: MediaService,
     private readonly apps: AppConfigStore,
+    private readonly mailer: LifecycleMailer,
   ) {}
 
   async get(tenantId: string, base: string): Promise<Brand> {
@@ -98,7 +100,8 @@ export class BrandService {
 
   /**
    * El dueño pide su app nativa. `403` si el plan no la incluye (solo Pro y Cadena), `409` si ya
-   * la pidió. Deja la app en `requested` con un evento para la cola de la plataforma.
+   * la pidió. Deja la app en `requested` con un evento para la cola de la plataforma y avisa por
+   * correo a la plataforma (TASK-021) después del commit, sin esperar el envío.
    */
   async requestApp(tenantId: string, staffId: string, base: string): Promise<Brand> {
     const plan = await this.apps.plan(tenantId);
@@ -134,6 +137,7 @@ export class BrandService {
         },
       });
     });
+    this.mailer.appRequested(tenantId);
     return this.get(tenantId, base);
   }
 }
