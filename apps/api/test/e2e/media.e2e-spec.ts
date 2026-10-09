@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { rename, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import type { INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -217,6 +219,17 @@ describe('Medios: subida y servido (TASK-016)', () => {
       expect(response.status).toBe(413);
     });
 
+    it('más de 24 megapíxeles (bomba de descompresión chica en bytes) → 413', async () => {
+      const huge = await sharp({
+        create: { width: 5000, height: 5000, channels: 3, background: '#fff' },
+      })
+        .png()
+        .toBuffer();
+      expect(huge.length).toBeLessThan(1024 * 1024);
+      const response = await upload(owner, tenant.slug, huge, 'bomba.png', 'image/png').expect(413);
+      expect((response.body as { message: string }).message).toMatch(/24 MP/);
+    });
+
     it('un campo de texto extra o sin archivo → 400', async () => {
       await request(app.getHttpServer())
         .post('/api/staff/media')
@@ -285,6 +298,57 @@ describe('Medios: subida y servido (TASK-016)', () => {
       await upload(otherOwner, tenant.slug, await pngWithExif(20, 20), 'a.png', 'image/png').expect(
         401,
       );
+    });
+  });
+
+  describe('consistencia de medios', () => {
+    it('el borrado toma el lock de medios de la marca (no corre en medio de un uso)', async () => {
+      const response = await upload(
+        owner,
+        tenant.slug,
+        await pngWithExif(33, 33),
+        'l.png',
+        'image/png',
+      ).expect(201);
+      const hash = /([0-9a-f]{64})\.webp$/.exec((response.body as MediaUploadResponse).url)![1]!;
+      const holdMs = 1_500;
+      let released = 0;
+      // Otra transacción (como un PATCH de ítem que referencia la imagen) tiene el lock.
+      const holder = prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`media:${tenant.id}`}))`;
+          await new Promise((resolve) => setTimeout(resolve, holdMs));
+          released = Date.now();
+        },
+        { timeout: 10_000 },
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await request(app.getHttpServer())
+        .delete(`/api/staff/media/${hash}`)
+        .set('X-Tenant-Slug', tenant.slug)
+        .set('Authorization', `Bearer ${owner}`)
+        .expect(204);
+      const finished = Date.now();
+      await holder;
+      expect(released).toBeGreaterThan(0);
+      expect(finished).toBeGreaterThanOrEqual(released);
+    });
+
+    it('si falla la escritura del archivo no queda registro ni archivo a medias', async () => {
+      const png = await pngWithExif(37, 37);
+      const dir = join(process.env.MEDIA_DIR!, tenant.id);
+      // Un archivo donde va la carpeta de la marca hace fallar la escritura.
+      const backup = `${dir}.bak-${Date.now()}`;
+      await rename(dir, backup);
+      await writeFile(dir, 'no soy una carpeta');
+      const before = await prisma.mediaAsset.count({ where: { tenantId: tenant.id } });
+      try {
+        await upload(owner, tenant.slug, png, 'f.png', 'image/png').expect(500);
+        expect(await prisma.mediaAsset.count({ where: { tenantId: tenant.id } })).toBe(before);
+      } finally {
+        await rm(dir, { force: true });
+        await rename(backup, dir);
+      }
     });
   });
 

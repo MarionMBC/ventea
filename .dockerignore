@@ -28,3 +28,6 @@ apps/mobile/ios
 deploy/test-vps/*.log
 deploy/test-vps/*.tmp
 deploy/test-vps/.sync-routes.lock
+
+# medios subidos en desarrollo (TASK-016): no van a la imagen
+apps/api/media/

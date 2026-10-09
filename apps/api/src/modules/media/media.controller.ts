@@ -95,12 +95,14 @@ export class PublicMediaController {
     @Param('file') file: string,
     @Res() res: Response,
   ): void {
-    const full = MEDIA_FILE_PATTERN.test(file) ? this.storage.filePath(tenantId, file) : null;
-    if (!full) throw new NotFoundException('Imagen no encontrada');
+    const target = MEDIA_FILE_PATTERN.test(file) ? this.storage.servable(tenantId, file) : null;
+    if (!target) throw new NotFoundException('Imagen no encontrada');
 
     res.sendFile(
-      full,
+      target.file,
       {
+        // Ruta relativa a la carpeta de la marca: `send` rechaza todo lo que salga de `root`.
+        root: target.root,
         dotfiles: 'deny',
         headers: {
           // Fijo: lo que hay en disco siempre es un WebP generado por la API.

@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 
+import { AUTH_REQUEST_KEY, type AuthPrincipal } from '@/common/auth/auth.context';
 import { TENANT_REQUEST_KEY } from '@/common/tenant.context';
 
 import { SlidingWindowLimiter } from './rate-limit';
@@ -26,10 +27,11 @@ export interface RateLimitOptions {
   /** Largo de la ventana en horas (default 1: el límite es por hora). */
   windowHours?: number;
   /**
-   * Qué se cuenta: la IP (default) o la marca del request (`tenant`, rutas de marca
-   * autenticadas: el cobro de la suscripción limita por marca, no por conexión).
+   * Qué se cuenta: la IP (default), la marca del request (`tenant`, rutas de marca
+   * autenticadas: el cobro de la suscripción limita por marca, no por conexión) o la sesión
+   * (`principal`: el cliente o staff autenticado; exige el guard de auth antes que este).
    */
-  key?: 'ip' | 'tenant';
+  key?: 'ip' | 'tenant' | 'principal';
 }
 
 /**
@@ -82,7 +84,12 @@ export class RateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     for (const options of rules) {
       const byTenant = options.key === 'tenant';
-      const key = byTenant ? tenantKey(request) : ipKey(request);
+      const key =
+        options.key === 'principal'
+          ? principalKey(request)
+          : byTenant
+            ? tenantKey(request)
+            : ipKey(request);
       const windowMs = (options.windowHours ?? 1) * HOUR_MS;
       const retryInMs = this.store
         .limiter(options.bucket, windowMs)
@@ -112,6 +119,16 @@ export class RateLimitGuard implements CanActivate {
 
 function ipKey(request: Request): string {
   return request.ip ?? request.socket.remoteAddress ?? 'unknown';
+}
+
+function principalKey(request: Request): string {
+  const principal = (request as unknown as Record<string, unknown>)[AUTH_REQUEST_KEY] as
+    AuthPrincipal | undefined;
+  if (!principal) {
+    // Programación defensiva: `key: 'principal'` sin @CustomerAuth/@StaffAuth antes.
+    throw new Error('RateLimit por sesión en una ruta sin sesión');
+  }
+  return `${principal.kind}:${principal.tenantId}:${principal.id}`;
 }
 
 function tenantKey(request: Request): string {

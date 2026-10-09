@@ -59,7 +59,9 @@ No hay revocación del lado del servidor: cerrar sesión es descartar los tokens
   (null si no hay), `appDisplayName`, `logoUrl` e `iconUrl`. Las URLs de imágenes subidas a
   Ventea salen **absolutas** (`https://<host del request>/api/media/<tenantId>/<hash>.webp`, o
   `MEDIA_PUBLIC_BASE_URL` si está definida): sirven igual en el web, la app nativa y el generador
-  de apps. Una URL heredada de antes de TASK-016 sale tal cual.
+  de apps. El host del request se usa solo si es de la plataforma (`TENANT_BASE_DOMAIN` y sus
+  subdominios, o el de `PUBLIC_ORIGIN`); con otro Host las URLs salen **relativas**
+  (`/api/media/…`). Una URL heredada de antes de TASK-016 sale tal cual.
 - **`/api/menu`** no muestra ítems ni categorías borrados desde el panel; `imageUrl` absoluta como
   arriba.
 
@@ -271,6 +273,10 @@ centavos enteros ≥ 0 (las opciones pueden ser negativas), nombres requeridos.
 height}` con URLs absolutas.
 - **Límites por marca:** cuota `MEDIA_QUOTA_MB` (200) → `403` con el motivo; 60 subidas por hora
   (`MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR`) → `429` + `Retry-After`.
+- **Límites por imagen y por servidor:** más de **24 MP** (se mira la cabecera antes de
+  decodificar) → `413`. sharp procesa como mucho 2 imágenes a la vez por proceso
+  (`MEDIA_PROCESSING_CONCURRENCY`); las demás esperan hasta 20 s (`MEDIA_PROCESSING_WAIT_MS`) y
+  después, o con más de 20 en fila, → `503`.
 - **Servido:** solo nombres con forma de hash bajo un tenantId con forma de UUID (traversal →
   `404`); `Content-Type: image/webp` fijo, `nosniff`, `Cross-Origin-Resource-Policy:
 cross-origin` (la app nativa y el panel la cargan desde otro origen) y CSP `sandbox`.
@@ -304,7 +310,7 @@ Solo el **dueño**. Contratos en `packages/shared/src/contracts/brand.ts`.
 | DELETE | `/api/devices/:id` | cliente · al cerrar sesión; `404` si no es suyo; `204`                                                                  |
 
 - **Upsert por (marca, token):** si el token era de otro cliente de la marca (cambio de cuenta en
-  el mismo teléfono), pasa al actual (`201`). Máximo 10 dispositivos con push por cliente.
+  el mismo teléfono), pasa al actual (`201`). Al cambiar de dueño se descarta el `biometricKeyId`. Máximo 10 dispositivos por cliente (los más viejos se borran) y 30 registros por cliente y hora (`DEVICE_REGISTER_RATE_LIMIT_PER_HOUR`, `429`).
 - **Aviso de estado:** `PATCH /api/staff/orders/:id/status` a `preparing`, `ready`, `completed` o
   `cancelled` manda un push a los dispositivos del cliente **después** de responder y sin
   bloquear (un FCM caído no afecta el pedido). Payload FCM: `notification {title, body}`

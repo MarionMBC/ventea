@@ -191,6 +191,18 @@ describe('Mi marca, app por marca y credenciales push (TASK-016)', () => {
         .expect(409);
     });
 
+    it('Host del request fuera de la plataforma → URLs relativas, nunca ese host', async () => {
+      const tenant = (
+        await request(app.getHttpServer())
+          .get('/api/tenant')
+          .set('Host', 'evil.example')
+          .set('X-Tenant-Slug', chain.slug)
+          .expect(200)
+      ).body as PublicTenant;
+      expect(tenant.branding.logoUrl).toMatch(/^\/api\/media\/[0-9a-f-]{36}\/[0-9a-f]{64}\.webp$/);
+      expect(JSON.stringify(tenant)).not.toContain('evil.example');
+    });
+
     it.each([
       [{ primaryColor: 'red' }, 'color no hex'],
       [{ bundleId: 'app.robado.x' }, 'bundleId (solo plataforma)'],

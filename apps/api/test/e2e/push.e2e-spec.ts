@@ -152,6 +152,71 @@ describe('Push: dispositivos y avisos de estado del pedido (TASK-016)', () => {
       expect(await prisma.device.count({ where: { id: first.id } })).toBe(0);
     });
 
+    it('pasado el máximo (10) se BORRAN los dispositivos más viejos, no quedan filas sin token', async () => {
+      const heavy = await registerCustomer(app, tenant.slug);
+      for (let i = 0; i < 12; i++) {
+        await device(heavy.accessToken, tenant.slug, {
+          platform: 'android',
+          pushToken: `tok-heavy-${i}`,
+        }).expect(201);
+      }
+      const rows = await prisma.device.findMany({
+        where: { tenantId: tenant.id, customerId: heavy.customer.id },
+      });
+      expect(rows).toHaveLength(10);
+      expect(rows.every((row) => row.pushToken !== null)).toBe(true);
+      expect(rows.some((row) => row.pushToken === 'tok-heavy-0')).toBe(false);
+      expect(rows.some((row) => row.pushToken === 'tok-heavy-11')).toBe(true);
+    });
+
+    it('al cambiar de dueño el dispositivo no arrastra el biometricKeyId del anterior', async () => {
+      const first = await registerCustomer(app, tenant.slug);
+      const second = await registerCustomer(app, tenant.slug);
+      const created = (
+        await device(first.accessToken, tenant.slug, {
+          platform: 'ios',
+          pushToken: 'tok-bio',
+        }).expect(201)
+      ).body as Device;
+      await prisma.device.update({
+        where: { id: created.id },
+        data: { biometricKeyId: 'cred-de-first' },
+      });
+      await device(second.accessToken, tenant.slug, {
+        platform: 'ios',
+        pushToken: 'tok-bio',
+      }).expect(201);
+      const row = await prisma.device.findUniqueOrThrow({ where: { id: created.id } });
+      expect(row.customerId).toBe(second.customer.id);
+      expect(row.biometricKeyId).toBeNull();
+    });
+
+    it('rate limit por cliente en el registro → 429', async () => {
+      const spammer = await registerCustomer(app, tenant.slug);
+      const neighbour = await registerCustomer(app, tenant.slug);
+      process.env.DEVICE_REGISTER_RATE_LIMIT_PER_HOUR = '3';
+      try {
+        for (let i = 0; i < 3; i++) {
+          await device(spammer.accessToken, tenant.slug, {
+            platform: 'web',
+            pushToken: `tok-rl-${i}`,
+          }).expect(201);
+        }
+        const response = await device(spammer.accessToken, tenant.slug, {
+          platform: 'web',
+          pushToken: 'tok-rl-x',
+        }).expect(429);
+        expect(Number(response.headers['retry-after'])).toBeGreaterThan(0);
+        // Otro cliente de la misma marca no comparte el cupo.
+        await device(neighbour.accessToken, tenant.slug, {
+          platform: 'web',
+          pushToken: 'tok-rl-other',
+        }).expect(201);
+      } finally {
+        process.env.DEVICE_REGISTER_RATE_LIMIT_PER_HOUR = '';
+      }
+    });
+
     it('el mismo token en otra marca es otro dispositivo', async () => {
       const other = await registerCustomer(app, noCreds.slug);
       await device(customer.accessToken, tenant.slug, {

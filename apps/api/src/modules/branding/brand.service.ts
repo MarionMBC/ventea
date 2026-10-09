@@ -73,22 +73,25 @@ export class BrandService {
   /** Logo e ícono tienen que ser medios subidos por la marca (400 si no). */
   async update(tenantId: string, input: UpdateBrandInput, base: string): Promise<Brand> {
     const { logoUrl, iconUrl, ...fields } = input;
-    const data: Prisma.TenantBrandingUncheckedUpdateInput = { ...fields };
-    if (logoUrl !== undefined) {
-      data.logoUrl = logoUrl
-        ? await this.media.resolveOwnedRef(tenantId, logoUrl, 'logoUrl')
-        : null;
-    }
-    if (iconUrl !== undefined) {
-      data.iconUrl = iconUrl
-        ? await this.media.resolveOwnedRef(tenantId, iconUrl, 'iconUrl')
-        : null;
-    }
-
-    await this.prisma.tenantBranding.upsert({
-      where: { tenantId },
-      update: data,
-      create: { ...(data as Prisma.TenantBrandingUncheckedCreateInput), tenantId },
+    // En una transacción: `resolveOwnedRef` toma el lock de medios de la marca hasta el commit,
+    // así un borrado de la imagen no se cuela entre la verificación y el guardado.
+    await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.TenantBrandingUncheckedUpdateInput = { ...fields };
+      if (logoUrl !== undefined) {
+        data.logoUrl = logoUrl
+          ? await this.media.resolveOwnedRef(tenantId, logoUrl, 'logoUrl', tx)
+          : null;
+      }
+      if (iconUrl !== undefined) {
+        data.iconUrl = iconUrl
+          ? await this.media.resolveOwnedRef(tenantId, iconUrl, 'iconUrl', tx)
+          : null;
+      }
+      await tx.tenantBranding.upsert({
+        where: { tenantId },
+        update: data,
+        create: { ...(data as Prisma.TenantBrandingUncheckedCreateInput), tenantId },
+      });
     });
     return this.get(tenantId, base);
   }

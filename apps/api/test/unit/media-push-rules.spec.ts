@@ -5,8 +5,10 @@ import { contrastRatio, createMenuItemSchema, reorderSchema, textContrastOn } fr
 import { redactSensitive } from '@/common/logging/redact';
 import { brandWarnings, defaultBundleId, defaultPublisher } from '@/modules/branding/brand-rules';
 import { detectImageFormat } from '@/modules/media/image-signature';
+import { MediaStorage } from '@/modules/media/media-storage';
 import {
   absoluteMediaUrl,
+  isAllowedHost,
   MEDIA_FILE_PATTERN,
   mediaPath,
   parseMediaRef,
@@ -88,10 +90,61 @@ describe('URLs de medios', () => {
       'https://legado.test/logo.png',
     );
     expect(absoluteMediaUrl(null, 'https://a.test')).toBeNull();
-    expect(publicBaseUrl('https://cdn.test///', 'http', 'x')).toBe('https://cdn.test');
-    expect(publicBaseUrl('', 'https', 'carolina.ventea.tech')).toBe('https://carolina.ventea.tech');
-    expect(publicBaseUrl(undefined, 'http', 'evil.test/"><script>')).toBe('http://localhost');
-    expect(publicBaseUrl(undefined, 'javascript', 'a.test')).toBe('http://a.test');
+    const prod = { baseDomain: 'ventea.tech', production: true };
+    expect(publicBaseUrl('https://cdn.test///', 'http', 'x', prod)).toBe('https://cdn.test');
+    expect(publicBaseUrl('', 'https', 'carolina.ventea.tech', prod)).toBe(
+      'https://carolina.ventea.tech',
+    );
+    expect(publicBaseUrl(undefined, 'javascript', 'API.ventea.tech', prod)).toBe(
+      'http://api.ventea.tech',
+    );
+  });
+
+  it('Host fuera de la plataforma → base vacía (URLs relativas), nunca el host del cliente', () => {
+    const prod = { baseDomain: 'ventea.tech', production: true };
+    for (const host of [
+      'evil.test',
+      'ventea.tech.evil.test',
+      'evilventea.tech',
+      'evil.test/"><script>',
+      'localhost:3000',
+      '127.0.0.1',
+      undefined,
+    ]) {
+      expect(publicBaseUrl(undefined, 'https', host, prod)).toBe('');
+    }
+    expect(publicBaseUrl(undefined, 'https', 'ventea.tech', prod)).toBe('https://ventea.tech');
+    expect(absoluteMediaUrl(mediaPath(TENANT, HASH), '')).toBe(mediaPath(TENANT, HASH));
+  });
+
+  it('PUBLIC_ORIGIN (instalación dedicada) y localhost solo fuera de producción', () => {
+    const single = { publicOrigin: 'https://pedidos.carolina.cl', production: true };
+    expect(isAllowedHost('pedidos.carolina.cl', single)).toBe(true);
+    expect(isAllowedHost('otro.carolina.cl', single)).toBe(false);
+    expect(isAllowedHost('127.0.0.1:51234', { production: false })).toBe(true);
+    expect(isAllowedHost('localhost', { production: true })).toBe(false);
+  });
+});
+
+describe('MediaStorage: rutas servibles', () => {
+  const storage = new MediaStorage({
+    get: (key: string) => (key === 'MEDIA_DIR' ? '/srv/media' : undefined),
+  } as never);
+
+  it('sirve relativo a la carpeta de la marca', () => {
+    const target = storage.servable(TENANT, `${HASH}.webp`)!;
+    expect(target.file).toBe(`${HASH}.webp`);
+    expect(target.root.endsWith(TENANT)).toBe(true);
+    expect(target.root.startsWith(storage.root)).toBe(true);
+  });
+
+  it.each([
+    [TENANT, '../x.webp'],
+    [TENANT, `..${'/'}${OTHER}/${HASH}.webp`],
+    ['..', `${HASH}.webp`],
+    [`${TENANT}/..`, `${HASH}.webp`],
+  ])('rechaza %s / %s', (tenantId, file) => {
+    expect(storage.servable(tenantId, file)).toBeNull();
   });
 });
 
@@ -178,6 +231,21 @@ describe('cifrado de credenciales push (AES-256-GCM)', () => {
     parts[3] = data.toString('base64url');
     expect(() => decryptCredentials(parts.join('.'), key, TENANT)).toThrow();
     expect(() => decryptCredentials('v2.x.y.z', key, TENANT)).toThrow();
+  });
+
+  it('rechaza un tag truncado (GCM acepta 4 bytes si no se fija authTagLength) o un IV de otro largo', () => {
+    const stored = encryptCredentials('secreto', key, TENANT);
+    const [version, iv, tag, data] = stored.split('.');
+    const shortTag = Buffer.from(tag!, 'base64url').subarray(0, 4).toString('base64url');
+    expect(() =>
+      decryptCredentials([version, iv, shortTag, data].join('.'), key, TENANT),
+    ).toThrow();
+    const longIv = Buffer.concat([Buffer.from(iv!, 'base64url'), Buffer.alloc(4)]).toString(
+      'base64url',
+    );
+    expect(() => decryptCredentials([version, longIv, tag, data].join('.'), key, TENANT)).toThrow();
+    expect(Buffer.from(tag!, 'base64url')).toHaveLength(16);
+    expect(Buffer.from(iv!, 'base64url')).toHaveLength(12);
   });
 
   it('clave: 32 bytes en hex o base64; lo demás no', () => {
