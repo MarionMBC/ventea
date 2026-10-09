@@ -180,6 +180,21 @@ describe('cifrado de credenciales push (AES-256-GCM)', () => {
     expect(() => decryptCredentials('v2.x.y.z', key, TENANT)).toThrow();
   });
 
+  it('rechaza un tag truncado (GCM acepta 4 bytes si no se fija authTagLength) o un IV de otro largo', () => {
+    const stored = encryptCredentials('secreto', key, TENANT);
+    const [version, iv, tag, data] = stored.split('.');
+    const shortTag = Buffer.from(tag!, 'base64url').subarray(0, 4).toString('base64url');
+    expect(() =>
+      decryptCredentials([version, iv, shortTag, data].join('.'), key, TENANT),
+    ).toThrow();
+    const longIv = Buffer.concat([Buffer.from(iv!, 'base64url'), Buffer.alloc(4)]).toString(
+      'base64url',
+    );
+    expect(() => decryptCredentials([version, longIv, tag, data].join('.'), key, TENANT)).toThrow();
+    expect(Buffer.from(tag!, 'base64url')).toHaveLength(16);
+    expect(Buffer.from(iv!, 'base64url')).toHaveLength(12);
+  });
+
   it('clave: 32 bytes en hex o base64; lo demás no', () => {
     expect(parseCredentialsKey('00'.repeat(32))?.length).toBe(32);
     expect(parseCredentialsKey(randomBytes(32).toString('base64'))?.length).toBe(32);
