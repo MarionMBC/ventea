@@ -49,8 +49,10 @@ Postgres: con varias réplicas corre una). Ningún correo lleva datos de pedidos
 finales; el pie dice por qué llega.
 
 **Anti-phishing:** la bienvenida sale hacia un correo que todavía no se verificó, así que su
-asunto es genérico («Tu cuenta de Ventea está lista»). Los nombres de marca y de dueño se
-rechazan en el registro si traen un link o un dominio, y en todos los correos van sin links y
+asunto es genérico («Tu cuenta de Ventea está lista»). El registro rechaza solo lo que es
+inequívocamente un link en los nombres de marca y de dueño (`://`, `www.`, `@`, `/`); un punto
+pegado (`Pollo.Express`, `Lic.María`) se acepta y en todos los correos los nombres van
+neutralizados («Pollo Express»: sin nada que un cliente de correo convierta en link) y
 recortados a 60 caracteres. Los links de un correo solo pueden apuntar a `TENANT_BASE_DOMAIN`
 (o sus subdominios) o al host de `PUBLIC_ORIGIN`. Un envío que se corta a mitad (el proceso
 murió) cuenta como intento. Pendiente antes de abrir el registro al público: verificar el
@@ -176,7 +178,8 @@ curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \
 
 Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) y deja la marca
 `active`. No toca una cancelación agendada por el dueño. El servicio `api` de los compose
-lleva `stop_grace_period: 40s`: el apagado espera la corrida de cobro en curso (hasta 35 s). Con un cobro con tarjeta sin
+lleva `stop_grace_period: 75s`: el apagado espera, en serie, la corrida de cobro en curso (hasta 35 s) y el envío de correo
+en curso (hasta 30 s; el despacho deja de tomar correos nuevos al empezar el apagado). Con un cobro con tarjeta sin
 confirmar responde `409`: primero `resolve-payment`.
 
 ### Alertas

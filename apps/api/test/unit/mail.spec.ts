@@ -1,4 +1,10 @@
-import { hasLinkLike, signupSchema, TERMS_VERSION } from '@ventea/shared';
+import {
+  hasUnambiguousLink,
+  LINK_CHECK_MAX,
+  neutralizeLinks,
+  signupSchema,
+  TERMS_VERSION,
+} from '@ventea/shared';
 
 import { redactSensitive } from '@/common/logging/redact';
 import {
@@ -246,39 +252,92 @@ describe('plantillas', () => {
 });
 
 describe('nombres con links (anti-phishing)', () => {
-  it('detecta URLs, www. y dominios con TLD; no confunde iniciales ni siglas', () => {
+  const signupBody = (names: { restaurantName?: string; ownerName?: string } = {}) => ({
+    restaurantName: 'Pollos Juan',
+    slug: 'pollos-juan',
+    ownerName: 'Juan Pérez',
+    ownerEmail: 'juan@example.com',
+    ownerPassword: 'una-clave-larga-123',
+    planCode: 'pro',
+    interval: 'month',
+    acceptedTermsVersion: TERMS_VERSION,
+    ...names,
+  });
+
+  /** Nombres reales con punto pegado (títulos, marcas): el registro los acepta. */
+  const REAL_NAMES = [
+    'Pollo.Express',
+    'Burger.co',
+    'Sushi.Bar',
+    'Mr.Pollo',
+    'Tacos.mx',
+    'Hnos.García',
+    'Lic.María López',
+    'Ing.Carlos Pérez',
+    'Ma.José',
+  ];
+
+  it('el signup rechaza solo lo inequívoco: ://, www., @ y /', () => {
     for (const bad of [
       'https://evil.com',
       've a http://x',
       'www.evil',
-      'evil.com',
-      'Pollos Juan.co',
-      'soporte-ventea.com.hn',
+      'WWW.Evil.com',
+      'soporte@evil',
+      'evil/login',
       'ftp://x',
     ]) {
-      expect(hasLinkLike(bad)).toBe(true);
-    }
-    for (const ok of ['Pollos Juan', 'Juan P. Pérez', 'Pollos S.A.', 'Café 1.5', 'Ñandú & Co']) {
-      expect(hasLinkLike(ok)).toBe(false);
+      expect(hasUnambiguousLink(bad)).toBe(true);
+      expect(signupSchema.safeParse(signupBody({ restaurantName: bad })).success).toBe(false);
+      expect(signupSchema.safeParse(signupBody({ ownerName: bad })).success).toBe(false);
     }
   });
 
-  it('el signup rechaza nombre de marca o de dueño con un link', () => {
-    const body = {
-      restaurantName: 'Pollos Juan',
-      slug: 'pollos-juan',
-      ownerName: 'Juan Pérez',
-      ownerEmail: 'juan@example.com',
-      ownerPassword: 'una-clave-larga-123',
-      planCode: 'pro',
-      interval: 'month',
-      acceptedTermsVersion: TERMS_VERSION,
-    };
-    expect(signupSchema.safeParse(body).success).toBe(true);
-    expect(signupSchema.safeParse({ ...body, restaurantName: 'Entra a evil.com' }).success).toBe(
-      false,
+  it('el signup acepta nombres reales con punto pegado (sin falsos positivos)', () => {
+    for (const name of [...REAL_NAMES, 'S.A. de C.V.', 'Café 1.5', 'www Tacos', "D'Angelo's"]) {
+      expect(hasUnambiguousLink(name)).toBe(false);
+      expect(
+        signupSchema.safeParse(signupBody({ restaurantName: name, ownerName: name })).success,
+      ).toBe(true);
+    }
+  });
+
+  it('en el correo esos nombres salen neutralizados («Pollo Express»)', () => {
+    expect(neutralizeLinks('Pollo.Express')).toBe('Pollo Express');
+    expect(neutralizeLinks('Lic.María López')).toBe('Lic María López');
+    expect(neutralizeLinks('Tacos.mx')).toBe('Tacos mx');
+    for (const name of REAL_NAMES) expect(neutralizeLinks(name)).not.toMatch(/\p{L}\.\p{L}{2}/u);
+    const mail = render('welcome', 'es', welcome('Pollo.Express', 'Lic.María López'));
+    expect(mail.text).toContain('Creamos Pollo Express.');
+    expect(mail.text).toContain('Lic María López');
+  });
+
+  it('neutralizeLinks cubre acentos, IDN, puntos anchos y esquemas', () => {
+    expect(neutralizeLinks('entra a café.com')).toBe('entra a café com');
+    expect(neutralizeLinks('evil.рф')).toBe('evil рф');
+    expect(neutralizeLinks('evil。com')).toBe('evil com');
+    expect(neutralizeLinks('evil．com')).toBe('evil com');
+    expect(neutralizeLinks('evil｡com')).toBe('evil com');
+    expect(neutralizeLinks('https://evil.example/login')).toBe('evil example/login');
+    expect(neutralizeLinks('www.evil.com.hn')).toBe('www evil com hn');
+    // Lo que no parece dominio queda igual.
+    expect(neutralizeLinks('S.A. de C.V. · Café 1.5 · J.P. Grill')).toBe(
+      'S.A. de C.V. · Café 1.5 · J.P. Grill',
     );
-    expect(signupSchema.safeParse({ ...body, ownerName: 'https://evil.com' }).success).toBe(false);
+  });
+
+  it('DoS: 100 KB en el nombre se rechaza en menos de 50 ms', () => {
+    const huge = `${'a.'.repeat(50_000)}1`;
+    let start = performance.now();
+    const result = signupSchema.safeParse(signupBody({ restaurantName: huge, ownerName: huge }));
+    expect(performance.now() - start).toBeLessThan(50);
+    expect(result.success).toBe(false);
+    start = performance.now();
+    hasUnambiguousLink(huge);
+    neutralizeLinks(huge);
+    expect(performance.now() - start).toBeLessThan(50);
+    // El tope de entrada corta antes de procesar.
+    expect(neutralizeLinks(huge).length).toBeLessThanOrEqual(LINK_CHECK_MAX);
   });
 });
 

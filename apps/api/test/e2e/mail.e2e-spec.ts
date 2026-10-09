@@ -20,7 +20,8 @@ import {
 } from './helpers';
 
 const DAY = 24 * 60 * 60 * 1000;
-const HOSTILE = '<b>Pollos</b> & "Ana"';
+// Sin «/» ni «@»: el registro rechaza esos (link inequívoco); el resto tiene que llegar escapado.
+const HOSTILE = '<b>Pollos<b> & "Ana" <script>';
 const ALERTS = ['ops@ventea.tech', 'alertas@ventea.tech'];
 
 describe('Correos transaccionales (TASK-021)', () => {
@@ -49,6 +50,12 @@ describe('Correos transaccionales (TASK-021)', () => {
     mailer = app.get(LifecycleMailer);
     prisma = createRawPrisma();
     platform = await platformAdminToken(app, prisma);
+    // La outbox es compartida: lo que otras suites dejaron en cola (se apagaron sin despachar)
+    // no sale por el transporte de esta.
+    await prisma.emailMessage.updateMany({
+      where: { status: 'pending' },
+      data: { status: 'skipped' },
+    });
   });
 
   afterAll(async () => {
@@ -87,8 +94,10 @@ describe('Correos transaccionales (TASK-021)', () => {
       const [first] = fake.sent;
       expect(first?.subject).toBe(`Solicitud de app: ${HOSTILE} (${tenant.slug})`);
       expect(first?.subject).not.toMatch(/[\r\n]/);
-      expect(first?.html).not.toContain('<b>Pollos</b>');
-      expect(first?.html).toContain('&lt;b&gt;Pollos&lt;/b&gt; &amp; &quot;Ana&quot;');
+      expect(first?.html).not.toMatch(/<b>|<script>/);
+      expect(first?.html).toContain(
+        '&lt;b&gt;Pollos&lt;b&gt; &amp; &quot;Ana&quot; &lt;script&gt;',
+      );
       expect(first?.text).toContain('plan Cadena');
       expect(first?.html).toContain('https://app.ventea.tech/admin/plataforma/apps');
       expect(first?.from).toEqual({ name: 'Ventea', address: 'hola@ventea.tech' });
@@ -115,7 +124,7 @@ describe('Correos transaccionales (TASK-021)', () => {
         .send({
           restaurantName: HOSTILE,
           slug,
-          ownerName: 'Ana <i>Pérez</i>',
+          ownerName: 'Ana <i>Pérez',
           ownerEmail: 'Ana@PollosAna.com',
           ownerPassword: 'una-clave-larga-123',
           planCode: 'pro',
@@ -132,8 +141,8 @@ describe('Correos transaccionales (TASK-021)', () => {
       // Anti-phishing: el asunto no lleva texto elegido por quien se registra.
       expect(welcome?.subject).toBe('Tu cuenta de Ventea está lista');
       expect(welcome?.html).toContain('<html lang="es">');
-      expect(welcome?.html).not.toMatch(/<b>|<i>/);
-      expect(welcome?.html).toContain('Ana &lt;i&gt;Pérez&lt;/i&gt;');
+      expect(welcome?.html).not.toMatch(/<b>|<i>|<script>/);
+      expect(welcome?.html).toContain('Ana &lt;i&gt;Pérez');
       expect(welcome?.html).toContain(`href="https://${slug}.ventea.tech/admin"`);
       expect(welcome?.text).toContain(`https://${slug}.ventea.tech`);
       expect(welcome?.text).toContain('Recibes este correo porque creaste la cuenta');
@@ -145,29 +154,62 @@ describe('Correos transaccionales (TASK-021)', () => {
       expect(await outbox(tenant.id, 'welcome')).toHaveLength(1);
     });
 
-    it('el signup rechaza nombres con links o dominios: no hay alta ni correo', async () => {
-      const base = {
-        ownerEmail: 'victima@example.com',
-        ownerPassword: 'una-clave-larga-123',
-        planCode: 'pro',
-        interval: 'month',
-        acceptedTermsVersion: TERMS_VERSION,
-      };
+    const signupBase = {
+      ownerEmail: 'victima@example.com',
+      ownerPassword: 'una-clave-larga-123',
+      planCode: 'pro',
+      interval: 'month',
+      acceptedTermsVersion: TERMS_VERSION,
+    };
+
+    it('el signup rechaza nombres con un link inequívoco (://, www., @, /): sin alta ni correo', async () => {
       const cases = [
-        { restaurantName: 'Cuenta suspendida: entra a evil.com', ownerName: 'Soporte' },
         { restaurantName: 'Pollos Ana', ownerName: 'https://evil.example/login' },
         { restaurantName: 'www.evil', ownerName: 'Ana' },
+        { restaurantName: 'Soporte@evil', ownerName: 'Ana' },
+        { restaurantName: 'Pollos Ana', ownerName: 'evil/login' },
       ];
       for (const names of cases) {
         const slug = `mail-${randomUUID().slice(0, 8)}`;
-        await request(app.getHttpServer())
+        const response = await request(app.getHttpServer())
           .post('/api/platform/signup')
-          .send({ ...base, ...names, slug })
+          .send({ ...signupBase, ...names, slug })
           .expect(400);
+        const field = names.restaurantName === 'Pollos Ana' ? 'ownerName' : 'restaurantName';
+        expect(JSON.stringify(response.body)).toContain(field);
         expect(await prisma.tenant.findUnique({ where: { slug } })).toBeNull();
       }
       await mail.drain();
       expect(fake.sent).toHaveLength(0);
+    });
+
+    it('acepta nombres con punto pegado y el correo los neutraliza', async () => {
+      const slug = `mail-${randomUUID().slice(0, 8)}`;
+      await request(app.getHttpServer())
+        .post('/api/platform/signup')
+        .send({
+          ...signupBase,
+          restaurantName: 'Pollo.Express',
+          ownerName: 'Lic.María López',
+          slug,
+        })
+        .expect(201);
+      await mail.drain();
+      expect(fake.sent).toHaveLength(1);
+      const [welcome] = fake.sent;
+      expect(welcome?.text).toContain('Creamos Pollo Express.');
+      expect(welcome?.text).toContain('Lic María López');
+      expect(welcome?.html).not.toContain('Pollo.Express');
+    });
+
+    it('DoS: un nombre de ~100 KB responde 400 rápido, sin bloquear el event loop', async () => {
+      const huge = `${'a.'.repeat(49_000)}1`;
+      const start = performance.now();
+      await request(app.getHttpServer())
+        .post('/api/platform/signup')
+        .send({ ...signupBase, restaurantName: huge, ownerName: 'Ana', slug: 'mail-dos' })
+        .expect(400);
+      expect(performance.now() - start).toBeLessThan(1_000);
     });
   });
 
@@ -473,6 +515,49 @@ describe('Tope de envío por minuto (TASK-021)', () => {
       (row) => row.status,
     );
     expect(statuses.sort()).toEqual(['pending', 'sent', 'sent']);
+  });
+});
+
+describe('Apagado del despacho (TASK-021)', () => {
+  it('al empezar el apagado no se toman correos nuevos', async () => {
+    const fake = new FakeMailTransport();
+    const app = await createApp({ mail: fake });
+    const prisma = createRawPrisma();
+    try {
+      const tenant = await seedTenant(prisma, 'mail-stop');
+      const mail = app.get(MailService);
+      const raw = prisma as unknown as Parameters<MailService['enqueue']>[1];
+      // Encolado «dentro de una transacción» (con `db`): no despierta al despachador.
+      await mail.enqueue(
+        {
+          kind: 'welcome',
+          to: 'dueno@example.com',
+          language: 'es',
+          tenantId: tenant.id,
+          dedupeKey: `test:stop:${tenant.id}`,
+          payload: {
+            tenantName: 'Pollos',
+            ownerName: 'Ana',
+            panelUrl: 'https://x.ventea.tech/admin',
+            menuUrl: 'https://x.ventea.tech',
+            trialEndsAt: null,
+            supportEmail: 'hola@ventea.tech',
+          },
+        },
+        raw,
+      );
+      await mail.beforeApplicationShutdown();
+      mail.kick();
+      expect(await mail.dispatchPending()).toBe(0);
+      await mail.drain();
+      expect(fake.sent).toHaveLength(0);
+      expect(
+        await prisma.emailMessage.findUnique({ where: { dedupeKey: `test:stop:${tenant.id}` } }),
+      ).toMatchObject({ status: 'pending' });
+    } finally {
+      await prisma.$disconnect();
+      await app.close();
+    }
   });
 });
 
