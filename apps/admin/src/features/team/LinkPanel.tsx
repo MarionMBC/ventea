@@ -1,4 +1,4 @@
-import { teamLinkPath, type TeamLinkKind } from '@ventea/shared';
+import { teamLinkPath, type TeamLinkKind, type TeamMailStatus } from '@ventea/shared';
 import { useId, useRef, useState } from 'react';
 
 import { useI18n } from '@/i18n';
@@ -13,21 +13,38 @@ export function teamLink(
   return `${origin}${teamLinkPath(kind, token)}`;
 }
 
+/** Texto según el correo: solo se dice «enviamos» si de verdad salió a la cola con SMTP. */
+function mailMessage(mail: TeamMailStatus | undefined) {
+  switch (mail) {
+    case 'queued':
+      return 'team.linkMail.queued' as const;
+    case 'trial':
+      return 'team.linkMail.trial' as const;
+    case 'daily_limit':
+      return 'team.linkMail.daily_limit' as const;
+    default:
+      return 'team.linkMail.manual' as const;
+  }
+}
+
 /**
  * Enlace de un solo uso recién creado (invitación o contraseña nueva) para copiar y compartir.
- * La API también lo manda por correo (TASK-021); si no llega (o no hay SMTP), el dueño lo copia
- * y lo comparte por donde quiera. Se muestra una sola vez.
+ * La API también lo manda por correo cuando puede (TASK-021: con SMTP, fuera de la prueba y bajo
+ * el tope diario); si no, o si no llega, el dueño lo copia y lo comparte. Se muestra una sola vez.
  */
 export function LinkPanel({
   kind,
   token,
   email,
   expiresAt,
+  mail,
 }: {
   kind: TeamLinkKind;
   token: string;
   email: string;
   expiresAt: Date;
+  /** Qué pasó con el correo (API). Sin dato, o sin SMTP, no se promete correo. */
+  mail?: TeamMailStatus;
 }) {
   const { t, dateTime } = useI18n();
   const id = useId();
@@ -49,7 +66,9 @@ export function LinkPanel({
   return (
     <div className="link-panel">
       <h3 className="link-panel__title">{t('team.linkTitle')}</h3>
-      <p>{t('team.linkNoEmail', { email, date: dateTime(expiresAt) })}</p>
+      <p>
+        {t(mailMessage(mail), { email })} {t('team.linkExpiry', { date: dateTime(expiresAt) })}
+      </p>
       <label className="field__label" htmlFor={`${id}-link`}>
         {t('team.linkLabel')}
       </label>

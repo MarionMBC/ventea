@@ -122,8 +122,14 @@ export const teamLocationsEn = {
   'team.inviting': 'Creating…',
   'team.inviteReady': 'Invitation for {email} is ready',
   'team.linkTitle': 'Share this link',
-  'team.linkNoEmail':
-    'We also email it to {email}. If it doesn’t arrive, copy the link and share it (for example, by WhatsApp). It expires {date} and works only once.',
+  'team.linkMail.queued':
+    'We emailed it to {email}. If it doesn’t arrive, copy the link and share it (for example, by WhatsApp).',
+  'team.linkMail.manual': 'Copy the link and share it with {email} (for example, by WhatsApp).',
+  'team.linkMail.trial':
+    'During the free trial we don’t send team emails: copy the link and share it with {email}.',
+  'team.linkMail.daily_limit':
+    'You reached today’s limit of team emails: copy the link and share it with {email}.',
+  'team.linkExpiry': 'It expires {date} and works only once.',
   'team.linkOnce': 'For security we show it only now. If you lose it, create a new one.',
   'team.linkLabel': 'Single-use link',
   'team.copy': 'Copy link',
@@ -278,8 +284,14 @@ export const teamLocationsEs: TeamLocationsMessages = {
   'team.inviting': 'Creando…',
   'team.inviteReady': 'La invitación para {email} está lista',
   'team.linkTitle': 'Comparta este enlace',
-  'team.linkNoEmail':
-    'También se lo enviamos por correo a {email}. Si no le llega, copia el enlace y compártelo (por ejemplo, por WhatsApp). Vence el {date} y sirve una sola vez.',
+  'team.linkMail.queued':
+    'Enviamos el enlace por correo a {email}. Si no llega, cópialo y compártelo (por ejemplo, por WhatsApp).',
+  'team.linkMail.manual': 'Copia el enlace y compártelo con {email} (por ejemplo, por WhatsApp).',
+  'team.linkMail.trial':
+    'Durante la prueba gratis no enviamos correos del equipo: copia el enlace y compártelo con {email}.',
+  'team.linkMail.daily_limit':
+    'Llegaste al límite diario de correos del equipo: copia el enlace y compártelo con {email}.',
+  'team.linkExpiry': 'Vence el {date} y sirve una sola vez.',
   'team.linkOnce': 'Por seguridad solo lo mostramos ahora. Si lo pierdes, crea uno nuevo.',
   'team.linkLabel': 'Enlace de un solo uso',
   'team.copy': 'Copiar enlace',

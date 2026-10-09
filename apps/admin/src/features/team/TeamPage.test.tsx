@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { CreatedInvitation, Team } from '@ventea/shared';
+import type { CreatedInvitation, Team, TeamMailStatus } from '@ventea/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App, createQueryClient } from '@/app/App';
@@ -12,6 +12,7 @@ import { teamLink } from './LinkPanel';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const TOKEN = 'A'.repeat(40) + 'b_-';
+let resetMail: TeamMailStatus | undefined;
 
 function makeTeam(overrides: Partial<Team> = {}): Team {
   return {
@@ -66,6 +67,7 @@ function renderApp(
       const created: CreatedInvitation = {
         token: TOKEN,
         expiresAt: new Date('2026-10-12T12:00:00Z'),
+        mail: 'queued',
         invitation: {
           id: uuid(50),
           email: body.email,
@@ -88,7 +90,10 @@ function renderApp(
       return new Response(null, { status: 204 });
     }
     if (req.path.endsWith('/password-reset') && req.method === 'POST') {
-      return json({ token: TOKEN, expiresAt: new Date('2026-10-12T12:00:00Z') }, 201);
+      return json(
+        { token: TOKEN, expiresAt: new Date('2026-10-12T12:00:00Z'), mail: resetMail },
+        201,
+      );
     }
     return undefined;
   });
@@ -103,6 +108,7 @@ function renderApp(
 }
 
 afterEach(() => {
+  resetMail = undefined;
   document.title = '';
   vi.restoreAllMocks();
 });
@@ -147,7 +153,7 @@ describe('Equipo', () => {
     });
     const link = within(ready).getByLabelText('Single-use link') as HTMLInputElement;
     expect(link.value).toBe(`${window.location.origin}/admin/join#${TOKEN}`);
-    expect(within(ready).getByText(/We also email it to nuevo@example.com/)).toBeTruthy();
+    expect(within(ready).getByText(/We emailed it to nuevo@example.com/)).toBeTruthy();
     fireEvent.click(within(ready).getByRole('button', { name: 'Copy link' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(link.value));
     expect(await within(ready).findByRole('button', { name: 'Link copied' })).toBeTruthy();
@@ -198,6 +204,27 @@ describe('Equipo', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create link' }));
     const link = (await within(dialog).findByLabelText('Single-use link')) as HTMLInputElement;
     expect(link.value).toBe(`${window.location.origin}/admin/reset-password#${TOKEN}`);
+    // Sin dato de correo (API vieja o sin SMTP) no se promete correo.
+    expect(within(dialog).getByText(/^Copy the link and share it with ana@chc.test/)).toBeTruthy();
+  });
+
+  it('en prueba o con el tope diario: lo dice y no promete correo', async () => {
+    resetMail = 'trial';
+    renderApp('/admin/team');
+    fireEvent.click(await screen.findByRole('button', { name: 'Password link' }));
+    let dialog = screen.getByRole('dialog', { name: 'New password link for Ana Cocina' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create link' }));
+    expect(
+      await within(dialog).findByText(/During the free trial we don’t send team emails/),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    resetMail = 'daily_limit';
+    fireEvent.click(await screen.findByRole('button', { name: 'Password link' }));
+    dialog = screen.getByRole('dialog', { name: 'New password link for Ana Cocina' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create link' }));
+    expect(await within(dialog).findByText(/today’s limit of team emails/)).toBeTruthy();
+    expect(within(dialog).queryByText(/We emailed/)).toBeNull();
   });
 });
 

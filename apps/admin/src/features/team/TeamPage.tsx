@@ -97,6 +97,7 @@ function InviteDrawer({
           token={created.token}
           email={created.invitation.email}
           expiresAt={created.expiresAt}
+          mail={created.mail}
         />
       ) : (
         <form id={`${id}-form`} className="form-grid" onSubmit={submit} noValidate>
@@ -200,6 +201,7 @@ function ResetDrawer({ member, onClose }: { member: TeamMember; onClose: () => v
           token={link.token}
           email={member.email}
           expiresAt={link.expiresAt}
+          mail={link.mail}
         />
       ) : (
         <div className="form-grid">
