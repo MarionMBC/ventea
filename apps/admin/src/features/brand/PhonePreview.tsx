@@ -1,4 +1,4 @@
-import { isHexColor, textContrastOn, WCAG_AA_NORMAL, type StaffMenu } from '@ventea/shared';
+import { filledToneHex, isHexColor, parseHexRgb, readableOn, type StaffMenu } from '@ventea/shared';
 import type { CSSProperties } from 'react';
 
 import { useI18n } from '@/i18n';
@@ -12,10 +12,18 @@ export interface PreviewBrand {
   iconUrl: string | null;
 }
 
-/** Texto legible sobre `color`: blanco si llega a AA, si no casi negro (mismo criterio que la API). */
+/** Texto legible sobre un fondo de la marca que no se oscurece (encabezado): regla de la app. */
 export function textOn(color: string): string {
-  if (!isHexColor(color)) return '#ffffff';
-  return textContrastOn(color).white >= WCAG_AA_NORMAL ? '#ffffff' : '#111111';
+  const rgb = parseHexRgb(color);
+  return rgb ? readableOn(rgb) : '#ffffff';
+}
+
+/**
+ * Botones, chips e insignias: la misma regla que la app (`filledTone` de shared). Oscurece el
+ * color hasta 20 % para que el texto blanco llegue a AA; si no alcanza, texto oscuro.
+ */
+export function filled(color: string): { fill: string; on: string } {
+  return filledToneHex(color) ?? { fill: color, on: '#ffffff' };
 }
 
 const safe = (color: string | null, fallback: string) =>
@@ -45,13 +53,15 @@ export function PhonePreview({
   // Los primeros productos del menú visible, de las primeras categorías.
   const shown = categories.flatMap((category) => category.items).slice(0, 4);
 
+  const primaryTone = filled(primary);
+  const accentTone = filled(accent);
   const style = {
-    '--pv-primary': primary,
-    '--pv-on-primary': textOn(primary),
+    '--pv-primary': primaryTone.fill,
+    '--pv-on-primary': primaryTone.on,
     '--pv-secondary': secondary,
     '--pv-on-secondary': textOn(secondary),
-    '--pv-accent': accent,
-    '--pv-on-accent': textOn(accent),
+    '--pv-accent': accentTone.fill,
+    '--pv-on-accent': accentTone.on,
   } as CSSProperties;
 
   const mark = (url: string | null, className: string) =>

@@ -14,3 +14,4 @@ export * from './contracts/rewards.js';
 export * from './contracts/tenant.js';
 export * from './utils/contrast.js';
 export * from './utils/money.js';
+export * from './utils/tone.js';
