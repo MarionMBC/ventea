@@ -14,15 +14,23 @@ import {
 import { useDragReorder } from './dnd';
 import { moveId } from './reorder';
 
+export type MoveDir = 'up' | 'down';
+
 export interface TreeHandlers {
   onEditCategory: (category: StaffMenuCategory) => void;
   onDeleteCategory: (category: StaffMenuCategory) => void;
-  onMoveCategory: (ids: string[], moved: StaffMenuCategory) => void;
+  /** `via`: el botón usado (teclado/táctil); el foco vuelve a él tras mover. */
+  onMoveCategory: (ids: string[], moved: StaffMenuCategory, via?: MoveDir) => void;
   onAddItem: (category: StaffMenuCategory) => void;
   onEditItem: (item: StaffMenuItem) => void;
   onDeleteItem: (item: StaffMenuItem) => void;
   onToggleItem: (item: StaffMenuItem) => void;
-  onMoveItem: (category: StaffMenuCategory, ids: string[], moved: StaffMenuItem) => void;
+  onMoveItem: (
+    category: StaffMenuCategory,
+    ids: string[],
+    moved: StaffMenuItem,
+    via?: MoveDir,
+  ) => void;
 }
 
 /**
@@ -71,7 +79,11 @@ export function MenuTree({
             canReorder={canReorder}
             handlers={handlers}
             onMove={(delta) =>
-              handlers.onMoveCategory(moveId(allCategoryIds, category.id, delta), category)
+              handlers.onMoveCategory(
+                moveId(allCategoryIds, category.id, delta),
+                category,
+                delta < 0 ? 'up' : 'down',
+              )
             }
             dragProps={dragProps(category.id)}
           />
@@ -144,6 +156,8 @@ function CategoryCard({
                     className="icon-btn"
                     aria-label={t('menu.moveUp', { name: category.name })}
                     disabled={index <= 0}
+                    data-move-id={category.id}
+                    data-move-dir="up"
                     onClick={() => onMove(-1)}
                   >
                     <IconArrowUp size={18} />
@@ -153,6 +167,8 @@ function CategoryCard({
                     className="icon-btn"
                     aria-label={t('menu.moveDown', { name: category.name })}
                     disabled={index >= total - 1}
+                    data-move-id={category.id}
+                    data-move-dir="down"
                     onClick={() => onMove(1)}
                   >
                     <IconArrowDown size={18} />
@@ -193,7 +209,14 @@ function CategoryCard({
                 canEdit={canEdit}
                 canReorder={canReorder}
                 handlers={handlers}
-                onMove={(delta) => handlers.onMoveItem(category, moveId(ids, item.id, delta), item)}
+                onMove={(delta) =>
+                  handlers.onMoveItem(
+                    category,
+                    moveId(ids, item.id, delta),
+                    item,
+                    delta < 0 ? 'up' : 'down',
+                  )
+                }
                 dragProps={itemDrag(item.id)}
               />
             ))}
@@ -322,6 +345,8 @@ function ItemRow({
                   className="icon-btn"
                   aria-label={t('menu.moveUp', { name: item.name })}
                   disabled={index <= 0}
+                  data-move-id={item.id}
+                  data-move-dir="up"
                   onClick={() => onMove(-1)}
                 >
                   <IconArrowUp size={18} />
@@ -331,6 +356,8 @@ function ItemRow({
                   className="icon-btn"
                   aria-label={t('menu.moveDown', { name: item.name })}
                   disabled={index >= total - 1}
+                  data-move-id={item.id}
+                  data-move-dir="down"
                   onClick={() => onMove(1)}
                 >
                   <IconArrowDown size={18} />

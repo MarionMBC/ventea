@@ -12,7 +12,7 @@ import {
 } from '@ventea/shared';
 
 import { useApi } from '@/app/services';
-import type { ApiClient } from '@/lib/api';
+import { ApiError, type ApiClient } from '@/lib/api';
 
 import { reorderBody, sortByIds } from './reorder';
 
@@ -51,7 +51,12 @@ function useMenuMutation<TVars, TResult = unknown>(
 ) {
   const client = useApi();
   const queryClient = useQueryClient();
+  // Con varias mutaciones del menú en vuelo (dos «agotado» seguidos), solo la ÚLTIMA en
+  // terminar restaura o recarga: si no, el fallo o la recarga de la primera pisa el optimismo
+  // de la segunda hasta el refetch (parpadeo). `isMutating` cuenta a la que está terminando.
+  const last = () => queryClient.isMutating({ mutationKey: MENU_QUERY_KEY }) <= 1;
   return useMutation({
+    mutationKey: MENU_QUERY_KEY,
     mutationFn: (vars: TVars) => run(client, vars),
     onMutate: async (vars: TVars) => {
       if (!optimistic) return { previous: undefined };
@@ -61,9 +66,10 @@ function useMenuMutation<TVars, TResult = unknown>(
       return { previous };
     },
     onError: (_error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(MENU_QUERY_KEY, context.previous);
+      if (context?.previous && last()) queryClient.setQueryData(MENU_QUERY_KEY, context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: MENU_QUERY_KEY }),
+    onSettled: () =>
+      last() ? queryClient.invalidateQueries({ queryKey: MENU_QUERY_KEY }) : undefined,
   });
 }
 
@@ -177,6 +183,8 @@ export async function saveGroup(
   client: ApiClient,
   original: StaffMenu['modifierGroups'][number] | null,
   draft: GroupDraft,
+  /** Cada opción creada avisa su id: un reintento tras un fallo a mitad no la duplica. */
+  onCreated?: (index: number, id: string) => void,
 ): Promise<void> {
   if (!original) {
     const body: CreateModifierGroupInput = {
@@ -207,13 +215,32 @@ export async function saveGroup(
   const kept = new Set(draft.options.flatMap((o) => (o.id ? [o.id] : [])));
   for (const option of original.options) {
     if (!kept.has(option.id)) {
-      await client.request(`/staff/menu/modifier-options/${enc(option.id)}`, { method: 'DELETE' });
+      // Ya borrada en un intento anterior: 404 no es un error acá.
+      await client
+        .request(`/staff/menu/modifier-options/${enc(option.id)}`, { method: 'DELETE' })
+        .catch((error: unknown) => {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+        });
     }
   }
 
   const ids: string[] = [];
-  for (const option of draft.options) {
+  for (const [index, option] of draft.options.entries()) {
     const before = option.id ? original.options.find((o) => o.id === option.id) : undefined;
+    if (option.id && !before) {
+      // Creada en un intento anterior que falló después (el grupo cacheado todavía no la
+      // tiene): se actualiza completa en vez de crearla otra vez.
+      await client.request(`/staff/menu/modifier-options/${enc(option.id)}`, {
+        method: 'PATCH',
+        body: {
+          name: option.name,
+          priceDeltaCents: option.priceDeltaCents,
+          isAvailable: option.isAvailable,
+        },
+      });
+      ids.push(option.id);
+      continue;
+    }
     if (!before) {
       const created = await client.request<{ id: string }>(
         `/staff/menu/modifier-groups/${enc(original.id)}/options`,
@@ -226,6 +253,7 @@ export async function saveGroup(
           },
         },
       );
+      onCreated?.(index, created.id);
       ids.push(created.id);
       continue;
     }
@@ -262,8 +290,13 @@ export function useSaveGroup() {
       {
         original,
         draft,
-      }: { original: StaffMenu['modifierGroups'][number] | null; draft: GroupDraft },
-    ) => saveGroup(client, original, draft),
+        onCreated,
+      }: {
+        original: StaffMenu['modifierGroups'][number] | null;
+        draft: GroupDraft;
+        onCreated?: (index: number, id: string) => void;
+      },
+    ) => saveGroup(client, original, draft, onCreated),
   );
 }
 

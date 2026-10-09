@@ -303,6 +303,50 @@ describe('Menú: edición', () => {
     );
   });
 
+  it('teclado: tras mover, el foco vuelve al botón del ítem movido (o al opuesto en el tope)', async () => {
+    renderMenu();
+    await screen.findByText('Reaper Sandwich');
+    fireEvent.click(screen.getByRole('button', { name: 'Move Classic Sandwich up' }));
+    // Llegó al tope: «subir» queda deshabilitado → foco en «bajar» del mismo ítem.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Move Classic Sandwich down' }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Move Classic Sandwich down' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Move Classic Sandwich up' }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Move Sandwiches down' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Move Sandwiches up' }),
+      ),
+    );
+  });
+
+  it('dos «agotado» seguidos: el fallo del primero no deshace el optimismo del segundo', async () => {
+    const pending: ((r: Response) => void)[] = [];
+    renderMenu({
+      before: (req) =>
+        req.path.endsWith('/availability')
+          ? new Promise<Response>((resolve) => pending.push(resolve))
+          : undefined,
+    });
+    await screen.findByText('Fries');
+    const sw = (name: string) => screen.getByRole('switch', { name: `${name} available` });
+    fireEvent.click(sw('Reaper Sandwich'));
+    fireEvent.click(sw('Fries'));
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => pending[0]!(apiError(500, 'Error interno')));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    // La segunda sigue en vuelo: su cambio optimista se mantiene.
+    expect(sw('Fries').getAttribute('aria-checked')).toBe('false');
+    await act(async () => pending[1]!(new Response(null, { status: 204 })));
+  });
+
   it('reordenar arrastrando un producto sobre otro', async () => {
     const { state } = renderMenu();
     await screen.findByText('Reaper Sandwich');
@@ -415,6 +459,47 @@ describe('Menú: edición', () => {
       isAvailable: true,
     });
     expect(calls(api, 'PATCH', /options\/reorder$/)).toHaveLength(1);
+  });
+
+  it('precio por encima del tope de la API: error propio, sin llamar', async () => {
+    const { api } = renderMenu();
+    await screen.findByText('Reaper Sandwich');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Classic Sandwich' }));
+    const drawer = screen.getByRole('dialog', { name: 'Edit product' });
+    fireEvent.change(within(drawer).getByLabelText('Price (USD)'), {
+      target: { value: '10000000.01' },
+    });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Save' }));
+    expect(within(drawer).getByText('The price can’t be higher than $10,000,000.00.')).toBeTruthy();
+    expect(calls(api, 'PATCH', /items/)).toHaveLength(0);
+  });
+
+  it('grupo: reintentar tras un fallo a mitad no duplica las opciones creadas', async () => {
+    let failReorder = true;
+    const { api, state } = renderMenu({
+      before: (req) =>
+        failReorder && req.path.endsWith('/options/reorder')
+          ? apiError(500, 'Error interno')
+          : undefined,
+    });
+    await screen.findByText('Reaper Sandwich');
+    fireEvent.click(screen.getByRole('tab', { name: /Modifier groups/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit group Spice level' }));
+    const drawer = screen.getByRole('dialog', { name: 'Edit modifier group' });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Add option' }));
+    fireEvent.change(within(drawer).getByLabelText('Option 3 name'), {
+      target: { value: 'Ghost' },
+    });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Remove option 1' }));
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Save' }));
+    expect(await within(drawer).findByRole('alert')).toBeTruthy();
+    expect(calls(api, 'POST', /options$/)).toHaveLength(1);
+
+    failReorder = false;
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Group “Spice level” saved.')).toBeTruthy();
+    expect(calls(api, 'POST', /options$/)).toHaveLength(1);
+    expect(state.menu.modifierGroups[0]!.options.map((o) => o.name)).toEqual(['Reaper', 'Ghost']);
   });
 
   it('en español', async () => {

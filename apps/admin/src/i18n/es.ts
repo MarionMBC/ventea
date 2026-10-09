@@ -336,6 +336,7 @@ export const es: Messages = {
   'item.description': 'Descripción',
   'item.category': 'Categoría',
   'item.price': 'Precio ({currency})',
+  'item.priceTooHigh': 'El precio no puede pasar de {max}.',
   'item.priceInvalid': 'Escribe un precio válido, por ejemplo 12.50.',
   'item.compareAt': 'Precio anterior',
   'item.compareAtHint': 'Se muestra tachado para destacar un descuento.',

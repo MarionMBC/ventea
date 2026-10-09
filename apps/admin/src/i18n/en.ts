@@ -339,6 +339,7 @@ export const en = {
   'item.description': 'Description',
   'item.category': 'Category',
   'item.price': 'Price ({currency})',
+  'item.priceTooHigh': 'The price can’t be higher than {max}.',
   'item.priceInvalid': 'Enter a valid price, for example 12.50.',
   'item.compareAt': 'Previous price',
   'item.compareAtHint': 'Shown crossed out to highlight a discount.',

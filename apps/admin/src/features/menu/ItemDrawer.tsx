@@ -1,4 +1,5 @@
 import {
+  MENU_MAX_CENTS,
   MENU_TAG_MAX,
   type StaffMenu,
   type StaffMenuItem,
@@ -73,7 +74,7 @@ export function ItemDrawer({
   onSaved: (name: string) => void;
 }) {
   const i18n = useI18n();
-  const { t, locale } = i18n;
+  const { t, locale, money } = i18n;
   const formId = useId();
   const [draft, setDraft] = useState<Draft>(() => draftOf(item, categoryId));
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
@@ -101,8 +102,11 @@ export function ItemDrawer({
     const compareAt = draft.compareAt.trim() ? parseMoneyInput(draft.compareAt) : null;
     const tags = parseTags(draft.tags);
     if (!draft.name.trim()) found.name = t('item.nameRequired');
+    const tooHigh = t('item.priceTooHigh', { max: money(MENU_MAX_CENTS, menu.currency) });
     if (price === null) found.price = t('item.priceInvalid');
+    else if (price > MENU_MAX_CENTS) found.price = tooHigh;
     if (draft.compareAt.trim() && compareAt === null) found.compareAt = t('item.priceInvalid');
+    else if (compareAt !== null && compareAt > MENU_MAX_CENTS) found.compareAt = tooHigh;
     else if (compareAt !== null && price !== null && compareAt <= price) {
       found.compareAt = t('item.compareAtTooLow');
     }

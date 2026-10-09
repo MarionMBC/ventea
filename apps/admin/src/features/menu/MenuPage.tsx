@@ -5,7 +5,7 @@ import type {
   StaffMenuItem,
   StaffModifierGroup,
 } from '@ventea/shared';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { useSession } from '@/app/services';
 import { ConfirmDialog } from '@/features/platform/ConfirmDialog';
@@ -23,7 +23,7 @@ import {
   useStaffMenu,
 } from './api';
 import { ItemDrawer } from './ItemDrawer';
-import { MenuTree, type TreeHandlers } from './MenuTree';
+import { MenuTree, type MoveDir, type TreeHandlers } from './MenuTree';
 import { GroupDrawer, ModifierGroups } from './ModifierGroups';
 
 type Tab = 'items' | 'groups';
@@ -102,6 +102,25 @@ export function MenuPage() {
   }, [t]);
 
   const data = menu.data;
+
+  /*
+   * Mover con los botones reordena el DOM y el navegador saca el foco del botón (queda en
+   * <body>): tras el render con el orden nuevo vuelve al mismo botón o, si quedó en un tope
+   * (deshabilitado), al opuesto. Así se puede seguir moviendo con el teclado.
+   */
+  const refocus = useRef<{ id: string; dir: MoveDir } | null>(null);
+  useEffect(() => {
+    const target = refocus.current;
+    if (!target) return;
+    refocus.current = null;
+    const button = (dir: MoveDir) =>
+      document.querySelector<HTMLButtonElement>(
+        `[data-move-id="${target.id}"][data-move-dir="${dir}"]`,
+      );
+    const same = button(target.dir);
+    const next = same && !same.disabled ? same : button(target.dir === 'up' ? 'down' : 'up');
+    next?.focus();
+  }, [data]);
   const visible = useMemo(() => (data ? filterMenu(data, query) : []), [data, query]);
   const searching = query.trim() !== '';
   const itemCount = data?.categories.reduce((sum, c) => sum + c.items.length, 0) ?? 0;
@@ -122,7 +141,8 @@ export function MenuPage() {
       setCategoryForm({ category });
     },
     onDeleteCategory: (category) => openDelete({ kind: 'category', category }),
-    onMoveCategory: (ids, moved) => {
+    onMoveCategory: (ids, moved, via) => {
+      if (via) refocus.current = { id: moved.id, dir: via };
       setAnnouncement(
         t('menu.moved', {
           name: moved.name,
@@ -143,7 +163,8 @@ export function MenuPage() {
       );
       setAvailability.mutate({ id: item.id, isAvailable }, { onError: fail });
     },
-    onMoveItem: (category, ids, moved) => {
+    onMoveItem: (category, ids, moved, via) => {
+      if (via) refocus.current = { id: moved.id, dir: via };
       setAnnouncement(
         t('menu.moved', {
           name: moved.name,

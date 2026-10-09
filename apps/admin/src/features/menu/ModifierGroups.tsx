@@ -1,4 +1,4 @@
-import type { StaffMenu, StaffModifierGroup } from '@ventea/shared';
+import { MENU_MAX_CENTS, type StaffMenu, type StaffModifierGroup } from '@ventea/shared';
 import { useId, useState, type FormEvent } from 'react';
 
 import { describeError, useI18n } from '@/i18n';
@@ -129,7 +129,7 @@ export function GroupDrawer({
   onSaved: (name: string) => void;
 }) {
   const i18n = useI18n();
-  const { t, locale } = i18n;
+  const { t, locale, money } = i18n;
   const formId = useId();
   const save = useSaveGroup();
   const [name, setName] = useState(group?.name ?? '');
@@ -144,7 +144,8 @@ export function GroupDrawer({
   const update = (key: string, patch: Partial<OptionRow>) =>
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
 
-  const validate = (): GroupDraft | null => {
+  /** Borrador válido y la fila (`key`) de cada opción, en el mismo orden. */
+  const validate = (): { draft: GroupDraft; keys: string[] } | null => {
     const minSelect = Number(min);
     const maxSelect = Number(max);
     if (!name.trim()) return fail(t('group.nameRequired'));
@@ -156,11 +157,16 @@ export function GroupDrawer({
     }
     if (minSelect > maxSelect) return fail(t('group.minOverMax'));
     const options: OptionDraft[] = [];
+    const keys: string[] = [];
     for (const row of rows) {
       if (!row.name.trim() && !row.price.trim() && !row.id) continue; // fila vacía nueva
       if (!row.name.trim()) return fail(t('group.optionNameRequired'));
       const cents = row.price.trim() ? parseMoneyInput(row.price, { allowNegative: true }) : 0;
       if (cents === null) return fail(t('group.optionPriceInvalid', { name: row.name.trim() }));
+      if (Math.abs(cents) > MENU_MAX_CENTS) {
+        return fail(t('item.priceTooHigh', { max: money(MENU_MAX_CENTS, menu.currency) }));
+      }
+      keys.push(row.key);
       options.push({
         id: row.id,
         name: row.name.trim(),
@@ -170,7 +176,7 @@ export function GroupDrawer({
     }
     if (options.length > 50) return fail(t('group.tooManyOptions'));
     setError(null);
-    return { name: name.trim(), minSelect, maxSelect, options };
+    return { draft: { name: name.trim(), minSelect, maxSelect, options }, keys };
   };
 
   function fail(message: string): null {
@@ -181,9 +187,25 @@ export function GroupDrawer({
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (save.isPending) return;
-    const draft = validate();
-    if (!draft) return;
-    save.mutate({ original: group, draft }, { onSuccess: () => onSaved(draft.name) });
+    const valid = validate();
+    if (!valid) return;
+    const { draft, keys } = valid;
+    // El grupo como está ahora (el menú se recarga tras cada intento), no como estaba al abrir:
+    // si un intento anterior falló a mitad, lo ya aplicado no se repite.
+    const original = group
+      ? (menu.modifierGroups.find((candidate) => candidate.id === group.id) ?? group)
+      : null;
+    save.mutate(
+      {
+        original,
+        draft,
+        onCreated: (index, id) => {
+          const key = keys[index];
+          setRows((current) => current.map((row) => (row.key === key ? { ...row, id } : row)));
+        },
+      },
+      { onSuccess: () => onSaved(draft.name) },
+    );
   };
 
   const shownError = error ?? (save.error ? describeError(save.error, i18n) : null);
