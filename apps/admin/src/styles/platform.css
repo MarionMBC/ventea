@@ -6,6 +6,7 @@
 /* Login de plataforma (el de la marca usa `.auth`, en shell.css). */
 .login {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: var(--gutter);
@@ -54,6 +55,7 @@
 
 .pf {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
 }
 
@@ -325,6 +327,7 @@
   width: 100%;
   max-width: 28rem;
   max-height: calc(100vh - 2 * var(--gutter));
+  max-height: calc(100dvh - 2 * var(--gutter));
   overflow-y: auto;
   padding: 1.5rem;
   border-radius: var(--radius-lg);
