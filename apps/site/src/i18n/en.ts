@@ -137,7 +137,7 @@ export const en: Dict = {
         id: 'ai',
         title: 'Artificial intelligence and automation',
         summary: 'Language models and automations inside your processes, with human oversight.',
-        body: 'We integrate large language models (LLMs) where they help: classifying, summarizing, drafting or extracting data from documents, always with a person reviewing the result. And we automate repetitive work across your tools. We use it in our own product, Ventea Marketing.',
+        body: 'We integrate large language models (LLMs) where they help: classifying, summarizing, drafting or extracting data from documents, with a person reviewing the result. And we automate repetitive work across your tools. We use it in our own product, Ventea Marketing.',
         includes: [
           'LLM assistants and workflows connected to your data',
           'Document and message extraction and classification',
@@ -277,7 +277,8 @@ export const en: Dict = {
         { title: 'Apps', text: 'Web and mobile under each restaurant’s brand' },
         { title: 'Operations', text: 'Containers, automated deployments and backups' },
       ],
-      languageNote: 'The product is in Spanish.',
+      languageNote:
+        'The product site and the kitchen board are in Spanish; the customer app in the screenshot is in English.',
       cta: 'Visit Ventea for restaurants',
       kitchen: {
         alt: 'Ventea kitchen board with orders in the New, In the kitchen and Ready columns, each with its items, notes and total.',
@@ -300,7 +301,7 @@ export const en: Dict = {
     title: 'Engineering with business judgment',
     paragraphs: [
       'Ventea is a digital engineering company: we design, build and connect software for companies. We start with the architecture —how systems, data and integrations fit together— so that what we build can grow.',
-      'The code, the infrastructure and the documentation are yours from day one. You talk directly to the people who design and write the software.',
+      'By default, the code, the infrastructure and the documentation are put in your name, and we state it in writing in the contract. You talk directly to the people who design and write the software.',
     ],
     principlesTitle: 'How it shows in the work',
     principles: [
@@ -355,6 +356,7 @@ export const en: Dict = {
       messageHint: 'The problem you want to solve, the systems involved and any important date.',
       counter: 'Up to {max} characters ({count}/{max}).',
       honeypot: 'Leave this field empty',
+      noscript: 'This form needs JavaScript to prepare the email. Write to us directly at',
       submit: 'Prepare email',
       note: 'Opens your email app with the message ready to send to hola@ventea.tech. Nothing is stored on this site.',
       errorsSummary: 'Please check the highlighted fields.',
@@ -376,9 +378,9 @@ export const en: Dict = {
     },
     status: {
       opening: 'Opening your email app…',
-      openedTitle: 'Your message is ready in your email app',
+      openedTitle: 'We tried to open your email app',
       openedText:
-        'The email has not been sent yet: review it and press send in your app. If it did not open, copy the text and write to us directly.',
+        'If it opened, review the message and press send: nothing has been sent yet. If it did not open, copy the text or write to us directly at hola@ventea.tech.',
       copy: 'Copy the message',
       copied: 'Message copied.',
       copyFailed: 'Could not copy. Select the text below and copy it.',

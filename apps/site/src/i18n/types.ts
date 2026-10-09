@@ -204,6 +204,8 @@ export interface Dict {
       /** `{count}` y `{max}` se reemplazan. */
       counter: string;
       honeypot: string;
+      /** Sin JS el formulario no funciona: se ofrece el correo directo. */
+      noscript: string;
       submit: string;
       note: string;
       errorsSummary: string;

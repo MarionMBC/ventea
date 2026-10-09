@@ -138,7 +138,7 @@ export const es: Dict = {
         title: 'Inteligencia artificial y automatización',
         summary:
           'Modelos de lenguaje y automatizaciones dentro de sus procesos, con supervisión humana.',
-        body: 'Integramos modelos de lenguaje (LLM) donde aportan: clasificar, resumir, redactar borradores o extraer datos de documentos, siempre con la revisión de una persona. Y automatizamos el trabajo repetitivo entre sus herramientas. Lo aplicamos en nuestro propio producto, Ventea Marketing.',
+        body: 'Integramos modelos de lenguaje (LLM) donde aportan: clasificar, resumir, redactar borradores o extraer datos de documentos, con la revisión de una persona. Y automatizamos el trabajo repetitivo entre sus herramientas. Lo aplicamos en nuestro propio producto, Ventea Marketing.',
         includes: [
           'Asistentes y flujos con LLM conectados a sus datos',
           'Extracción y clasificación de documentos y mensajes',
@@ -278,7 +278,8 @@ export const es: Dict = {
         { title: 'Aplicaciones', text: 'Web y móvil con la marca de cada restaurante' },
         { title: 'Operación', text: 'Contenedores, despliegues automatizados y respaldos' },
       ],
-      languageNote: '',
+      languageNote:
+        'El sitio del producto y el panel de cocina están en español; la app de clientes de la captura está en inglés.',
       cta: 'Visitar Ventea para restaurantes',
       kitchen: {
         alt: 'Panel de cocina de Ventea con pedidos en las columnas Nuevos, En cocina y Listos, cada uno con sus productos, notas y total.',
@@ -301,7 +302,7 @@ export const es: Dict = {
     title: 'Ingeniería con criterio de negocio',
     paragraphs: [
       'Ventea es una empresa de ingeniería digital: diseñamos, desarrollamos y conectamos software para empresas. Empezamos por la arquitectura —cómo se organizan los sistemas, los datos y las integraciones— para que lo que construimos pueda crecer.',
-      'El código, la infraestructura y la documentación son suyos desde el primer día. Usted habla directamente con las personas que diseñan y escriben el software.',
+      'Por defecto, el código, la infraestructura y la documentación quedan a su nombre; lo dejamos por escrito en el contrato. Usted habla directamente con las personas que diseñan y escriben el software.',
     ],
     principlesTitle: 'Cómo se nota en el trabajo',
     principles: [
@@ -357,6 +358,8 @@ export const es: Dict = {
         'El problema que quiere resolver, los sistemas involucrados y cualquier fecha importante.',
       counter: 'Hasta {max} caracteres ({count}/{max}).',
       honeypot: 'Deje este campo vacío',
+      noscript:
+        'Este formulario necesita JavaScript para preparar el correo. Escríbanos directamente a',
       submit: 'Preparar correo',
       note: 'Abre su aplicación de correo con el mensaje listo para enviar a hola@ventea.tech. Este sitio no guarda nada.',
       errorsSummary: 'Revise los campos marcados.',
@@ -378,9 +381,9 @@ export const es: Dict = {
     },
     status: {
       opening: 'Abrimos su aplicación de correo…',
-      openedTitle: 'Su mensaje está listo en su aplicación de correo',
+      openedTitle: 'Intentamos abrir su aplicación de correo',
       openedText:
-        'El correo todavía no se envió: revíselo y presione enviar en su aplicación. Si no se abrió, copie el texto y escríbanos directamente.',
+        'Si se abrió, revise el mensaje y presione enviar: todavía no se envió nada. Si no se abrió, copie el texto o escríbanos directamente a hola@ventea.tech.',
       copy: 'Copiar el mensaje',
       copied: 'Mensaje copiado.',
       copyFailed: 'No se pudo copiar. Seleccione el texto de abajo y cópielo.',

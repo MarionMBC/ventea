@@ -35,13 +35,41 @@ describe('diccionarios es/en', () => {
     expect(shape(en)).toEqual(shape(es));
   });
 
-  it('solo las notas de idioma pueden ir vacías (y solo en español)', () => {
+  it('solo la nota de idioma de Ventea Marketing puede ir vacía (en español)', () => {
     const empty = (dict: unknown) => strings(dict).filter(([, text]) => text.trim() === '');
     expect(empty(en)).toEqual([]);
-    expect(empty(es).map(([key]) => key)).toEqual([
-      '.products.marketing.languageNote',
-      '.products.restaurants.languageNote',
-    ]);
+    expect(empty(es).map(([key]) => key)).toEqual(['.products.marketing.languageNote']);
+  });
+
+  it('nota de idioma de restaurantes exacta: sitio y panel en español, app de la captura en inglés', () => {
+    expect(en.products.restaurants.languageNote).toMatch(/kitchen board are in Spanish/);
+    expect(en.products.restaurants.languageNote).toMatch(
+      /customer app in the screenshot is in English/,
+    );
+    expect(es.products.restaurants.languageNote).toMatch(
+      /app de clientes de la captura está en inglés/,
+    );
+  });
+
+  it('sin garantías absolutas: propiedad del código como práctica contractual', () => {
+    const all = (dict: unknown) =>
+      strings(dict)
+        .map(([, value]) => value)
+        .join(' ');
+    expect(all(es)).not.toMatch(/desde el primer día|siempre con|garantiza/i);
+    expect(all(en)).not.toMatch(/from day one|always with|guarantee/i);
+    expect(es.about.paragraphs[1]).toMatch(/^Por defecto, .*por escrito en el contrato/);
+    expect(en.about.paragraphs[1]).toMatch(/^By default, .*in writing in the contract/);
+  });
+
+  it('el estado del mailto no afirma que el mensaje esté listo ni enviado', () => {
+    expect(es.contact.status.openedTitle).toBe('Intentamos abrir su aplicación de correo');
+    expect(en.contact.status.openedTitle).toBe('We tried to open your email app');
+    for (const dict of [es, en]) {
+      expect(Object.values(dict.contact.status).join(' ')).not.toMatch(
+        /está listo|is ready|enviado con éxito|was sent|has been sent(?! yet)/i,
+      );
+    }
   });
 
   it('los servicios son los cinco del brief, en el mismo orden en los dos idiomas', () => {
