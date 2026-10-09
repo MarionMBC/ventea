@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { rewardProgramSchema } from './rewards.js';
+import { publicRewardSchema } from './rewards-admin.js';
 
 /** Datos públicos de la marca: con esto la app se viste de la marca correcta. */
 export const publicTenantSchema = z.object({
@@ -18,6 +19,11 @@ export const publicTenantSchema = z.object({
     appDisplayName: z.string().nullable(),
   }),
   rewardProgram: rewardProgramSchema,
+  /**
+   * Recompensas activas del catálogo (TASK-023), en orden. Opcional: una API anterior no lo
+   * manda, y con el programa apagado viene vacío.
+   */
+  rewards: z.array(publicRewardSchema).optional(),
 });
 
 export const openingHoursSchema = z.array(

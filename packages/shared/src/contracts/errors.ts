@@ -8,7 +8,7 @@ import { PLAN_CODE } from '../domain/enums.js';
  */
 
 /** Recurso que topa un límite del plan contratado. */
-export const PLAN_LIMIT_RESOURCE = ['locations', 'branded_app'] as const;
+export const PLAN_LIMIT_RESOURCE = ['locations', 'branded_app', 'reports'] as const;
 export type PlanLimitResource = (typeof PLAN_LIMIT_RESOURCE)[number];
 
 /**

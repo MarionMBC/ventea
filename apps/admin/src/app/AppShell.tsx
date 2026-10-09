@@ -41,8 +41,12 @@ const NAV: readonly NavItem[] = [
   { to: '/menu', label: 'nav.menu', icon: IconMenuBook },
 ];
 
-/** Solo el dueño ve Mi marca y la facturación (la API responde 403 al resto). */
+/** Dueño y gerente ven los reportes (TASK-023). */
+const MANAGER_NAV: readonly NavItem[] = [{ to: '/reports', label: 'nav.reports', icon: IconChart }];
+
+/** Solo el dueño ve Puntos, Mi marca y la facturación (la API responde 403 al resto). */
 const OWNER_NAV: readonly NavItem[] = [
+  { to: '/rewards', label: 'nav.rewards', icon: IconStar },
   { to: '/brand', label: 'nav.brand', icon: IconPalette },
   { to: '/facturacion', label: 'nav.billing', icon: IconBilling },
 ];
@@ -53,9 +57,7 @@ const OWNER_NAV: readonly NavItem[] = [
  */
 const SOON: readonly { label: TKey; icon: Icon }[] = [
   { label: 'nav.locations', icon: IconLocation },
-  { label: 'nav.rewards', icon: IconStar },
   { label: 'nav.staff', icon: IconUsers },
-  { label: 'nav.reports', icon: IconChart },
 ];
 
 const SIDEBAR_KEY = 'ventea.admin.sidebar';
@@ -149,7 +151,12 @@ export function AppShell() {
   };
 
   const name = brandName(tenant);
-  const items = [...NAV, ...(current?.staff.role === 'owner' ? OWNER_NAV : [])];
+  const role = current?.staff.role;
+  const items = [
+    ...NAV,
+    ...(role === 'owner' || role === 'manager' ? MANAGER_NAV : []),
+    ...(role === 'owner' ? OWNER_NAV : []),
+  ];
 
   return (
     <div

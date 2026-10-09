@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { getMe, getRewardBalance, getRewardLedger, getTenant } from '../../api/endpoints';
-import type { RewardLedgerReason } from '../../api/types';
+import type { RewardCatalogEntry, RewardLedgerEntry, RewardLedgerReason } from '../../api/types';
 import { useBrand } from '../../brand/useBrand';
 import { ProfileMenu } from '../../components/navigation/ProfileMenu';
 import { BrandLogo } from '../../components/ui/BrandLogo';
+import { formatPrice } from '../../components/ui/formatPrice';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { BackHeader } from '../../components/navigation/AppHeader';
-import { formatDate, t } from '../../i18n';
+import { formatDate, intlLocale, t } from '../../i18n';
 import type { MessageKey } from '../../i18n';
 import { useAuth } from '../auth/authContext';
+import { fromCents } from '../menu/pricing';
 import { useResource } from '../useResource';
 import { ScreenShell } from './ScreenShell';
 import { RetryState, SignInState } from './ScreenStates';
@@ -31,6 +33,34 @@ const reasonKeys: Record<RewardLedgerReason, MessageKey> = {
   manual_adjustment: 'points.reason.adjustment',
   expiration: 'points.reason.expiration',
   signup_bonus: 'points.reason.signup',
+};
+
+/* A reward redeemed at the counter (TASK-023) has no order; its note is the reward's name. */
+const entryLabel = (entry: RewardLedgerEntry): string =>
+  entry.reason === 'redemption' && !entry.orderId && entry.note
+    ? t('points.reason.reward', { name: entry.note })
+    : t(reasonKeys[entry.reason] ?? 'points.reason.adjustment');
+
+const rewardDetail = (reward: RewardCatalogEntry, balance: number | null): string => {
+  const what =
+    reward.kind === 'discount' && reward.discountCents
+      ? t('rewards.discount', { amount: formatPrice(fromCents(reward.discountCents)) })
+      : t('rewards.item');
+  if (balance === null) return what;
+  const missing = reward.pointsCost - balance;
+  return `${what} · ${missing <= 0 ? t('rewards.ready') : t('rewards.toGo', { points: missing })}`;
+};
+
+/**
+ * Tasa de puntos en palabras: «2.5 puntos por cada $1» o, por debajo de 1, «1 punto cada $2»
+ * (nada de «0.5 puntos por cada $1»). Hasta 2 decimales, con el formato del idioma.
+ */
+export const earnRateText = (rate: number): string => {
+  if (rate >= 1) {
+    const points = new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 2 }).format(rate);
+    return t('points.earnRate', { points, amount: formatPrice(1) });
+  }
+  return t('points.earnRateLow', { amount: formatPrice(1 / rate) });
 };
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
@@ -64,6 +94,8 @@ export const ProfileScreen = ({
   const me = useResource((signal) => getMe(signal), [], { enabled: isAuthenticated });
   const tenant = useResource((signal) => getTenant(signal), [], { enabled: isAuthenticated });
   const pointsEnabled = tenant.data?.rewardProgram.isEnabled === true;
+  const rewards = pointsEnabled ? (tenant.data?.rewards ?? []) : [];
+  const rate = tenant.data?.rewardProgram.pointsPerCurrencyUnit ?? 0;
   const balance = useResource((signal) => getRewardBalance(signal), [pointsEnabled], {
     enabled: isAuthenticated && pointsEnabled,
   });
@@ -116,9 +148,34 @@ export const ProfileScreen = ({
           )}
         </div>
 
+        {rewards.length > 0 && (
+          <section className="vt-section" aria-labelledby="vt-rewards-title">
+            <h2 className="vt-h3" id="vt-rewards-title">
+              {t('rewards.title')}
+            </h2>
+            <span className="vt-caption">{t('rewards.howTo')}</span>
+            <ul className="vt-totals vt-rewards">
+              {rewards.map((reward) => (
+                <li key={reward.id} className="vt-totals__row">
+                  <span className="vt-stack-1">
+                    <span className="vt-rewards__name">{reward.name}</span>
+                    <span className="vt-caption">
+                      {rewardDetail(reward, balance.data?.balance ?? null)}
+                    </span>
+                  </span>
+                  <span className="vt-text-brand vt-rewards__cost">
+                    {t('rewards.cost', { points: reward.pointsCost })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {pointsEnabled && (
           <section className="vt-section">
             <h2 className="vt-h3">{t('points.activity')}</h2>
+            {rate > 0 && <span className="vt-caption">{earnRateText(rate)}</span>}
             {ledger.error && !ledger.data ? (
               <RetryState
                 title={t('points.loadError')}
@@ -142,7 +199,7 @@ export const ProfileScreen = ({
                 {entries.map((entry) => (
                   <div key={entry.id} className="vt-totals__row">
                     <span className="vt-stack-1">
-                      <span>{t(reasonKeys[entry.reason] ?? 'points.reason.adjustment')}</span>
+                      <span>{entryLabel(entry)}</span>
                       <span className="vt-caption">{formatDate(entry.createdAt, DATE_FORMAT)}</span>
                     </span>
                     <span className={entry.points > 0 ? 'vt-text-brand' : undefined}>

@@ -313,11 +313,13 @@ async function main() {
         ['menu', '/menu'],
         ['mi-marca', '/brand'],
         ['facturacion', '/facturacion'],
+        ['reportes', '/reports'],
+        ['puntos', '/rewards'],
       ]) {
         await page.goto(`${BASE}${route}`);
         await settle(page);
         const result = await page.evaluate(measure);
-        if (screen === 'mi-marca')
+        if (screen === 'mi-marca' || screen === 'puntos')
           result.problems.push(...(await page.evaluate(measureSavebar)).problems);
         await record(screen, result);
       }
@@ -342,6 +344,24 @@ async function main() {
       await page.locator('.menu-cat__actions .icon-btn--danger').first().click();
       await settle(page);
       await record('menu-confirmar-borrado', await page.evaluate(measureDialog));
+      await page.keyboard.press('Escape');
+
+      // Reportes: vista de tabla. Puntos: panel del cliente y editor de recompensa (TASK-023).
+      await page.goto(`${BASE}/reports`);
+      await settle(page);
+      await page.locator('.chart-card__view .segmented__item').nth(1).click();
+      await settle(page);
+      await record('reportes-tabla', await page.evaluate(measure));
+      await page.goto(`${BASE}/rewards`);
+      await settle(page);
+      await page.locator('.rw-table__action button').first().click();
+      await settle(page);
+      await record('puntos-cliente', await page.evaluate(measureDialog));
+      await page.keyboard.press('Escape');
+      await settle(page);
+      await page.locator('.rw__add').click();
+      await settle(page);
+      await record('puntos-recompensa', await page.evaluate(measureDialog));
       await page.keyboard.press('Escape');
 
       // Cajón de navegación (menos de 1024 px).

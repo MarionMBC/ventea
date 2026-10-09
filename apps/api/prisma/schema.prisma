@@ -35,23 +35,23 @@ model PlatformAdmin {
 
 /// Una marca cliente del SaaS. Carolina Hot Chicken es el tenant #1, no un caso especial.
 model Tenant {
-  id        String   @id @default(uuid())
-  slug      String   @unique
-  name      String
-  currency  String   @db.Char(3)
-  timezone  String   @default("America/Santiago")
+  id              String           @id @default(uuid())
+  slug            String           @unique
+  name            String
+  currency        String           @db.Char(3)
+  timezone        String           @default("America/Santiago")
   /// `false` = la marca no existe para nadie (404). La suspensión por falta de pago NO
   /// usa esto: es un estado de `Subscription` (402, el staff sigue entrando).
-  isActive  Boolean  @default(true)
+  isActive        Boolean          @default(true)
   /// Región donde vive la marca. La asigna la plataforma al registrarla (RegionService).
-  region     String           @default("hn-1")
-  createdVia TenantCreatedVia @default(script)
+  region          String           @default("hn-1")
+  createdVia      TenantCreatedVia @default(script)
   /// Versión de términos y privacidad que aceptó el dueño al registrarse (TASK-007,
   /// `TERMS_VERSIONS` de @ventea/shared) y cuándo. Null en marcas creadas por script.
   termsVersion    String?
   termsAcceptedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   subscription    Subscription?
   billingEvents   BillingEvent[]
@@ -73,6 +73,7 @@ model Tenant {
   appConfig       AppConfig?
   appConfigEvents AppConfigEvent[]
   emailMessages   EmailMessage[]
+  rewardCatalog   RewardCatalogItem[]
 
   @@map("tenants")
 }
@@ -116,7 +117,7 @@ model Plan {
   updatedAt         DateTime @updatedAt
 
   subscriptions        Subscription[]
-  pendingSubscriptions Subscription[] @relation("PendingPlan")
+  pendingSubscriptions Subscription[]   @relation("PendingPlan")
   paymentAttempts      PaymentAttempt[]
 
   @@map("plans")
@@ -275,12 +276,12 @@ enum PaymentAttemptStatus {
 
 /// Look and feel por marca: es lo que hace que el mismo binario se vea como otra app.
 model TenantBranding {
-  tenantId       String  @id
+  tenantId              String  @id
   /// Media propia (`/api/media/<tenantId>/<hash>.webp`, TASK-016) o una URL heredada.
-  logoUrl        String?
-  primaryColor   String  @default("#E23B2E")
-  secondaryColor String  @default("#1F1D1B")
-  appDisplayName String?
+  logoUrl               String?
+  primaryColor          String  @default("#E23B2E")
+  secondaryColor        String  @default("#1F1D1B")
+  appDisplayName        String?
   // TASK-016 (Mi marca). Todos opcionales: las marcas existentes no cambian.
   accentColor           String?
   /// Ícono de la app nativa (cuadrado). Media propia.
@@ -321,16 +322,16 @@ model MediaAsset {
 
 /// Auditoría del menú: quién cambió qué y cuándo. Append-only.
 model MenuChange {
-  id       String @id @default(uuid())
-  tenantId String
-  staffId  String
+  id        String   @id @default(uuid())
+  tenantId  String
+  staffId   String
   /// `category` | `item` | `modifier_group` | `modifier_option`.
-  entity   String
-  entityId String
+  entity    String
+  entityId  String
   /// `create` | `update` | `delete` | `soft_delete` | `reorder` | `availability`.
-  action   String
+  action    String
   /// Campos cambiados (valores nuevos). Nunca datos personales.
-  changes  Json?
+  changes   Json?
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -341,25 +342,25 @@ model MenuChange {
 
 /// App nativa de la marca (1:1). La crea la solicitud del dueño o la plataforma.
 model AppConfig {
-  tenantId        String       @id
+  tenantId           String       @id
   /// Identificador en las tiendas. Único GLOBAL a propósito: es un espacio de nombres de
   /// Apple/Google, no un dato de negocio de la marca. Solo plataforma lo edita.
-  bundleId        String       @unique
-  publisher       AppPublisher
-  status          AppStatus    @default(not_requested)
-  version         String?
-  buildNumber     Int?
-  storeUrlAndroid String?
-  storeUrlIos     String?
-  requestedAt     DateTime?
+  bundleId           String       @unique
+  publisher          AppPublisher
+  status             AppStatus    @default(not_requested)
+  version            String?
+  buildNumber        Int?
+  storeUrlAndroid    String?
+  storeUrlIos        String?
+  requestedAt        DateTime?
   /// Service account de FCM cifrada (AES-256-GCM, `PUSH_CREDENTIALS_KEY`, AAD = tenantId).
   /// Nunca sale de la API: las respuestas solo dicen `configured`.
   pushCredentialsEnc String?
   /// Proyecto de Firebase de esas credenciales (no es secreto; ayuda a operar).
   pushProjectId      String?
   pushUpdatedAt      DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -382,7 +383,7 @@ enum AppStatus {
 
 /// Historial de la app de la marca (solicitud, cambios de plataforma, credenciales push).
 model AppConfigEvent {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
   /// `requested` | `updated` | `push_credentials_set` | `push_credentials_cleared`.
   type      String
@@ -449,18 +450,18 @@ enum EmailStatus {
 // ─── Sucursales ──────────────────────────────────────────────────────────────
 
 model Location {
-  id        String  @id @default(uuid())
-  tenantId  String
-  name      String
-  address   String
-  latitude  Float
-  longitude Float
-  phone     String?
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  address      String
+  latitude     Float
+  longitude    Float
+  phone        String?
   /// Horario semanal como JSON: [{ day: 0-6, opens: "11:00", closes: "23:00" }]
   openingHours Json?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
@@ -472,11 +473,11 @@ model Location {
 // ─── Catálogo ────────────────────────────────────────────────────────────────
 
 model MenuCategory {
-  id        String  @id @default(uuid())
+  id        String    @id @default(uuid())
   tenantId  String
   name      String
-  sortOrder Int     @default(0)
-  isActive  Boolean @default(true)
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
   /// Soft-delete (TASK-016): solo cuando conserva ítems borrados con pedidos (FK Restrict).
   deletedAt DateTime?
 
@@ -488,29 +489,30 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id          String  @id @default(uuid())
-  tenantId    String
-  categoryId  String
-  name        String
-  description String?
-  imageUrl    String?
+  id                  String    @id @default(uuid())
+  tenantId            String
+  categoryId          String
+  name                String
+  description         String?
+  imageUrl            String?
   /// Precio en la unidad mínima de la moneda (centavos). Nunca decimal flotante.
-  basePriceCents Int
+  basePriceCents      Int
   /// Precio anterior (tachado en la app). Null si no hay rebaja.
   compareAtPriceCents Int?
   /// Badges de la app: popular, new, hot, combo…
-  tags           String[] @default([])
-  isAvailable    Boolean  @default(true)
-  sortOrder      Int      @default(0)
+  tags                String[]  @default([])
+  isAvailable         Boolean   @default(true)
+  sortOrder           Int       @default(0)
   /// Soft-delete (TASK-016): un ítem con pedidos no se borra; sale del menú y del panel.
-  deletedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category       MenuCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   modifierGroups MenuItemModifierGroup[]
   orderLines     OrderLine[]
+  rewardItems    RewardCatalogItem[]
 
   @@index([tenantId, categoryId])
   @@index([tenantId, isAvailable])
@@ -533,10 +535,10 @@ model ModifierGroup {
 }
 
 model ModifierOption {
-  id       String @id @default(uuid())
-  tenantId String
-  groupId  String
-  name     String
+  id              String  @id @default(uuid())
+  tenantId        String
+  groupId         String
+  name            String
   /// Puede ser negativo: quitar un ingrediente puede descontar.
   priceDeltaCents Int     @default(0)
   isAvailable     Boolean @default(true)
@@ -568,13 +570,13 @@ model MenuItemModifierGroup {
 /// Cliente final. El email es único POR TENANT: la misma persona puede tener
 /// cuenta en dos marcas distintas y son cuentas separadas.
 model Customer {
-  id           String  @id @default(uuid())
-  tenantId     String
-  email        String
-  phone        String?
-  passwordHash String?
-  firstName    String?
-  lastName     String?
+  id               String    @id @default(uuid())
+  tenantId         String
+  email            String
+  phone            String?
+  passwordHash     String?
+  firstName        String?
+  lastName         String?
   /// Habilitó desbloqueo biométrico en algún dispositivo (el secreto vive en el device, no acá).
   biometricEnabled Boolean   @default(false)
   emailVerifiedAt  DateTime?
@@ -602,7 +604,8 @@ model StaffMember {
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rewardEntries RewardLedgerEntry[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -617,15 +620,15 @@ enum TenantRole {
 
 /// Dispositivo registrado: destino de push y ancla del login biométrico.
 model Device {
-  id         String         @id @default(uuid())
-  tenantId   String
-  customerId String
-  platform   DevicePlatform
-  pushToken  String?
+  id             String         @id @default(uuid())
+  tenantId       String
+  customerId     String
+  platform       DevicePlatform
+  pushToken      String?
   /// Identificador de la credencial biométrica. El secreto nunca sale del dispositivo.
   biometricKeyId String?
-  lastSeenAt     DateTime @default(now())
-  createdAt      DateTime @default(now())
+  lastSeenAt     DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -663,16 +666,16 @@ model Order {
   pointsEarned   Int @default(0)
   pointsRedeemed Int @default(0)
 
-  customerNotes String?
+  customerNotes          String?
   /// Header Idempotency-Key del POST que creó el pedido (único por cliente).
   idempotencyKey         String?
   /// sha256 del cuerpo validado: misma clave con otro cuerpo es un error del cliente.
   idempotencyRequestHash String?
-  scheduledFor  DateTime?
-  placedAt      DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  scheduledFor           DateTime?
+  placedAt               DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   location      Location            @relation(fields: [locationId], references: [id], onDelete: Restrict)
@@ -685,6 +688,8 @@ model Order {
   @@index([tenantId, status])
   @@index([tenantId, customerId, placedAt])
   @@index([tenantId, locationId, placedAt])
+  /// Reportes (TASK-023): rango de fechas de toda la marca, sin filtro de sucursal.
+  @@index([tenantId, placedAt])
   @@map("orders")
 }
 
@@ -752,15 +757,15 @@ model OrderLineOption {
 
 /// Reglas del programa de puntos: cada marca configura el suyo.
 model RewardProgram {
-  tenantId  String  @id
-  isEnabled Boolean @default(false)
+  tenantId              String   @id
+  isEnabled             Boolean  @default(false)
   /// Puntos otorgados por unidad monetaria gastada (ej. 1.0 = 1 punto por peso).
-  pointsPerCurrencyUnit Float @default(1)
+  pointsPerCurrencyUnit Float    @default(1)
   /// Valor en centavos de 1 punto al canjear.
-  redemptionValueCents Int      @default(1)
-  minPointsToRedeem    Int      @default(0)
-  signupBonusPoints    Int      @default(0)
-  updatedAt            DateTime @updatedAt
+  redemptionValueCents  Int      @default(1)
+  minPointsToRedeem     Int      @default(0)
+  signupBonusPoints     Int      @default(0)
+  updatedAt             DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -770,22 +775,68 @@ model RewardProgram {
 /// Libro contable append-only de puntos. El saldo es SUM(points), nunca un
 /// contador mutable: así toda variación queda con causa y es auditable.
 model RewardLedgerEntry {
-  id         String  @id @default(uuid())
-  tenantId   String
-  customerId String
-  orderId    String?
+  id             String             @id @default(uuid())
+  tenantId       String
+  customerId     String
+  orderId        String?
   /// Positivo acredita, negativo debita.
-  points    Int
-  reason    RewardLedgerReason
-  note      String?
-  createdAt DateTime           @default(now())
+  points         Int
+  reason         RewardLedgerReason
+  note           String?
+  /// Auditoría (TASK-023): quién del staff hizo el ajuste o el canje desde el panel. Null en
+  /// asientos automáticos (pedido, bono de registro, devolución de canje).
+  staffId        String?
+  /// Nombre del staff al momento del asiento: la auditoría conserva el autor aunque la persona
+  /// se borre después (`staffId` pasa a null).
+  staffName      String?
+  /// Motivo interno del ajuste. Nunca sale a la app del cliente (`/api/rewards/ledger`).
+  staffNote      String?
+  /// Recompensa del catálogo canjeada en el local (asiento `redemption` sin pedido).
+  rewardId       String?
+  /// Header `Idempotency-Key` del ajuste o canje desde el panel: un reintento (timeout, red)
+  /// devuelve el asiento ya creado en vez de duplicarlo. Único por marca.
+  idempotencyKey String?
+  createdAt      DateTime           @default(now())
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  staff    StaffMember?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  reward   RewardCatalogItem? @relation(fields: [rewardId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, customerId, createdAt])
   @@map("reward_ledger_entries")
+}
+
+/// Recompensa canjeable del catálogo de la marca (TASK-023): un producto del menú o un
+/// descuento fijo, por un costo en puntos. La app la muestra; se canjea en el local (panel).
+model RewardCatalogItem {
+  id            String            @id @default(uuid())
+  tenantId      String
+  name          String
+  pointsCost    Int
+  kind          RewardCatalogKind
+  /// `item`: producto del menú que se entrega. SetNull si el producto se borra del todo.
+  menuItemId    String?
+  /// `discount`: monto fijo en centavos.
+  discountCents Int?
+  isActive      Boolean           @default(true)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  menuItem      MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  ledgerEntries RewardLedgerEntry[]
+
+  @@index([tenantId, isActive, sortOrder])
+  @@map("reward_catalog_items")
+}
+
+enum RewardCatalogKind {
+  item
+  discount
 }
 
 enum RewardLedgerReason {

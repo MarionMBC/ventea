@@ -49,6 +49,8 @@ export interface RequestOptions<T> {
   /** Schema zod de la respuesta: valida el contrato y convierte fechas. */
   schema?: ResponseSchema<T>;
   signal?: AbortSignal;
+  /** Headers extra (p. ej. `Idempotency-Key`). No pisan los del cliente (auth, tenant). */
+  headers?: Record<string, string>;
 }
 
 export interface UploadOptions<T> {
@@ -200,8 +202,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     body: unknown,
     token: string | undefined,
     signal?: AbortSignal,
+    extra: Record<string, string> = {},
   ): Promise<Response> {
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = { ...extra, Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     if (tenantSlug) headers[TENANT_HEADER] = tenantSlug;
@@ -258,17 +261,17 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   }
 
   async function request<T>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
-    const { method = 'GET', body, auth = true, schema, signal } = opts;
+    const { method = 'GET', body, auth = true, schema, signal, headers } = opts;
     const token = auth ? session.get()?.accessToken : undefined;
     if (auth && !token) throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');
 
-    let response = await send(path, method, body, token, signal);
+    let response = await send(path, method, body, token, signal, headers);
 
     if (auth && response.status === 401) {
       // Si otro request ya renovó el token mientras este viajaba, se reintenta con el
       // nuevo sin pedir otro refresh.
       if (session.get()?.accessToken === token) await refreshOnce();
-      response = await send(path, method, body, session.get()?.accessToken, signal);
+      response = await send(path, method, body, session.get()?.accessToken, signal, headers);
       if (response.status === 401) {
         session.set(null);
         throw new ApiError(401, SESSION_EXPIRED_MESSAGE, 'session');

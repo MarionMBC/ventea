@@ -24,6 +24,8 @@ import { Funnel } from '@/features/platform/Funnel';
 import { TenantApp } from '@/features/platform/TenantApp';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
+import { ReportsPage } from '@/features/reports/ReportsPage';
+import { RewardsPage } from '@/features/rewards/RewardsPage';
 import { I18nProvider } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
@@ -128,11 +130,11 @@ export function App({
                       </Route>
                       <Route path="/menu" element={<MenuPage />} />
                       <Route path="/brand" element={<BrandPage />} />
-                      {/* TODO: locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
+                      {/* TODO: locations y staff. Fuera del menú (TASK-011). */}
                       <Route path="/locations" element={<Placeholder title="nav.locations" />} />
-                      <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
+                      <Route path="/rewards" element={<RewardsPage />} />
                       <Route path="/staff" element={<Placeholder title="nav.staff" />} />
-                      <Route path="/reports" element={<Placeholder title="nav.reports" />} />
+                      <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/facturacion" element={<BillingPage />} />
                     </Route>
                   </Route>
