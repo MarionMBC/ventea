@@ -7,6 +7,8 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
+  ServiceUnavailableException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -27,6 +29,7 @@ import { PRISMA } from '@/prisma/prisma.module';
 import { detectImageFormat } from './image-signature';
 import { MediaStorage } from './media-storage';
 import { absoluteMediaUrl, mediaFileName, mediaPath, parseMediaRef } from './media-url';
+import { ProcessingGate, ProcessingGateBusyError } from './processing-gate';
 
 /** Lo que deja multer (memoryStorage) del archivo subido. */
 export interface UploadedImage {
@@ -37,10 +40,25 @@ export interface UploadedImage {
 
 const DEFAULT_QUOTA_MB = 200;
 /**
- * Píxeles máximos al decodificar: corta las "bombas" (un PNG de 2 KB que se expande a
- * 50 000 × 50 000 en memoria). 40 MP cubre cualquier foto de teléfono.
+ * Píxeles máximos al decodificar: corta las "bombas" (un PNG de 100 KB que se expande a cientos
+ * de MB en memoria). 24 MP cubre la cámara de un teléfono (4000 × 6000) y acota cada
+ * decodificación a ~100 MB.
  */
-const MAX_INPUT_PIXELS = 40_000_000;
+const MAX_INPUT_PIXELS = 24_000_000;
+/** Procesamientos sharp a la vez por proceso, espera máxima y tope de la fila (configurables). */
+const DEFAULT_CONCURRENCY = 2;
+const DEFAULT_WAIT_MS = 20_000;
+const MAX_WAITING = 20;
+
+// Sin caché de libvips (no se reprocesa la misma imagen) y un hilo por imagen: el semáforo
+// decide cuántas a la vez, sin que una sola se quede con todo el threadpool.
+sharp.cache(false);
+sharp.concurrency(1);
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 /**
  * Medios de la marca (TASK-016). La subida se valida por magic number y se RE-CODIFICA con
@@ -51,14 +69,20 @@ const MAX_INPUT_PIXELS = 40_000_000;
 @Injectable()
 export class MediaService {
   private readonly quotaBytes: number;
+  private readonly gate: ProcessingGate;
 
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
     private readonly storage: MediaStorage,
     config: ConfigService,
   ) {
-    const raw = Number.parseInt(config.get<string>('MEDIA_QUOTA_MB') ?? '', 10);
-    this.quotaBytes = (Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_QUOTA_MB) * 1024 * 1024;
+    this.quotaBytes =
+      positiveInt(config.get<string>('MEDIA_QUOTA_MB'), DEFAULT_QUOTA_MB) * 1024 * 1024;
+    this.gate = new ProcessingGate(
+      positiveInt(config.get<string>('MEDIA_PROCESSING_CONCURRENCY'), DEFAULT_CONCURRENCY),
+      positiveInt(config.get<string>('MEDIA_PROCESSING_WAIT_MS'), DEFAULT_WAIT_MS),
+      MAX_WAITING,
+    );
   }
 
   async upload(
@@ -75,7 +99,18 @@ export class MediaService {
       throw new UnsupportedMediaTypeException('El archivo no es una imagen PNG, JPEG o WebP');
     }
 
-    const { main, thumb, width, height } = await normalize(file.buffer, format);
+    let normalized: Awaited<ReturnType<typeof normalize>>;
+    try {
+      normalized = await this.gate.run(() => normalize(file.buffer, format));
+    } catch (error) {
+      if (error instanceof ProcessingGateBusyError) {
+        throw new ServiceUnavailableException(
+          'Hay muchas imágenes procesándose; intenta de nuevo en unos segundos',
+        );
+      }
+      throw error;
+    }
+    const { main, thumb, width, height } = normalized;
     const hash = createHash('sha256').update(main).digest('hex');
     const bytes = main.length + thumb.length;
 
@@ -217,9 +252,15 @@ async function normalize(
 ): Promise<{ main: Buffer; thumb: Buffer; width: number; height: number }> {
   const options = { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' as const };
   try {
-    const metadata = await sharp(input, options).metadata();
+    // `metadata()` lee solo la cabecera: el tamaño se rechaza antes de decodificar nada.
+    const metadata = await sharp(input, { failOn: 'error', limitInputPixels: false }).metadata();
     if (metadata.format !== expected) {
       throw new UnsupportedMediaTypeException('El contenido no coincide con el tipo de imagen');
+    }
+    if ((metadata.width ?? 0) * (metadata.height ?? 0) > MAX_INPUT_PIXELS) {
+      throw new PayloadTooLargeException(
+        `La imagen tiene demasiados píxeles (máximo ${MAX_INPUT_PIXELS / 1_000_000} MP)`,
+      );
     }
     const { data: main, info } = await sharp(input, options)
       .rotate()
@@ -232,7 +273,12 @@ async function normalize(
       .toBuffer();
     return { main, thumb, width: info.width, height: info.height };
   } catch (error) {
-    if (error instanceof UnsupportedMediaTypeException) throw error;
+    if (
+      error instanceof UnsupportedMediaTypeException ||
+      error instanceof PayloadTooLargeException
+    ) {
+      throw error;
+    }
     // Imagen truncada, corrupta o demasiado grande en píxeles: el detalle de libvips no sale.
     throw new UnsupportedMediaTypeException(
       'No se pudo leer la imagen (dañada o demasiado grande)',

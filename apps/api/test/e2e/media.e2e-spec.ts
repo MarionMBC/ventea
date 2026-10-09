@@ -217,6 +217,17 @@ describe('Medios: subida y servido (TASK-016)', () => {
       expect(response.status).toBe(413);
     });
 
+    it('más de 24 megapíxeles (bomba de descompresión chica en bytes) → 413', async () => {
+      const huge = await sharp({
+        create: { width: 5000, height: 5000, channels: 3, background: '#fff' },
+      })
+        .png()
+        .toBuffer();
+      expect(huge.length).toBeLessThan(1024 * 1024);
+      const response = await upload(owner, tenant.slug, huge, 'bomba.png', 'image/png').expect(413);
+      expect((response.body as { message: string }).message).toMatch(/24 MP/);
+    });
+
     it('un campo de texto extra o sin archivo → 400', async () => {
       await request(app.getHttpServer())
         .post('/api/staff/media')

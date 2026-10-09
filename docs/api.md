@@ -265,6 +265,10 @@ centavos enteros ≥ 0 (las opciones pueden ser negativas), nombres requeridos.
 height}` con URLs absolutas.
 - **Límites por marca:** cuota `MEDIA_QUOTA_MB` (200) → `403` con el motivo; 60 subidas por hora
   (`MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR`) → `429` + `Retry-After`.
+- **Límites por imagen y por servidor:** más de **24 MP** (se mira la cabecera antes de
+  decodificar) → `413`. sharp procesa como mucho 2 imágenes a la vez por proceso
+  (`MEDIA_PROCESSING_CONCURRENCY`); las demás esperan hasta 20 s (`MEDIA_PROCESSING_WAIT_MS`) y
+  después, o con más de 20 en fila, → `503`.
 - **Servido:** solo nombres con forma de hash bajo un tenantId con forma de UUID (traversal →
   `404`); `Content-Type: image/webp` fijo, `nosniff`, `Cross-Origin-Resource-Policy:
 cross-origin` (la app nativa y el panel la cargan desde otro origen) y CSP `sandbox`.

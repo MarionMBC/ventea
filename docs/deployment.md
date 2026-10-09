@@ -39,6 +39,8 @@ directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los 
 | `MEDIA_DIR`                        | `/data/media` (prod) · `./media` (dev) | raíz de los archivos                                                                |
 | `MEDIA_QUOTA_MB`                   | `200`                                  | cuota por marca (imagen + miniatura)                                                |
 | `MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR` | `60`                                   | subidas por marca y hora (en memoria, por proceso)                                  |
+| `MEDIA_PROCESSING_CONCURRENCY`     | `2`                                    | imágenes que sharp procesa a la vez por proceso; el resto espera                    |
+| `MEDIA_PROCESSING_WAIT_MS`         | `20000`                                | espera máxima por un lugar (después, `503`; más de 20 en fila, `503` en el acto)    |
 | `MEDIA_PUBLIC_BASE_URL`            | host del request                       | base fija de las URLs absolutas (CDN o dominio canónico)                            |
 | `PUSH_CREDENTIALS_KEY`             | vacía = push apagado                   | 32 bytes (`openssl rand -base64 32`) para cifrar las credenciales FCM de cada marca |
 
@@ -48,6 +50,9 @@ directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los 
 - **`PUSH_CREDENTIALS_KEY`** va al gestor de secretos, fuera de la VPS. Perderla deja ilegibles
   las credenciales FCM guardadas (se vuelven a cargar marca por marca); mal formada, la API no
   arranca. Rotarla exige volver a cargar las credenciales de todas las marcas.
+- **Memoria:** el servicio `api` corre con `mem_limit: 768m` en los dos compose. sharp decodifica
+  fuera del heap de Node (hasta 24 MP por imagen, ~100 MB); con el semáforo de 2 y el tope, un
+  abuso reinicia la API en vez de dejar sin memoria a la VPS.
 - **Proxy:** la subida es `multipart` hasta 5 MB y va directo a la API (Traefik / Caddy no limitan
   el cuerpo por defecto). Si se pone un proxy con límite (nginx: `client_max_body_size`), dejar
   al menos 6 MB en `/api/staff/media`.
