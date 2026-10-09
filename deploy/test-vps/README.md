@@ -23,8 +23,8 @@ API responde `402` al resto):
 | `<slug>.ventea.tech`          | el resto         | `web` (`ventea-test-web-1:80`, priority 10) |
 | `app.ventea.tech`             | `/api`, `/api/*` | `api` (priority 100)                        |
 | `app.ventea.tech`             | el resto         | `web` (priority 50): landing y registro     |
-| `ventea.tech` (apex)          | todo             | `web` (priority 50): nginx `301` a `app.`   |
-| `www.ventea.tech`             | todo             | `web` (priority 50): nginx `301` a `app.`   |
+| `ventea.tech` (apex)          | todo             | `web` (priority 50): sitio corporativo      |
+| `www.ventea.tech`             | todo             | `web` (priority 50): nginx `301` al apex    |
 
 En `web` (nginx, `deploy/Dockerfile.web`) el panel de staff vive en `/admin` y llama a `/api`
 del mismo origen, así que no hay CORS de por medio. En `/` queda el build web de `apps/mobile`.
@@ -34,9 +34,13 @@ En `app.ventea.tech` (TASK-007; antes en el apex), el mismo nginx (otro `server`
 ver `deploy/nginx.conf`) sirve la landing (`apps/landing`) en `/`, `/registro`, `/terminos` y
 `/privacidad` (cada una con su `index.html` del build), y el panel en `/admin/` — el de
 plataforma en `https://app.ventea.tech/admin/plataforma` (`/plataforma` redirige). La landing y
-el panel llaman a `app.ventea.tech/api` (mismo origen). El apex y `www` responden `301` a
-`https://app.ventea.tech` conservando ruta y query (`ventea.tech/registro?plan=pro` →
-`app.ventea.tech/registro?plan=pro`). Las rutas de `app.`, del apex y de `www` son fijas: las
+el panel llaman a `app.ventea.tech/api` (mismo origen).
+
+En el apex `ventea.tech` (TASK-008) el mismo nginx sirve el **sitio corporativo** (`apps/site`,
+en inglés, estático, sin `/api`): `/`, `/privacy` y un `404` propio. `www` responde `301` al apex
+conservando ruta y query. Las rutas del SaaS que vivieron en el apex (`/registro`, `/terminos`,
+`/privacidad`, `/precios`, `/admin*`, `/plataforma`) responden `301` a `app.` con la misma ruta y
+query (`ventea.tech/registro?plan=pro` → `app.ventea.tech/registro?plan=pro`). Las rutas de `app.`, del apex y de `www` son fijas: las
 publica `sync-routes.sh` en cada corrida, cada una con su certificado. Priority explícita 50
 (no 10) en sus routers web: sin ella Traefik usa el largo de la regla, y cualquier otro router
 del Traefik compartido que declare `Host(ventea.tech)` ganaría en silencio. Antes del primer
@@ -148,8 +152,10 @@ curl -I https://carolina-hot-chicken.ventea.tech/admin/   # 200, el panel
 curl -I https://app.ventea.tech/                  # 200, la landing
 curl -I https://app.ventea.tech/terminos         # 200 (su index.html, con su <title>)
 curl -s https://app.ventea.tech/api/platform/plans | head -c 200   # precios por app.
+curl -I https://ventea.tech/                     # 200, sitio corporativo
+curl -I https://ventea.tech/privacy              # 200 (su index.html); /no-existe → 404 propio
 curl -I https://ventea.tech/registro?plan=pro    # 301 → https://app.ventea.tech/registro?plan=pro
-curl -I https://www.ventea.tech/                 # 301 → https://app.ventea.tech/
+curl -I https://www.ventea.tech/x?a=1            # 301 → https://ventea.tech/x?a=1
 curl -I https://app.ventea.tech/admin/plataforma # 200, panel de plataforma
 curl -I https://carolina-hot-chicken.ventea.tech/admin/plataforma   # 301 → app.
 ```
