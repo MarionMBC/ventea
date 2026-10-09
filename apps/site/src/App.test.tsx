@@ -49,7 +49,10 @@ describe.each([
     ).toHaveProperty('href', `${config.marketingUrl}/`);
     expect(
       within(products).getByRole('link', { name: new RegExp(t.products.restaurants.cta) }),
-    ).toHaveProperty('href', `${config.restaurantsUrl}/`);
+    ).toHaveProperty(
+      'href',
+      t.locale === 'es' ? 'https://app.ventea.tech/es/' : 'https://app.ventea.tech/',
+    );
     // Capturas reales con alt y tamaño fijo (sin CLS).
     const images = within(products).getAllByRole('img');
     expect(images).toHaveLength(3);
@@ -86,6 +89,10 @@ describe.each([
       t.locale === 'es' ? '/es/politica-de-privacidad' : '/privacy',
     );
     expect(within(footer).getByRole('link', { name: t.products.marketing.name })).toBeTruthy();
+    // Ventea para restaurantes: la landing en el idioma de la página (ES en /es/).
+    expect(
+      within(footer).getByRole('link', { name: t.products.restaurants.name }).getAttribute('href'),
+    ).toBe(config.restaurantsUrl[t.locale]);
     for (const service of t.services.items) {
       expect(within(footer).getByRole('link', { name: service.title })).toBeTruthy();
     }
@@ -135,6 +142,16 @@ describe('otras rutas', () => {
   it('404 en el idioma de la ruta', () => {
     render(<App path="/nope" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'app.ventea.tech' }).getAttribute('href')).toBe(
+      'https://app.ventea.tech/',
+    );
+  });
+
+  it('404 en español enlaza la landing en español', () => {
+    render(<App path="/es/nada" />);
+    expect(screen.getByRole('link', { name: 'app.ventea.tech/es' }).getAttribute('href')).toBe(
+      'https://app.ventea.tech/es/',
+    );
   });
 
   it('prerender: el HTML del servidor trae el contenido (sin JS) y el hero', () => {
