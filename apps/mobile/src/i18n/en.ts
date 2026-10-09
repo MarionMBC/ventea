@@ -223,6 +223,7 @@ export const en = {
   'points.reason.signup': 'Welcome bonus',
   'points.reason.reward': 'Reward: {name}',
   'points.earnRate': 'You earn {points} points per {amount} spent.',
+  'points.earnRateLow': 'You earn 1 point for every {amount} spent.',
   'rewards.title': 'Rewards',
   'rewards.howTo': 'Redeem them at the counter: show your account to the team.',
   'rewards.item': 'Free product',

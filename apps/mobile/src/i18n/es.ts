@@ -210,6 +210,7 @@ export const es: Record<MessageKey, string> = {
   'points.reason.expiration': 'Vencidos',
   'points.reason.reward': 'Recompensa: {name}',
   'points.earnRate': 'Ganas {points} puntos por cada {amount}.',
+  'points.earnRateLow': 'Ganas 1 punto por cada {amount}.',
   'rewards.title': 'Recompensas',
   'rewards.howTo': 'Canjéalas en el local: muestra tu cuenta al equipo.',
   'rewards.item': 'Producto gratis',

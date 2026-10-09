@@ -7,7 +7,7 @@ import { BrandLogo } from '../../components/ui/BrandLogo';
 import { formatPrice } from '../../components/ui/formatPrice';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { BackHeader } from '../../components/navigation/AppHeader';
-import { formatDate, t } from '../../i18n';
+import { formatDate, intlLocale, t } from '../../i18n';
 import type { MessageKey } from '../../i18n';
 import { useAuth } from '../auth/authContext';
 import { fromCents } from '../menu/pricing';
@@ -49,6 +49,18 @@ const rewardDetail = (reward: RewardCatalogEntry, balance: number | null): strin
   if (balance === null) return what;
   const missing = reward.pointsCost - balance;
   return `${what} · ${missing <= 0 ? t('rewards.ready') : t('rewards.toGo', { points: missing })}`;
+};
+
+/**
+ * Tasa de puntos en palabras: «2.5 puntos por cada $1» o, por debajo de 1, «1 punto cada $2»
+ * (nada de «0.5 puntos por cada $1»). Hasta 2 decimales, con el formato del idioma.
+ */
+export const earnRateText = (rate: number): string => {
+  if (rate >= 1) {
+    const points = new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 2 }).format(rate);
+    return t('points.earnRate', { points, amount: formatPrice(1) });
+  }
+  return t('points.earnRateLow', { amount: formatPrice(1 / rate) });
 };
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
@@ -161,11 +173,7 @@ export const ProfileScreen = ({
         {pointsEnabled && (
           <section className="vt-section">
             <h2 className="vt-h3">{t('points.activity')}</h2>
-            {rate > 0 && (
-              <span className="vt-caption">
-                {t('points.earnRate', { points: rate, amount: formatPrice(1) })}
-              </span>
-            )}
+            {rate > 0 && <span className="vt-caption">{earnRateText(rate)}</span>}
             {ledger.error && !ledger.data ? (
               <RetryState
                 title={t('points.loadError')}

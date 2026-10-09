@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { sessionStore } from '../../api/session';
 import { AuthProvider } from '../auth/AuthProvider';
-import { ProfileScreen } from './ProfileScreen';
+import { earnRateText, ProfileScreen } from './ProfileScreen';
 
 /*
  * The profile reflects the brand's points setup from `/api/tenant` (TASK-023): the earn rate,
@@ -112,6 +112,12 @@ describe('profile points (TASK-023)', () => {
     expect(screen.getByText(/off · 380 points to go/)).toBeInTheDocument();
     expect(screen.getByText('500 pts')).toBeInTheDocument();
     expect(await screen.findByText('Reward: Free fries')).toBeInTheDocument();
+  });
+
+  test('earn rate reads naturally below 1 and without long decimals (review)', () => {
+    expect(earnRateText(0.5)).toMatch(/^You earn 1 point for every \D*2(\.00)? spent\.$/);
+    expect(earnRateText(2.5)).toMatch(/^You earn 2\.5 points per /);
+    expect(earnRateText(1.234)).toMatch(/^You earn 1\.23 points per /);
   });
 
   test('an API without rewards still renders the points', async () => {
