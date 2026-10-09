@@ -1,37 +1,87 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 
 import { config } from '@/config';
-import { PROJECT_TYPES } from '@/content';
+import { format, type Dict } from '@/i18n';
+import type { ProjectTypeId } from '@/i18n/types';
+import { PROJECT_TYPE_EVENT } from '@/home/projectTypeEvent';
 
 import {
   buildMailto,
+  buildMessage,
   EMPTY_CONTACT,
+  FIELD_ORDER,
+  isSpam,
   LIMITS,
+  plainText,
   validateContact,
   type ContactErrors,
   type ContactFields,
 } from './mailto';
 
+type Status = 'idle' | 'opening' | 'opened';
+type CopyState = 'idle' | 'copied' | 'failed';
+
 interface Props {
+  t: Dict;
   to?: string;
   /** Abre el `mailto:`. Inyectable para los tests (jsdom no navega). */
   openUrl?: (url: string) => void;
+  /** Copia al portapapeles. Inyectable para los tests. */
+  copyText?: (text: string) => Promise<void>;
 }
 
-const ORDER: (keyof ContactFields)[] = ['name', 'company', 'email', 'projectType', 'message'];
+/** Tiempo del estado «Abrimos su aplicación de correo…» antes de mostrar las alternativas. */
+const OPENING_MS = 900;
+
+const PROJECT_TYPE_IDS: readonly ProjectTypeId[] = [
+  'software',
+  'apps',
+  'ai',
+  'architecture',
+  'saas',
+  'other',
+];
+
+function defaultCopy(text: string): Promise<void> {
+  if (!navigator.clipboard?.writeText) return Promise.reject(new Error('sin portapapeles'));
+  return navigator.clipboard.writeText(text);
+}
 
 /**
- * Formulario de contacto: valida en el cliente y abre el programa de correo del visitante con el
- * mensaje armado. No hay backend: nada se envía ni se guarda desde el sitio.
+ * Formulario de contacto: valida en el cliente (errores accesibles, foco al primer campo con
+ * error), descarta envíos con el honeypot lleno y abre la aplicación de correo con el mensaje
+ * armado. No hay backend: nada se envía ni se guarda desde el sitio, y nunca se muestra
+ * «enviado». Si la aplicación no se abre, ofrece copiar el texto o escribir directo.
  */
 export function ContactForm({
+  t,
   to = config.contactEmail,
   openUrl = (url) => window.location.assign(url),
+  copyText = defaultCopy,
 }: Props) {
+  const c = t.contact;
   const [fields, setFields] = useState<ContactFields>(EMPTY_CONTACT);
+  const [honeypot, setHoneypot] = useState('');
   const [errors, setErrors] = useState<ContactErrors>({});
-  const [opened, setOpened] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
+  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const [preview, setPreview] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // CTA de un servicio → tipo de proyecto preseleccionado (si la persona no eligió otro).
+  useEffect(() => {
+    const onSelect = (event: Event) => {
+      const id = (event as CustomEvent<ProjectTypeId>).detail;
+      if (!PROJECT_TYPE_IDS.includes(id)) return;
+      setFields((prev) => (prev.projectType ? prev : { ...prev, projectType: id }));
+    };
+    document.addEventListener(PROJECT_TYPE_EVENT, onSelect);
+    return () => document.removeEventListener(PROJECT_TYPE_EVENT, onSelect);
+  }, []);
 
   const update =
     (key: keyof ContactFields) =>
@@ -39,37 +89,60 @@ export function ContactForm({
       const value = event.target.value;
       setFields((prev) => ({ ...prev, [key]: value }));
       if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
+      if (status !== 'idle') setStatus('idle');
     };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSpam(honeypot)) return;
     const found = validateContact(fields);
     setErrors(found);
-    const first = ORDER.find((key) => found[key]);
+    setSubmitted(true);
+    const first = FIELD_ORDER.find((key) => found[key]);
     if (first) {
-      setOpened(false);
+      setStatus('idle');
       formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
       return;
     }
-    openUrl(buildMailto(to, fields));
-    setOpened(true);
+    const mail = buildMessage(fields, c);
+    setPreview(plainText(to, mail, c));
+    setCopyState('idle');
+    setStatus('opening');
+    openUrl(buildMailto(to, mail));
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus('opened'), OPENING_MS);
   };
 
-  const describedBy = (key: keyof ContactFields, hint?: string) =>
-    [hint, errors[key] ? `contact-${key}-error` : undefined].filter(Boolean).join(' ') || undefined;
+  const onCopy = () => {
+    copyText(preview).then(
+      () => setCopyState('copied'),
+      () => setCopyState('failed'),
+    );
+  };
 
-  const error = (key: keyof ContactFields) =>
-    errors[key] ? (
+  const hasErrors = Object.values(errors).some(Boolean);
+
+  const describedBy = (key: keyof ContactFields, ...extra: string[]) =>
+    [...extra, errors[key] ? `contact-${key}-error` : undefined].filter(Boolean).join(' ') ||
+    undefined;
+
+  const error = (key: keyof ContactFields) => {
+    const code = errors[key];
+    return code ? (
       <p className="field__error" id={`contact-${key}-error`}>
-        {errors[key]}
+        {c.errors[code]}
       </p>
     ) : null;
+  };
 
   return (
     <form ref={formRef} className="contact-form" noValidate onSubmit={onSubmit}>
+      <p className="contact-form__summary" role="alert">
+        {submitted && hasErrors ? c.form.errorsSummary : ''}
+      </p>
       <div className="contact-form__row">
         <div className="field">
-          <label htmlFor="contact-name">Name</label>
+          <label htmlFor="contact-name">{c.form.name}</label>
           <input
             id="contact-name"
             name="name"
@@ -84,8 +157,28 @@ export function ContactForm({
           {error('name')}
         </div>
         <div className="field">
+          <label htmlFor="contact-email">{c.form.email}</label>
+          <input
+            id="contact-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            spellCheck={false}
+            required
+            maxLength={LIMITS.email}
+            value={fields.email}
+            onChange={update('email')}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={describedBy('email')}
+          />
+          {error('email')}
+        </div>
+      </div>
+      <div className="contact-form__row">
+        <div className="field">
           <label htmlFor="contact-company">
-            Company <span className="field__optional">(optional)</span>
+            {c.form.company} <span className="field__optional">{c.form.optional}</span>
           </label>
           <input
             id="contact-company"
@@ -96,27 +189,8 @@ export function ContactForm({
             onChange={update('company')}
           />
         </div>
-      </div>
-      <div className="contact-form__row">
         <div className="field">
-          <label htmlFor="contact-email">Work email</label>
-          <input
-            id="contact-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            required
-            maxLength={LIMITS.email}
-            value={fields.email}
-            onChange={update('email')}
-            aria-invalid={errors.email ? true : undefined}
-            aria-describedby={describedBy('email')}
-          />
-          {error('email')}
-        </div>
-        <div className="field">
-          <label htmlFor="contact-type">Project type</label>
+          <label htmlFor="contact-type">{c.form.projectType}</label>
           <select
             id="contact-type"
             name="projectType"
@@ -126,10 +200,10 @@ export function ContactForm({
             aria-invalid={errors.projectType ? true : undefined}
             aria-describedby={describedBy('projectType')}
           >
-            <option value="">Choose one…</option>
-            {PROJECT_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
+            <option value="">{c.form.choose}</option>
+            {PROJECT_TYPE_IDS.map((id) => (
+              <option key={id} value={id}>
+                {c.projectTypes[id]}
               </option>
             ))}
           </select>
@@ -137,7 +211,7 @@ export function ContactForm({
         </div>
       </div>
       <div className="field">
-        <label htmlFor="contact-message">What do you need?</label>
+        <label htmlFor="contact-message">{c.form.message}</label>
         <textarea
           id="contact-message"
           name="message"
@@ -150,25 +224,69 @@ export function ContactForm({
           aria-describedby={describedBy('message', 'contact-message-hint')}
         />
         <p className="field__hint" id="contact-message-hint">
-          The problem you want to solve, the systems involved and any deadline. Up to{' '}
-          {LIMITS.message} characters ({fields.message.length}/{LIMITS.message}).
+          {c.form.messageHint}{' '}
+          {format(c.form.counter, { max: LIMITS.message, count: fields.message.length })}
         </p>
         {error('message')}
       </div>
-      <div className="contact-form__actions">
-        <button type="submit" className="btn btn--primary">
-          Open email with my message
-        </button>
-        <p className="contact-form__note">
-          Opens your email app with the message ready to send to <a href={`mailto:${to}`}>{to}</a>.
-          Nothing is stored on this site.
-        </p>
+      {/* Honeypot: invisible para personas y lectores de pantalla; los bots lo completan. */}
+      <div className="hp" aria-hidden="true">
+        <label htmlFor="contact-website">{c.form.honeypot}</label>
+        <input
+          id="contact-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
       </div>
-      <p className="contact-form__status" role="status">
-        {opened
-          ? `Your email app should open with the message ready. If it did not, write to ${to}.`
-          : ''}
-      </p>
+      <div className="contact-form__actions">
+        <button type="submit" className="btn btn--primary btn--lg" aria-busy={status === 'opening'}>
+          {c.form.submit}
+          <span aria-hidden="true">→</span>
+        </button>
+        <p className="contact-form__note">{c.form.note}</p>
+      </div>
+      <div className="contact-form__status" role="status" aria-live="polite">
+        {status === 'opening' ? <p className="status status--opening">{c.status.opening}</p> : null}
+        {status === 'opened' ? (
+          <div className="status status--opened">
+            <p className="status__title">{c.status.openedTitle}</p>
+            <p>{c.status.openedText}</p>
+          </div>
+        ) : null}
+      </div>
+      {status === 'opened' ? (
+        <div className="contact-form__fallback">
+          <div className="contact-form__fallback-actions">
+            <button type="button" className="btn btn--outline" onClick={onCopy}>
+              {c.status.copy}
+            </button>
+            <a className="link-arrow" href={`mailto:${to}`}>
+              {c.status.writeDirect}
+            </a>
+          </div>
+          <p className="contact-form__copy-state" aria-live="polite">
+            {copyState === 'copied'
+              ? c.status.copied
+              : copyState === 'failed'
+                ? c.status.copyFailed
+                : ''}
+          </p>
+          <label className="contact-form__preview-label" htmlFor="contact-preview">
+            {c.status.previewLabel}
+          </label>
+          <textarea
+            id="contact-preview"
+            className="contact-form__preview"
+            readOnly
+            rows={7}
+            value={preview}
+          />
+        </div>
+      ) : null}
     </form>
   );
 }

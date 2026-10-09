@@ -1,88 +1,114 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMailto, EMPTY_CONTACT, validateContact, whatsappUrl } from './mailto';
+import { en } from '@/i18n/en';
+import { es } from '@/i18n/es';
 
-const FILLED = {
+import {
+  buildMailto,
+  buildMessage,
+  EMPTY_CONTACT,
+  isSpam,
+  plainText,
+  validateContact,
+  type ContactFields,
+} from './mailto';
+
+const FILLED: ContactFields = {
   name: '  Ana López ',
   company: 'Acme & Co',
   email: 'ana@acme.com',
-  projectType: 'SaaS platform',
-  message: 'We need a multi-tenant billing module.\nDeadline: Q1.',
+  projectType: 'saas',
+  message: 'Necesitamos un módulo de cobro multiempresa.\nFecha: Q1.',
 };
 
 function query(url: string) {
   return new URLSearchParams(url.slice(url.indexOf('?') + 1));
 }
 
-describe('buildMailto', () => {
-  it('addresses the configured email with an encoded subject and body', () => {
-    const url = buildMailto('hola@ventea.tech', FILLED);
+describe('buildMessage + buildMailto', () => {
+  it('arma asunto y cuerpo en español con la etiqueta del tipo de proyecto', () => {
+    const url = buildMailto('hola@ventea.tech', buildMessage(FILLED, es.contact));
     expect(url.startsWith('mailto:hola@ventea.tech?subject=')).toBe(true);
-    expect(query(url).get('subject')).toBe('SaaS platform project — Ana López, Acme & Co');
+    expect(query(url).get('subject')).toBe(
+      'Proyecto de Producto o plataforma SaaS — Ana López, Acme & Co',
+    );
     expect(query(url).get('body')).toBe(
       [
-        'Name: Ana López',
-        'Company: Acme & Co',
-        'Email: ana@acme.com',
-        'Project type: SaaS platform',
+        'Nombre: Ana López',
+        'Empresa: Acme & Co',
+        'Correo: ana@acme.com',
+        'Tipo de proyecto: Producto o plataforma SaaS',
         '',
-        'We need a multi-tenant billing module.\nDeadline: Q1.',
+        'Necesitamos un módulo de cobro multiempresa.',
+        'Fecha: Q1.',
       ].join('\r\n'),
     );
   });
 
-  it('encodes spaces as %20 (not +) and escapes & so the body is not cut', () => {
-    const url = buildMailto('hola@ventea.tech', FILLED);
+  it('en inglés usa las etiquetas en inglés', () => {
+    const mail = buildMessage(FILLED, en.contact);
+    expect(mail.subject).toBe('SaaS product or platform project — Ana López, Acme & Co');
+    expect(mail.body).toContain('Project type: SaaS product or platform');
+  });
+
+  it('codifica espacios como %20 (no +) y escapa & para no cortar el cuerpo', () => {
+    const url = buildMailto('hola@ventea.tech', buildMessage(FILLED, es.contact));
     expect(url).not.toContain('+');
     expect(url).toContain('Acme%20%26%20Co');
     expect(url.match(/&/g)).toHaveLength(1);
+    expect(url).not.toMatch(/[\r\n]/);
   });
 
-  it('keeps the subject on one line even if a field carries CR/LF', () => {
-    const url = buildMailto('hola@ventea.tech', {
-      ...FILLED,
-      name: 'Ana\r\nBcc: x@evil.test',
-      company: 'Acme\nCo',
-    });
-    const subject = query(url).get('subject') ?? '';
-    expect(subject).toBe('SaaS platform project — Ana Bcc: x@evil.test, Acme Co');
-    expect(subject).not.toMatch(/[\r\n]/);
+  it('el asunto queda en una sola línea aunque un campo traiga CR/LF (sin inyectar cabeceras)', () => {
+    const mail = buildMessage(
+      { ...FILLED, name: 'Ana\r\nBcc: x@evil.test', company: 'Acme\nCo', email: 'a@b.co\r\nCc: y' },
+      es.contact,
+    );
+    expect(mail.subject).toBe(
+      'Proyecto de Producto o plataforma SaaS — Ana Bcc: x@evil.test, Acme Co',
+    );
+    expect(mail.subject).not.toMatch(/[\r\n]/);
+    const url = buildMailto('hola@ventea.tech', mail);
     expect(url.split('&body=')[0]).not.toMatch(/%0D|%0A/i);
+    // En el cuerpo, las líneas de cabecera tampoco se parten.
+    expect(mail.body.split('\r\n')[0]).toBe('Nombre: Ana Bcc: x@evil.test');
+    expect(mail.body.split('\r\n')[2]).toBe('Correo: a@b.co Cc: y');
   });
 
-  it('omits the company from the subject when it is empty', () => {
-    const url = buildMailto('hola@ventea.tech', { ...FILLED, company: '' });
-    expect(query(url).get('subject')).toBe('SaaS platform project — Ana López');
-    expect(query(url).get('body')).toContain('Company: —');
+  it('sin empresa: no va en el asunto y el cuerpo lleva «—»', () => {
+    const mail = buildMessage({ ...FILLED, company: '' }, es.contact);
+    expect(mail.subject).toBe('Proyecto de Producto o plataforma SaaS — Ana López');
+    expect(mail.body).toContain('Empresa: —');
+  });
+
+  it('texto para copiar con destinatario y asunto', () => {
+    const text = plainText('hola@ventea.tech', buildMessage(FILLED, es.contact), es.contact);
+    expect(text.startsWith('Para: hola@ventea.tech\nAsunto: Proyecto de')).toBe(true);
+    expect(text).not.toContain('\r');
   });
 });
 
 describe('validateContact', () => {
-  it('requires name, a valid email, project type and a short message', () => {
-    expect(Object.keys(validateContact(EMPTY_CONTACT)).sort()).toEqual([
-      'email',
-      'message',
-      'name',
-      'projectType',
-    ]);
-    expect(validateContact({ ...FILLED, email: 'ana@acme' }).email).toMatch(/valid email/);
-    expect(validateContact({ ...FILLED, message: 'hi' }).message).toBeDefined();
+  it('pide nombre, correo válido, tipo de proyecto y un mensaje mínimo', () => {
+    expect(validateContact(EMPTY_CONTACT)).toEqual({
+      name: 'name',
+      email: 'email',
+      projectType: 'projectType',
+      message: 'message',
+    });
+    expect(validateContact({ ...FILLED, email: 'ana@acme' }).email).toBe('emailInvalid');
+    expect(validateContact({ ...FILLED, message: '  hola   ' }).message).toBe('message');
   });
 
-  it('accepts a complete form; company is optional', () => {
+  it('acepta un formulario completo; la empresa es opcional', () => {
     expect(validateContact({ ...FILLED, company: '' })).toEqual({});
   });
 });
 
-describe('whatsappUrl', () => {
-  it('returns null without a number', () => {
-    expect(whatsappUrl('', 'hi')).toBeNull();
-    expect(whatsappUrl(' + ', 'hi')).toBeNull();
-  });
-
-  it('keeps only digits and encodes the text', () => {
-    expect(whatsappUrl('+504 9999-8888', 'Hi there')).toBe(
-      'https://wa.me/50499998888?text=Hi%20there',
-    );
+describe('honeypot', () => {
+  it('cualquier contenido es spam; vacío o espacios no', () => {
+    expect(isSpam('')).toBe(false);
+    expect(isSpam('   ')).toBe(false);
+    expect(isSpam('http://spam.test')).toBe(true);
   });
 });
