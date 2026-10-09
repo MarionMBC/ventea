@@ -12,7 +12,11 @@ FunnelDailyCount                     (global: embudo de la landing, día × even
 
 Tenant ──┬── Subscription ── Plan    1:1  plan, intervalo, estado, período, prueba
          ├── BillingEvent[]               auditoría append-only de la suscripción
-         ├── TenantBranding          1:1  colores, logo, nombre visible
+         ├── TenantBranding          1:1  colores, logo, ícono, nombre visible, datos de tienda, idioma
+         ├── AppConfig               1:1  app nativa: bundleId, quién publica, estado, push cifrado
+         ├── AppConfigEvent[]             historial de la app (solicitud, cambios, credenciales)
+         ├── MediaAsset[]                 imágenes subidas (archivo en el volumen `media`)
+         ├── MenuChange[]                 auditoría del menú (quién, qué, cuándo)
          ├── RewardProgram           1:1  reglas de puntos de la marca
          ├── Location[]                   sucursales
          ├── MenuCategory[] ── MenuItem[] ── MenuItemModifierGroup ── ModifierGroup ── ModifierOption[]
@@ -98,11 +102,36 @@ de todos los clientes futuros.
 reutiliza en varios productos. Duplicarlo por producto obligaría a editar el mismo grupo
 en veinte lugares cada vez que cambia un precio.
 
+### Los medios: ruta en la base, archivo en el volumen (TASK-016)
+
+`MediaAsset` registra cada imagen subida (hash sha256 del WebP normalizado, bytes, tamaño) y
+sirve para la cuota y para verificar que un ítem o la marca solo usen imágenes propias. El
+archivo vive en `MEDIA_DIR/<tenantId>/<hash>.webp`. `MenuItem.imageUrl`, `logoUrl` e `iconUrl`
+guardan la **ruta** `/api/media/…`, nunca el host: el mismo archivo se sirve desde cualquier
+dominio de la plataforma y las respuestas la vuelven absoluta.
+
+### Borrado del menú: `deletedAt` solo cuando hay historia (TASK-016)
+
+Un ítem con pedidos no se borra: se marca `deletedAt` y sale del menú, del panel y del alta de
+pedidos. Los pedidos no lo necesitan (guardan snapshot), pero así el ítem sigue enlazado a su
+historia para reportes. Sin pedidos se borra de verdad. La categoría hereda la regla por la FK
+`Restrict` del ítem: si solo le quedan ítems borrados, también se marca.
+
+### `AppConfig.bundleId` es único global (TASK-016)
+
+Es la única excepción a «todo unique incluye `tenantId`»: el bundle id es un espacio de nombres
+de Apple y Google, no un dato de la marca, y dos marcas con el mismo romperían la publicación.
+Solo lo edita la plataforma. Las credenciales FCM se guardan cifradas (AES-256-GCM, el
+`tenantId` como dato asociado): copiadas a otra marca no descifran.
+
 ### `Device` guarda `biometricKeyId`, no la huella
 
 El secreto biométrico nunca sale del dispositivo ni llega al servidor. Lo que se guarda
 es el identificador de la credencial; la huella o el rostro desbloquean el refresh token
 almacenado en Keychain/Keystore. El backend solo ve el token que el dispositivo liberó.
+
+El `pushToken` (TASK-016) es único por marca en la práctica (upsert por `tenantId + pushToken`
+con lock): si otra cuenta inicia sesión en el mismo teléfono, el dispositivo pasa a ella.
 
 ### `Location` guarda coordenadas, no hay tracking
 

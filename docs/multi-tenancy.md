@@ -34,6 +34,12 @@ El slug **nunca** sale del body ni de un query param. Son campos que el cliente 
 en cada request: aceptarlos ahí es dejar que cualquiera pida los datos de otra marca
 cambiando un parámetro.
 
+Rutas fuera del middleware: `health`, `platform/*` (cruzan marcas por definición) y
+`GET media/*` (TASK-016): los archivos de imágenes son públicos y la marca va en la ruta
+(`/api/media/<tenantId>/<hash>.webp`), porque un `<img>` de la app nativa no puede mandar
+`X-Tenant-Slug`. El aislamiento de medios está en la escritura: un ítem o la marca solo pueden
+referenciar medios que esa marca subió (`MediaService.resolveOwnedRef`).
+
 Un tenant inexistente y uno desactivado (`isActive=false`) devuelven el mismo 404.
 Distinguirlos permitiría enumerar qué marcas usan la plataforma.
 
@@ -90,6 +96,11 @@ Todo unique de negocio incluye `tenantId`:
 @@unique([tenantId, email])   // Customer, StaffMember
 @@unique([tenantId, code])    // Order
 ```
+
+Única excepción: `AppConfig.bundleId` (TASK-016) es único global, porque el bundle id es un
+espacio de nombres de las tiendas, no un dato de la marca (ver
+[data-model.md](data-model.md)). Se lee siempre con `tenantId` (`findFirst({ where: { tenantId:
+{ not: id }, bundleId } })` para chequear colisiones).
 
 Un `email @unique` global rompería dos cosas a la vez: la misma persona no podría tener
 cuenta en dos marcas, y un `findUnique({ where: { email } })` cruzaría tenants sin que
