@@ -31,8 +31,9 @@ Object.assign(process.env, {
   MEDIA_QUOTA_MB: '',
   MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: '',
   MEDIA_PUBLIC_BASE_URL: '',
-  // Push (TASK-016): clave de prueba de 32 bytes (hex). El transporte es FakePushTransport.
-  PUSH_CREDENTIALS_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
+  // Push (TASK-016): clave aleatoria de 32 bytes por corrida (nada literal que parezca un
+  // secreto). Cifra y descifra en el mismo proceso; el transporte es FakePushTransport.
+  PUSH_CREDENTIALS_KEY: require('node:crypto').randomBytes(32).toString('hex'),
 });
 
 module.exports = { E2E_DATABASE_URL };
