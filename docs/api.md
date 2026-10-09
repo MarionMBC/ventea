@@ -345,11 +345,17 @@ Públicos (quien recibe el enlace), token SIEMPRE en el cuerpo, rate limit por I
   anterior (mismo email / mismo miembro). Inválido, vencido, usado, revocado o de otra marca → el
   mismo `404`. El panel arma el enlace con el token en el fragmento (`/admin/join#…`,
   `/admin/reset-password#…`). Además se envía por correo (`staff_invite` /
-  `staff_password_reset`, outbox de TASK-021, idioma de la marca) con el link
-  `https://<slug>.<TENANT_BASE_DOMAIN>/admin/…#token` (solo ese dominio, `isSafeLink`) y los
-  nombres neutralizados. Sin SMTP el correo queda `skipped` y el dueño copia el link del panel.
-  Enviado u omitido, el link se borra del `payload` de la outbox (`[redacted]`); un `failed` lo
-  conserva para reenviarlo.
+  `staff_password_reset`, outbox de TASK-021, idioma de la marca, asunto de invitación sin el nombre
+  de la marca) con el link `https://<slug>.<TENANT_BASE_DOMAIN>/admin/…#token` (en
+  `TENANT_MODE=single`, `PUBLIC_ORIGIN`; sin él no se manda) validado por `isSafeLink`, y los
+  nombres neutralizados. La respuesta trae `mail`: `queued` · `not_configured` (sin SMTP, queda
+  `skipped`) · `trial` (marca en prueba sin pago: solo link copiable) · `daily_limit` (tope de
+  `TEAM_MAIL_DAILY_LIMIT`, 20 correos del equipo por marca en 24 h; reinvitar o revocar no lo
+  devuelve) · `unavailable` (sin clave o sin link posible). El link se guarda en la outbox
+  **cifrado** (AES-256-GCM, clave HKDF de `PUSH_CREDENTIALS_KEY`, AAD = `dedupeKey`) y al quedar
+  `sent`, `skipped` o `failed` se reemplaza por `[redacted]`; por eso
+  `POST /api/platform/emails/:id/resend` responde `409` para estos tipos (el dueño regenera el
+  enlace desde Equipo).
 - **Dueños y auditoría:** el listado trae `invitedByName` en cada invitación; desactivar o quitar el
   rol a un dueño revoca sus invitaciones y enlaces de contraseña pendientes. Cada invitación, revocación, cambio de miembro y
   enlace de contraseña (creado, aceptado/confirmado) deja una línea `TeamAudit` en el log (ids, nunca emails ni tokens).
