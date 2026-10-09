@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 
@@ -91,7 +90,6 @@ function initials(name: string): string {
 export function AppShell() {
   const { session } = useServices();
   const current = useSession();
-  const queryClient = useQueryClient();
   const { t } = useI18n();
   const { data: tenant } = useTenant();
   // Pago pendiente (TASK-007): el dueño lo ve en todo el panel, no solo en Facturación (que
@@ -137,9 +135,9 @@ export function AppShell() {
   };
 
   const logout = () => {
-    // No hay revocación en el servidor: cerrar sesión es descartar los tokens.
+    // No hay revocación en el servidor: cerrar sesión es descartar los tokens. La caché
+    // (pedidos, facturación del dueño…) la vacía `ClearCacheOnSignOut` al quedar sin sesión.
     session.set(null);
-    queryClient.removeQueries({ queryKey: ['orders'] });
   };
 
   const name = brandName(tenant);

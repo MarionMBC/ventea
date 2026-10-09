@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -24,7 +24,7 @@ import { ApiError } from '@/lib/api';
 
 import { AppShell, Placeholder } from './AppShell';
 import { ErrorBoundary } from './ErrorBoundary';
-import { ServicesProvider, type Services } from './services';
+import { ServicesProvider, useServices, type Services } from './services';
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -38,6 +38,25 @@ export function createQueryClient(): QueryClient {
       mutations: { retry: false },
     },
   });
+}
+
+/**
+ * Al perder la sesión (cerrar sesión, refresh rechazado, otra pestaña) se vacía TODA la caché:
+ * si no, quien entre después en la misma pestaña (p. ej. alguien del equipo tras el dueño)
+ * vería datos del anterior, como la facturación, aunque su rol no los pida.
+ */
+function ClearCacheOnSignOut() {
+  const { session } = useServices();
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let signedIn = session.get() !== null;
+    return session.subscribe(() => {
+      const now = session.get() !== null;
+      if (signedIn && !now) queryClient.clear();
+      signedIn = now;
+    });
+  }, [session, queryClient]);
+  return null;
 }
 
 /**
@@ -70,6 +89,7 @@ export function App({
         <ServicesProvider services={services}>
           <PlatformProvider services={platform}>
             <QueryClientProvider client={queryClient}>
+              <ClearCacheOnSignOut />
               <BrowserRouter basename={basename}>
                 <Routes>
                   {isPlatformHost(hostname) ? (

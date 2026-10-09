@@ -6,7 +6,14 @@ import { urgencyOf } from '@/features/orders/OrderCard';
 import { LANG_STORAGE_KEY } from '@/i18n';
 import { createApiClient } from '@/lib/api';
 import { createSessionStore } from '@/lib/session';
-import { createFakeApi, makeOrder, STAFF_SESSION } from '@/test/fixtures';
+import {
+  apiError,
+  createFakeApi,
+  json,
+  makeOrder,
+  STAFF_SESSION,
+  type Handler,
+} from '@/test/fixtures';
 
 import { App, createQueryClient } from './App';
 
@@ -16,9 +23,16 @@ function renderPanel(
     path = '/admin/orders',
     role = 'owner',
     loggedIn = true,
-  }: { path?: string; role?: StaffAuthResponse['staff']['role']; loggedIn?: boolean } = {},
+    override,
+  }: {
+    path?: string;
+    role?: StaffAuthResponse['staff']['role'];
+    loggedIn?: boolean;
+    override?: Handler;
+  } = {},
 ) {
   const api = createFakeApi(orders);
+  api.setOverride(override);
   const session = createSessionStore(null);
   if (loggedIn) session.set({ ...STAFF_SESSION, staff: { ...STAFF_SESSION.staff, role } });
   const client = createApiClient({ session, fetch: api.fetch });
@@ -26,7 +40,7 @@ function renderPanel(
   queryClient.setDefaultOptions({ queries: { retry: false } });
   window.history.pushState({}, '', path);
   render(<App services={{ client, session }} queryClient={queryClient} />);
-  return { api, session };
+  return { api, session, queryClient };
 }
 
 const nav = () => screen.getByRole('navigation', { name: 'Dashboard sections' });
@@ -197,5 +211,69 @@ describe('Tarjeta: urgencia por tiempo', () => {
     const card = await screen.findByTestId('order-CHC-5000');
     expect(within(card).getByText('Note: bien cocido').classList.contains('note')).toBe(true);
     expect(within(card).getByText('Order note:').closest('.note--order')).toBeTruthy();
+  });
+});
+
+/** Facturación del dueño con pago pendiente en gracia: el marco muestra el aviso. */
+function pastDueBilling(): Record<string, unknown> {
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  return {
+    mode: 'manual',
+    status: 'past_due',
+    planCode: 'pro',
+    planName: 'Pro',
+    interval: 'month',
+    price: { amountCents: 5900, currency: 'USD' },
+    trialEndsAt: null,
+    currentPeriodStart: new Date(now - 30 * day).toISOString(),
+    currentPeriodEnd: new Date(now).toISOString(),
+    cancelAtPeriodEnd: false,
+    retryAt: null,
+    graceEndsAt: new Date(now + 3 * day).toISOString(),
+    pendingPlan: null,
+    card: null,
+    events: [],
+  };
+}
+
+describe('Caché al perder la sesión', () => {
+  it('cerrar sesión vacía TODA la caché: quien entra después no ve la facturación del dueño', async () => {
+    const { api, session, queryClient } = renderPanel([makeOrder()], {
+      override: (req) => (req.path === '/api/billing' ? json(pastDueBilling()) : undefined),
+    });
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(queryClient.getQueryData(['billing'])).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('heading', { name: 'Restaurant dashboard' })).toBeTruthy();
+    expect(queryClient.getQueryData(['billing'])).toBeUndefined();
+    expect(queryClient.getQueryData(['orders', 'active'])).toBeUndefined();
+
+    // Entra alguien del equipo en la misma pestaña.
+    act(() => session.set({ ...STAFF_SESSION, staff: { ...STAFF_SESSION.staff, role: 'staff' } }));
+    window.history.pushState({}, '', '/admin/orders');
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    expect(await screen.findByText('Ana Pérez')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(api.calls.filter((c) => c.path === '/api/billing')).toHaveLength(1);
+  });
+
+  it('un refresh rechazado también vacía la caché', async () => {
+    const { api, session, queryClient } = renderPanel([makeOrder()], {
+      override: (req) => (req.path === '/api/billing' ? json(pastDueBilling()) : undefined),
+    });
+    expect(await screen.findByRole('alert')).toBeTruthy();
+
+    // El access token vence y el refresh token ya no sirve.
+    api.setOverride((req) =>
+      req.path === '/api/auth/refresh' || req.path === '/api/staff/orders'
+        ? apiError(401, 'Unauthorized')
+        : undefined,
+    );
+    await act(() => queryClient.refetchQueries({ queryKey: ['orders'] }));
+    await waitFor(() => expect(session.get()).toBeNull());
+    expect(queryClient.getQueryData(['billing'])).toBeUndefined();
+    expect(await screen.findByRole('heading', { name: 'Restaurant dashboard' })).toBeTruthy();
   });
 });
