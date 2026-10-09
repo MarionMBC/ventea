@@ -10,6 +10,9 @@
  *   nombre de producto como `=HYPERLINK(...)` no se ejecuta como fórmula al abrirlo (CSV
  *   injection). Los números van como número (un monto negativo sigue siendo número).
  */
+/** Marca de orden de bytes: Excel la necesita para leer UTF-8 (acentos). */
+const BOM = String.fromCharCode(0xfeff);
+
 export type CsvCell = string | number;
 
 export interface CsvFormat {
@@ -35,7 +38,7 @@ function cell(value: CsvCell, format: CsvFormat): string {
 
 export function toCsv(rows: readonly (readonly CsvCell[])[], format: CsvFormat = CSV_EN): string {
   const lines = rows.map((row) => row.map((value) => cell(value, format)).join(format.separator));
-  return `﻿${lines.join('\r\n')}\r\n`;
+  return `${BOM}${lines.join('\r\n')}\r\n`;
 }
 
 /** Descarga un CSV con un enlace temporal (sin abrir otra pestaña). */
