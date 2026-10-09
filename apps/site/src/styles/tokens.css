@@ -1,0 +1,96 @@
+/*
+ * Tokens del sitio corporativo (TASK-008). Identidad sobria y técnica, distinta de la landing de
+ * restaurantes: tinta azul-grafito, papel frío y un acento teal propio. Todos los pares
+ * texto/fondo usados cumplen AA (≥ 4.5:1) en claro y en oscuro. Sin fuentes web: pila del
+ * sistema y monoespaciada del sistema para los detalles técnicos.
+ */
+:root {
+  color-scheme: light dark;
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Code', 'Cascadia Mono', Consolas, 'Liberation Mono', Menlo,
+    monospace;
+
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.1875rem;
+  --fs-xl: clamp(1.625rem, 1.25rem + 1.6vw, 2.25rem);
+  --fs-hero: clamp(2.125rem, 1.35rem + 3.4vw, 3.5rem);
+  --lh: 1.6;
+
+  /* Superficies */
+  --ink: #0b1220; /* hero y footer */
+  --ink-2: #16213a;
+  --paper: #f6f7f9;
+  --surface: #ffffff;
+  --tint: #eef1f5;
+  --line: #dde2ea;
+  --line-strong: #c3cad6;
+  --grid: rgb(148 163 184 / 0.09);
+
+  /* Texto */
+  --text: #0b1220;
+  --text-muted: #4a5565; /* 7.3:1 sobre --paper, 6.7:1 sobre --tint */
+  --on-ink: #f6f7f9;
+  --on-ink-muted: #b4bfd0; /* 10:1 sobre --ink */
+
+  /* Acento */
+  --accent: #0f766e; /* teal: 5.5:1 con blanco, 5.1:1 sobre --paper */
+  --accent-hover: #115e59;
+  --accent-soft: #d5f5ef;
+  --accent-bright: #2dd4bf; /* sobre --ink: 10:1 */
+  --link: var(--accent);
+  --btn-bg: var(--accent);
+  --btn-bg-hover: var(--accent-hover);
+  --btn-text: #ffffff;
+  --logo-bg: #0b1220;
+  --danger: #b42318;
+
+  --focus: #1d4ed8;
+  --focus-ring: 0 0 0 3px var(--paper), 0 0 0 6px var(--focus);
+
+  /* Medidas */
+  --tap: 48px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --gutter: 16px;
+  --container: 1160px;
+  --shadow: 0 1px 2px rgb(11 18 32 / 0.05), 0 6px 20px rgb(11 18 32 / 0.06);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #060a14;
+    --ink-2: #111a2b;
+    --paper: #0b1220;
+    --surface: #111a2b;
+    --tint: #0e1726;
+    --line: #24304a;
+    --line-strong: #34425f;
+    --grid: rgb(148 163 184 / 0.07);
+
+    --text: #e8edf5;
+    --text-muted: #a3afc2; /* 7.6:1 sobre --surface */
+
+    --accent-soft: #123b3a;
+    --link: #5eead4; /* 11:1 sobre --paper */
+    --btn-bg: #2dd4bf;
+    --btn-bg-hover: #5eead4;
+    --btn-text: #0b1220;
+    --logo-bg: #16213a;
+    --danger: #fca5a5;
+
+    --focus: #93c5fd;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
+  }
+}
