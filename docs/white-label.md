@@ -233,25 +233,34 @@ Requisitos: JDK 21, `ANDROID_HOME` con build-tools, `npm ci`.
 Una marca nueva estrena keystore la primera vez que se compila en release:
 `~/.ventea/keystores/<slug>.jks` y, al lado, `<slug>.properties` con su contraseña aleatoria
 (solo el usuario: `0600`; en Windows, ACL sin herencia). **Respaldar los dos en el gestor de
-secretos apenas se crean**: sin ellos Play no acepta actualizaciones de esa app. El generador
-nunca imprime la contraseña ni la copia a la copia de trabajo: gradle recibe solo las rutas
-(`VENTEA_KEYSTORE_FILE`, `VENTEA_KEYSTORE_PROPERTIES`).
+secretos, fuera de esta máquina, apenas se crean**: sin ellos Play no acepta actualizaciones
+de esa app. Son RSA 4096 con 30 años de validez. El generador nunca imprime la contraseña ni la
+copia a la copia de trabajo: gradle recibe solo las rutas (`VENTEA_KEYSTORE_FILE`,
+`VENTEA_KEYSTORE_PROPERTIES`), y ningún proceso hijo (vite, cap, gradle, git) hereda el token de
+plataforma ni la cuenta del dueño.
 
-Una marca que **ya tiene app publicada** sigue con su keystore, leído donde está:
+Con _Firma de apps de Play_, este keystore es la **clave de subida** (_upload key_): Google firma
+lo que se instala con su propia clave de la app. Si la clave de subida se pierde o se filtra, se
+pide un reset en Play Console (_Integridad de la app → Firma de apps → Solicitar restablecimiento
+de la clave de subida_); sin Play App Signing, perderla es perder la app.
 
-```bash
-npm run brand:app -- --tenant carolina-hot-chicken --config-from file --release \
-  --keystore-props /ruta/segura/keystore.properties   # [--keystore /ruta/al.jks]
-```
-
-Su `applicationId`, versión y build mínimo van en la plataforma (`PATCH
-/api/platform/tenants/:slug/app` con `bundleId`, `version`, `buildNumber`) o en su archivo de
-`brands/` (`brand.carolina.json`: `com.carolinahotchicken.app`, `1.2.0`, `buildNumber: 4`). El
+Solo para una marca que **ya tiene app publicada en Play con otro keystore**: se firma con ese,
+leído donde está y sin copiarlo (`--keystore-props <ruta> [--keystore <ruta>]` o
+`VENTEA_BRAND_KEYSTORE_PROPS`). Su `applicationId`, versión y build mínimo van en la plataforma
+(`PATCH /api/platform/tenants/:slug/app` con `bundleId`, `version`, `buildNumber`) o en su
+archivo de `brands/` (`version`, `buildNumber`); el build number nunca baja de ese mínimo. El
 SHA-256 del certificado queda en `metadata.json` para compararlo con el de Play Console.
+
+**Carolina** no está publicada: firma con su keystore de producción nuevo,
+`~/.ventea/keystores/carolina-hot-chicken.jks`, no con el de desarrollo de su repo. Conserva el
+`applicationId` de la app anterior (`com.carolinahotchicken.app`, desde 1.2.0 build 4), pero
+como la firma cambia, el APK 1.1.0 instalado a mano **no se actualiza**: hay que desinstalarlo
+antes de instalar el nuevo (se pierde la sesión de ese teléfono).
 
 Si la app anterior guardaba la sesión con otro prefijo, `legacyStoragePrefix` (o
 `--legacy-storage-prefix chc.`) migra `session`, `favourites` y `checkout.attempt` a
-`ventea.<slug>.*` en el primer arranque, así nadie pierde la sesión al actualizar.
+`ventea.<slug>.*` en el primer arranque de la app nativa (en la web, nunca), sin pisar datos
+nuevos. En Carolina queda declarado aunque hoy no migre nada: es inofensivo.
 
 ### Push en el build
 
@@ -265,16 +274,23 @@ En una Mac (Xcode 16+, Node 22):
 
 ```bash
 npm ci
-npm run brand:app -- --tenant demo-burgers --platform ios --api-url https://api.ventea.tech
+npm run brand:app -- --tenant demo-burgers --platform ios --config-from file
 open dist-apps/.work/demo-burgers/ios/App/App.xcodeproj
 # Signing & Capabilities: Team de la cuenta que publica · Product → Archive → Distribute
 ```
 
 Sin Mac: workflow **Brand app (iOS)** (`.github/workflows/brand-app-ios.yml`, manual con el
-slug). Cada marca es un _Environment_ de GitHub con su nombre y los secrets
-`IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROFILE_BASE64`, `IOS_TEAM_ID` y
-`VENTEA_PLATFORM_TOKEN`. Con firma exporta el `.ipa` para App Store Connect; sin ella compila
-sin firmar, para validar. El `.ipa` se sube con Transporter o `xcrun altool`.
+slug). Cada marca es un _Environment_ de GitHub con su nombre, limitado a la rama `main`
+(_Deployment branches_) y con revisores obligatorios, y los secrets `IOS_DIST_CERT_P12_BASE64`,
+`IOS_DIST_CERT_PASSWORD`, `IOS_PROFILE_BASE64` e `IOS_TEAM_ID`. Con firma exporta el `.ipa` para
+App Store Connect; sin ella compila sin firmar, para validar. El `.ipa` se sube con Transporter o
+`xcrun altool`.
+
+La configuración sale por defecto del archivo de `brands/` (`config_from: file`). Con
+`config_from: api` lee `https://api.ventea.tech` (fijo) con un token de plataforma, que dura 1 h:
+cargarlo fresco justo antes (`gh secret set VENTEA_PLATFORM_TOKEN --env <slug>`) y borrarlo al
+terminar (`gh secret delete VENTEA_PLATFORM_TOKEN --env <slug>`). **Nunca como secret
+permanente.**
 
 ### Fotos de una app anterior
 
@@ -306,7 +322,10 @@ Ventea):
    anuncios: no, clasificación de contenido, público objetivo (no niños), seguridad de datos
    (email, nombre, pedidos, token de dispositivo; cifrado en tránsito; borrado de cuenta).
 5. Categoría «Comida y bebida», email de soporte y sitio.
-6. _Pruebas internas_ → subir el `.aab` → probar en un teléfono → _Producción_.
+6. _Pruebas internas_ → subir el `.aab` → probar en un teléfono. Una cuenta de developer
+   **personal** nueva exige además una _prueba cerrada_ con al menos 12 testers durante 14 días
+   seguidos antes de poder pedir _Producción_ (las cuentas de organización no). Planificarlo con
+   la marca.
 7. Plataforma: `status: in_review`; al aprobarse, `published` y `storeUrls.android`.
 
 **App Store Connect** (cuenta de Ventea, o la del cliente con rol App Manager para Ventea):
@@ -321,8 +340,10 @@ Ventea):
 5. Subir el `.ipa` (workflow o Xcode) → TestFlight interno → probar.
 6. Revisión: cuenta de prueba con la que se pueda pedir y la **nota de `store-listing.md`**
    (app oficial del restaurante, contenido propio, programa de puntos, push de estado).
-7. **4.2.6** (apps de plantilla): si rechazan, no insistir desde la cuenta de Ventea; mover la
-   marca a su propia cuenta (`publisher = client`) y volver a enviar (ADR 0008).
+7. **4.2.6** (apps de plantilla): Apple pide que la app la envíe el dueño del contenido. Para
+   iOS, recomendar `publisher = client` (cuenta del restaurante) **desde el inicio**, también en
+   plan Pro; desde la cuenta de Ventea solo con la diferenciación de ADR 0008 y asumiendo el
+   riesgo. Si rechazan por 4.2.6, no insistir: mover la marca a su cuenta y volver a enviar.
 8. Plataforma: `in_review` → `published` con `storeUrls.ios`.
 
 Pendiente por marca, fuera del repo: cuentas de developer (Google, pago único; Apple, anual),
