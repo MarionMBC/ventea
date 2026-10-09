@@ -4,8 +4,9 @@
 // - Un HTML por ruta e idioma con su <head> (title, description, canonical, hreflang, OG, JSON-LD)
 //   y el contenido ya renderizado dentro de #root: buscadores y vistas previas no ejecutan JS, y
 //   el texto del hero (LCP) llega en el HTML. El cliente lo hidrata.
-//     /  → index.html · /en/ → en/index.html · /politica-de-privacidad → …/index.html
-//     /en/privacy → en/privacy/index.html · 404 → 404.html y en/404.html (nginx error_page)
+//     / → index.html (EN, idioma por defecto) · /privacy → privacy/index.html
+//     /es/ → es/index.html · /es/politica-de-privacidad → es/politica-de-privacidad/index.html
+//     404 → 404.html (EN) y es/404.html (nginx error_page)
 // - <link rel="preload"> del subset latino de Geist Sans (la fuente del LCP).
 // - sitemap.xml (con alternates), robots.txt, og.png 1200×630 (og/og.svg + el logo oficial) y
 //   logo.png 512×512 (isotipo oficial, para el JSON-LD).

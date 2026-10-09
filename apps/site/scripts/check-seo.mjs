@@ -1,6 +1,8 @@
-// Verifica la salida del build del sitio corporativo (TASK-009): HTML prerenderizado por ruta e
-// idioma con su <head> completo (lang, title único, description, canonical, hreflang es/en/
-// x-default, OG, Twitter, JSON-LD válido y sin datos no verificados), 404 por idioma con noindex,
+// Verifica la salida del build del sitio corporativo (TASK-009, TASK-014: inglés por defecto):
+// HTML prerenderizado por ruta e idioma con su <head> completo (lang, title único, description,
+// canonical, hreflang en/es/x-default (= EN), OG, Twitter, JSON-LD válido y sin datos no
+// verificados), ninguna referencia a las rutas viejas (/en/*, /politica-de-privacidad), 404 por
+// idioma con noindex,
 // preload de la fuente, og.png 1200×630, logo.png 512×512, sitemap con alternates y robots.
 // Corre al final de `npm run build`: si algo falta, el build falla en vez de publicar un sitio
 // sin metadatos.
@@ -13,23 +15,26 @@ const errors = [];
 const check = (ok, message) => ok || errors.push(message);
 
 const PAGES = [
-  { file: 'index.html', path: '/', lang: 'es', alt: '/en/', home: true, h1: 'Construimos' },
-  { file: 'en/index.html', path: '/en/', lang: 'en', alt: '/', home: true, h1: 'We build' },
+  { file: 'index.html', path: '/', lang: 'en', alt: '/es/', home: true, h1: 'We build' },
+  { file: 'es/index.html', path: '/es/', lang: 'es', alt: '/', home: true, h1: 'Construimos' },
   {
-    file: 'politica-de-privacidad/index.html',
-    path: '/politica-de-privacidad',
-    lang: 'es',
-    alt: '/en/privacy',
-    h1: 'Política de privacidad',
-  },
-  {
-    file: 'en/privacy/index.html',
-    path: '/en/privacy',
+    file: 'privacy/index.html',
+    path: '/privacy',
     lang: 'en',
-    alt: '/politica-de-privacidad',
+    alt: '/es/politica-de-privacidad',
     h1: 'Privacy policy',
   },
+  {
+    file: 'es/politica-de-privacidad/index.html',
+    path: '/es/politica-de-privacidad',
+    lang: 'es',
+    alt: '/privacy',
+    h1: 'Política de privacidad',
+  },
 ];
+
+// Rutas de TASK-009 que ahora redirigen (nginx 301): ningún link, canonical ni alternate a ellas.
+const OLD_ROUTES = /(href|content)="(https:\/\/ventea\.tech)?\/(en(\/|")|politica-de-privacidad)/;
 
 const titles = new Set();
 const descriptions = new Set();
@@ -49,17 +54,22 @@ for (const page of PAGES) {
     `${page.file}: hreflang en`,
   );
   check(
-    html.includes(`<link rel="alternate" hreflang="x-default" href="${es}" />`),
+    html.includes(`<link rel="alternate" hreflang="x-default" href="${en}" />`),
     `${page.file}: hreflang x-default`,
   );
   check(html.includes(`<meta property="og:url" content="${url}" />`), `${page.file}: og:url`);
   check(html.includes(`content="${SITE}/og.png"`), `${page.file}: og:image`);
   check(
-    html.includes(`<meta property="og:locale" content="${page.lang === 'es' ? 'es_LA' : 'en_US'}" />`),
+    html.includes(`<meta property="og:locale" content="${page.lang === 'es' ? 'es_ES' : 'en_US'}" />`),
     `${page.file}: og:locale`,
   );
   check(html.includes('name="twitter:card" content="summary_large_image"'), `${page.file}: twitter`);
   check(!html.includes('noindex'), `${page.file}: no debe ser noindex`);
+  check(!OLD_ROUTES.test(html), `${page.file}: referencia a una ruta vieja (${OLD_ROUTES.exec(html)?.[0]})`);
+  check(
+    html.includes(`"inLanguage":"${page.lang}"`) === Boolean(page.home),
+    `${page.file}: JSON-LD inLanguage ${page.lang}`,
+  );
   check(/rel="preload" href="\/assets\/geist-latin-wght-normal-[^"]+\.woff2"/.test(html), `${page.file}: preload fuente`);
   const title = /<title>([^<]+)<\/title>/.exec(html)?.[1];
   check(Boolean(title), `${page.file}: <title>`);
@@ -101,14 +111,15 @@ check(titles.size === PAGES.length, 'títulos repetidos entre rutas');
 check(descriptions.size === PAGES.length, 'descriptions repetidas entre rutas');
 
 for (const [file, lang] of [
-  ['404.html', 'es'],
-  ['en/404.html', 'en'],
+  ['404.html', 'en'],
+  ['es/404.html', 'es'],
 ]) {
   const html = readFileSync(path.join(dist, file), 'utf8');
   check(html.includes(`<html lang="${lang}">`), `${file}: lang`);
   check(html.includes('<meta name="robots" content="noindex" />'), `${file}: noindex`);
   check(!html.includes('rel="canonical"'), `${file}: sin canonical`);
   check(!html.includes('rel="alternate" hreflang'), `${file}: sin hreflang`);
+  check(!OLD_ROUTES.test(html), `${file}: referencia a una ruta vieja`);
 }
 
 const png = readFileSync(path.join(dist, 'og.png'));
@@ -118,12 +129,19 @@ check(logo.readUInt32BE(16) === 512 && logo.readUInt32BE(20) === 512, 'logo.png 
 for (const file of ['brand/logo-horizontal.svg', 'brand/logo-white.svg', 'favicon.svg']) {
   check(existsSync(path.join(dist, file)), `falta ${file}`);
 }
-check(!existsSync(path.join(dist, 'privacy')), 'dist/privacy no debe existir (/privacy → 301)');
+for (const old of ['en', 'politica-de-privacidad']) {
+  check(!existsSync(path.join(dist, old)), `dist/${old} no debe existir (la ruta redirige con 301)`);
+}
 
 const sitemap = readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
 check((sitemap.match(/<url>/g) ?? []).length === 4, 'sitemap.xml: 4 urls');
 check((sitemap.match(/<xhtml:link /g) ?? []).length === 12, 'sitemap.xml: 3 alternates por url');
 check(!sitemap.includes('404'), 'sitemap.xml: sin 404');
+check(!/ventea\.tech\/(en\/|politica-de-privacidad)/.test(sitemap), 'sitemap.xml: rutas viejas');
+check(
+  (sitemap.match(new RegExp(`hreflang="x-default" href="${SITE}/"`, 'g')) ?? []).length === 2,
+  'sitemap.xml: x-default de las homes = /',
+);
 check(
   readFileSync(path.join(dist, 'robots.txt'), 'utf8').includes(`Sitemap: ${SITE}/sitemap.xml`),
   'robots.txt: Sitemap',
@@ -134,5 +152,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log(
-  'SEO del build OK: 4 rutas (es/en) + 2 404, hreflang, OG, JSON-LD, preload, og.png, logo.png, sitemap y robots.',
+  'SEO del build OK: 4 rutas (en por defecto, es en /es/) + 2 404, hreflang (x-default = /), OG, JSON-LD, sin rutas viejas, preload, og.png, logo.png, sitemap y robots.',
 );
