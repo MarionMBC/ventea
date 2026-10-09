@@ -1,0 +1,362 @@
+/*
+ * Sucursales, Equipo y enlaces de un solo uso (TASK-022). Sin alturas fijas ni scroll propio:
+ * la página usa el scroll principal del panel y los paneles laterales el suyo (Drawer).
+ */
+
+/* ── Cupo del plan ───────────────────────────────────────────────────── */
+.usage {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.usage__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.usage__label {
+  font-weight: 700;
+}
+
+.usage__text {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage__bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.usage__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+.usage--full .usage__fill {
+  background: var(--warning-border);
+}
+
+.usage__note {
+  color: var(--warning-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+/* ── Sucursales ──────────────────────────────────────────────────────── */
+.loc-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .loc-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.loc-card.is-inactive {
+  background: var(--surface-2);
+}
+
+.loc-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.loc-card__name {
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.loc-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.loc-card__facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.loc-card__facts > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.loc-card__facts dt {
+  flex: none;
+  padding-top: 2px;
+  color: var(--text-muted);
+}
+
+.loc-card__facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.loc-form__switch {
+  display: grid;
+  gap: 2px;
+}
+
+.loc-form__switch .switch {
+  justify-self: start;
+}
+
+.drawer__foot:has(.loc-form__delete) {
+  flex-wrap: wrap;
+}
+
+.loc-form__delete {
+  flex-basis: 100%;
+}
+
+@media (min-width: 720px) {
+  .loc-form__delete {
+    flex-basis: auto;
+    margin-right: auto;
+  }
+}
+
+/* Horario: una fila por día (lunes a domingo). */
+.hours-form {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hours-form__row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 48px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.hours-form__day {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hours-form__day input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+}
+
+.hours-form__times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hours-form__times .field__input {
+  min-width: 0;
+  padding-inline: 8px;
+}
+
+.hours-form__closed {
+  color: var(--text-muted);
+}
+
+.hours-form__error {
+  grid-column: 1 / -1;
+}
+
+/* ── Equipo ──────────────────────────────────────────────────────────── */
+.team-list {
+  display: grid;
+  margin: 0 -20px;
+  padding: 0;
+  list-style: none;
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'avatar who'
+    'avatar role'
+    'actions actions';
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.team-row:first-child {
+  border-top: 0;
+}
+
+.team-row:not(:has(.team-row__avatar)) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'who'
+    'actions';
+}
+
+.team-row.is-inactive {
+  background: var(--surface-2);
+}
+
+.team-row__avatar {
+  display: inline-grid;
+  grid-area: avatar;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 750;
+}
+
+.team-row__who {
+  display: grid;
+  grid-area: who;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-row__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.team-row__email {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.team-row__role {
+  grid-area: role;
+  justify-self: start;
+}
+
+.team-row__role .field__input {
+  min-width: 9rem;
+}
+
+.team-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: actions;
+  gap: 6px;
+}
+
+@media (min-width: 760px) {
+  .team-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'avatar who role actions';
+  }
+
+  .team-row:not(:has(.team-row__avatar)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'who actions';
+  }
+
+  .team-row__actions {
+    justify-content: flex-end;
+  }
+}
+
+.team-roles {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+}
+
+.team-roles > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.team-roles dt {
+  font-weight: 700;
+}
+
+.team-roles dd {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ── Enlace de un solo uso ───────────────────────────────────────────── */
+.link-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.link-panel__title {
+  font-size: var(--fs-md);
+  font-weight: 750;
+}
+
+.link-panel__row {
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 560px) {
+  .link-panel__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+/* Páginas públicas de los enlaces (mismo marco que el login). */
+.auth__fields,
+.link-state {
+  display: grid;
+  gap: 1.125rem;
+}
+
+.link-state {
+  justify-items: start;
+}
+
+.link-state .state__icon {
+  background: var(--danger-bg);
+  color: var(--danger);
+}

@@ -35,7 +35,7 @@ describe('dictionaries', () => {
       eager: true,
     });
     const code = Object.entries(files)
-      .filter(([path]) => !/\/i18n\/(en|es)\.ts$/.test(path))
+      .filter(([path]) => !/\/i18n\/(en|es|team-locations)\.ts$/.test(path))
       .map(([, source]) => source)
       .join('\n');
     expect(Object.keys(files).length).toBeGreaterThan(20);

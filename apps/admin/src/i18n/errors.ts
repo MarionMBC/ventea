@@ -56,5 +56,7 @@ function byStatus(status: number, t: I18n['t']): string | undefined {
 function planLimitMessage(limit: PlanLimit, t: I18n['t']): string {
   const plan = limit.plan ? t(`plan.${limit.plan}`) : (limit.planName ?? t('errors.yourPlan'));
   if (limit.resource === 'branded_app') return t('errors.planLimitBrandedApp', { plan });
+  if (limit.resource === 'staff')
+    return t('errors.planLimitStaff', { plan, count: limit.max ?? 0 });
   return t('errors.planLimitLocations', { plan, count: limit.max ?? 0 });
 }

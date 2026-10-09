@@ -1,3 +1,5 @@
+import { teamLocationsEn } from './team-locations';
+
 /**
  * English: the panel's primary language. Every other dictionary must have exactly these keys
  * (`Messages`). Plurals use the `_one` / `_other` suffixes (see `translate`). `{name}` is an
@@ -492,6 +494,7 @@ export const en = {
   'appStatusBody.published': 'Your app is live. Share these links with your customers.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Your developer account',
+  ...teamLocationsEn,
 };
 
 /** Shape every dictionary must satisfy: same keys as English, string values. */

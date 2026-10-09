@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { BillingPage } from '@/features/billing/BillingPage';
 import { BrandPage } from '@/features/brand/BrandPage';
+import { LocationsPage } from '@/features/locations/LocationsPage';
 import { MenuPage } from '@/features/menu/MenuPage';
 import { RequireStaff } from '@/features/auth/RequireStaff';
 import { OrdersBoard } from '@/features/orders/OrdersBoard';
@@ -23,6 +24,8 @@ import { Funnel } from '@/features/platform/Funnel';
 import { TenantApp } from '@/features/platform/TenantApp';
 import { TenantDetail } from '@/features/platform/TenantDetail';
 import { TenantList } from '@/features/platform/TenantList';
+import { JoinPage, ResetPasswordPage } from '@/features/team/LinkPages';
+import { TeamPage } from '@/features/team/TeamPage';
 import { I18nProvider } from '@/i18n';
 import { ApiError } from '@/lib/api';
 
@@ -118,6 +121,9 @@ export function App({
                     <Route path="/plataforma/*" element={<PlatformElsewhere />} />
                   )}
                   <Route path="/login" element={<LoginPage />} />
+                  {/* Enlaces de un solo uso del equipo (TASK-022): sin sesión. */}
+                  <Route path="/join" element={<JoinPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route element={<RequireStaff />}>
                     <Route element={<AppShell />}>
                       <Route path="/orders" element={<OrdersSection />}>
@@ -126,10 +132,11 @@ export function App({
                       </Route>
                       <Route path="/menu" element={<MenuPage />} />
                       <Route path="/brand" element={<BrandPage />} />
-                      {/* TODO: locations, rewards, staff y reports. Fuera del menú (TASK-011). */}
-                      <Route path="/locations" element={<Placeholder title="nav.locations" />} />
+                      <Route path="/locations" element={<LocationsPage />} />
+                      <Route path="/team" element={<TeamPage />} />
+                      <Route path="/staff" element={<Navigate to="/team" replace />} />
+                      {/* TODO: rewards y reports. Fuera del menú (TASK-011). */}
                       <Route path="/rewards" element={<Placeholder title="nav.rewards" />} />
-                      <Route path="/staff" element={<Placeholder title="nav.staff" />} />
                       <Route path="/reports" element={<Placeholder title="nav.reports" />} />
                       <Route path="/facturacion" element={<BillingPage />} />
                     </Route>

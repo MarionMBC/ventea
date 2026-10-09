@@ -1,4 +1,5 @@
 import type { Messages } from './en';
+import { teamLocationsEs } from './team-locations';
 
 /** Español (Honduras / LatAm). Tiene que cumplir `Messages`: mismas claves que el inglés. */
 export const es: Messages = {
@@ -489,4 +490,5 @@ export const es: Messages = {
   'appStatusBody.published': 'Tu app ya está publicada. Comparte estos links con tus clientes.',
   'appPublisher.ventea': 'Ventea',
   'appPublisher.client': 'Tu cuenta de desarrollador',
+  ...teamLocationsEs,
 };

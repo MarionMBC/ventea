@@ -57,13 +57,21 @@ describe('Shell del panel', () => {
     const links = within(nav())
       .getAllByRole('link')
       .map((link) => link.textContent);
-    expect(links).toEqual(['Orders', 'History', 'Menu', 'My brand', 'Billing']);
+    expect(links).toEqual([
+      'Orders',
+      'History',
+      'Menu',
+      'Locations',
+      'My brand',
+      'Team',
+      'Billing',
+    ]);
     expect(within(nav()).getByRole('link', { name: 'Orders' }).getAttribute('aria-current')).toBe(
       'page',
     );
 
     const soon = within(nav()).getByRole('list', { name: 'Coming soon' });
-    for (const name of ['Locations', 'Rewards', 'Team', 'Reports']) {
+    for (const name of ['Rewards', 'Reports']) {
       expect(within(soon).getByText(name)).toBeTruthy();
     }
     expect(within(soon).queryAllByRole('link')).toHaveLength(0);
@@ -78,6 +86,9 @@ describe('Shell del panel', () => {
     expect(screen.getByText('Powered by Ventea')).toBeTruthy();
     expect(within(nav()).queryByRole('link', { name: 'Billing' })).toBeNull();
     expect(within(nav()).queryByRole('link', { name: 'My brand' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'Team' })).toBeNull();
+    // Sucursales las ve todo el equipo (solo lectura para staff, TASK-022).
+    expect(within(nav()).getByRole('link', { name: 'Locations' })).toBeTruthy();
     // El menú lo ve todo el equipo (solo lectura para staff).
     expect(within(nav()).getByRole('link', { name: 'Menu' })).toBeTruthy();
     // Marca del tenant: nombre e inicial (sin logo).
@@ -106,8 +117,8 @@ describe('Shell del panel', () => {
   });
 
   it('una sección sin implementar (ruta vieja) avisa y ofrece volver a pedidos', async () => {
-    renderPanel([], { path: '/admin/locations' });
-    expect(await screen.findByRole('heading', { name: 'Locations' })).toBeTruthy();
+    renderPanel([], { path: '/admin/rewards' });
+    expect(await screen.findByRole('heading', { name: 'Rewards' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe(
       '/admin/orders',
     );
