@@ -118,7 +118,8 @@ export function ImageUpload({
 
   const onFiles = (files: FileList | null) => {
     const file = files?.[0];
-    if (file) void start(file);
+    // Deshabilitado (p. ej. el formulario guardando): la subida terminaría sobre datos viejos.
+    if (file && !disabled) void start(file);
     if (input.current) input.current.value = '';
   };
 
@@ -167,6 +168,7 @@ export function ImageUpload({
         accept={MEDIA_UPLOAD_TYPES.join(',')}
         tabIndex={-1}
         aria-hidden="true"
+        disabled={disabled}
         onChange={(event) => onFiles(event.target.files)}
       />
       <div className="upload__actions">
