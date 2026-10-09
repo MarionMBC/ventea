@@ -1,0 +1,27 @@
+{
+  "name": "@ventea/brand-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generador de la app nativa de cada marca y migración de fotos del menú (TASK-019).",
+  "scripts": {
+    "app": "tsx src/cli.ts",
+    "import-images": "tsx src/import-images-cli.ts",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ventea/shared": "*",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@ventea/eslint-config": "*",
+    "@ventea/tsconfig": "*",
+    "eslint": "^10.9.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

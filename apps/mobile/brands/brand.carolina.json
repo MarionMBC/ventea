@@ -2,11 +2,14 @@
   "tenantSlug": "carolina-hot-chicken",
   "apiUrl": "https://api.ventea.tech",
   "appName": "Carolina Hot Chicken",
-  "bundleId": "app.ventea.carolinahotchicken",
+  "bundleId": "com.carolinahotchicken.app",
   "colors": { "primary": "#E23B2E", "secondary": "#1F1D1B", "accent": "#FDB913" },
   "logoUrl": null,
   "iconUrl": null,
   "defaultLanguage": "en",
   "currency": "USD",
-  "push": { "enabled": false }
+  "push": { "enabled": false },
+  "legacyStoragePrefix": "chc.",
+  "version": "1.2.0",
+  "buildNumber": 4
 }

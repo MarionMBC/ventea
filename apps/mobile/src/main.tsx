@@ -1,3 +1,5 @@
+/* First: moves a previous app's stored session before any store reads it. */
+import './brand/legacyStorage';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BUILD_BRAND } from './brand/runtime';

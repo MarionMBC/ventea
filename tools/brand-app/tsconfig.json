@@ -1,0 +1,10 @@
+{
+  "extends": "@ventea/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

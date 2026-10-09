@@ -1,0 +1,12 @@
+{
+  "$comment": "Fotos de la app vieja de Carolina (repo carolina-hot-chicken, --dir src/assets). Mismo emparejamiento por nombre que src/features/menu/productPhotos.ts; promo-hero.jpg era un banner de promoción, no un producto.",
+  "items": {
+    "Reaper Tender Sandwich": "products/sandwich.jpg",
+    "Nashville Tenders · 3 pzas": "products/tenders.jpg",
+    "Reaper Box": "products/combo-box.jpg"
+  },
+  "brand": {
+    "logo": "brand/logo-carolina-mark.png",
+    "icon": "brand/logo-carolina-mark.png"
+  }
+}
