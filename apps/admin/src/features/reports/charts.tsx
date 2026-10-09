@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 
 import { useI18n } from '@/i18n';
 
-import { downloadCsv, type CsvCell } from './csv';
+import { csvFormat, downloadCsv, type CsvCell } from './csv';
 
 /**
  * Gráficos de reportes sin dependencias (TASK-023): barras en SVG con `viewBox` estirable y los
@@ -156,7 +156,7 @@ export function ChartCard({
   children: ReactNode;
   wide?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const id = useId();
   const [view, setView] = useState<'chart' | 'table'>('chart');
 
@@ -191,7 +191,11 @@ export function ChartCard({
             aria-label={t('reports.csvAria', { name: title })}
             disabled={rows.length === 0}
             onClick={() =>
-              downloadCsv(filename, [columns.map((column) => column.header), ...csvRows])
+              downloadCsv(
+                filename,
+                [columns.map((column) => column.header), ...csvRows],
+                csvFormat(lang),
+              )
             }
           >
             {t('reports.csv')}

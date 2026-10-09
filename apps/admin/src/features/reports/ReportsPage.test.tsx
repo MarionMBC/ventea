@@ -8,7 +8,7 @@ import { createSessionStore } from '@/lib/session';
 import { createFakeApi, json, STAFF_SESSION } from '@/test/fixtures';
 
 import { labelEvery, niceMax } from './charts';
-import { toCsv } from './csv';
+import { CSV_ES, toCsv } from './csv';
 import { shiftDay, todayIn } from './ReportsPage';
 
 const LOCATION = '00000000-0000-4000-8000-00000000b001';
@@ -51,7 +51,9 @@ function makeReport(overrides: Partial<SalesReport> = {}): SalesReport {
 function renderReports({
   role = 'owner',
   respond,
+  path = '/admin/reports',
 }: {
+  path?: string;
   role?: 'owner' | 'manager' | 'staff';
   respond?: (query: URLSearchParams) => Response;
 } = {}) {
@@ -69,7 +71,7 @@ function renderReports({
   const client = createApiClient({ session, fetch: api.fetch });
   const queryClient = createQueryClient();
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  window.history.pushState({}, '', '/admin/reports');
+  window.history.pushState({}, '', path);
   render(<App services={{ client, session }} queryClient={queryClient} />);
   return { api };
 }
@@ -88,6 +90,19 @@ describe('helpers de reportes', () => {
         ['@SUM', '+1'],
       ]),
     ).toBe('﻿Producto,Ventas\r\n"\'=HYPERLINK(""x"")",14\r\n"Combo, grande",-2\r\n\'@SUM,\'+1\r\n');
+  });
+
+  it('CSV en español: punto y coma y coma decimal (Excel en configuración hispana)', () => {
+    expect(
+      toCsv(
+        [
+          ['Período', 'Ventas'],
+          ['Combo; grande', 1049.3],
+          ['Semana', 12],
+        ],
+        CSV_ES,
+      ),
+    ).toBe('﻿Período;Ventas\r\n"Combo; grande";1049,3\r\nSemana;12\r\n');
   });
 
   it('eje en números redondos y etiquetas espaciadas', () => {
@@ -206,5 +221,29 @@ describe('Reportes', () => {
     expect(screen.getByRole('link', { name: 'See plans' }).getAttribute('href')).toBe(
       '/admin/facturacion',
     );
+  });
+
+  it('filtros inválidos en la URL: «Limpiar filtros» vuelve al reporte por defecto', async () => {
+    const { api } = renderReports({
+      path: '/admin/reports?location=nope&from=2026-01-01',
+      respond: (query) =>
+        query.get('locationId')
+          ? json({ statusCode: 400, message: 'locationId inválido', error: 'Bad Request' }, 400)
+          : json(makeReport()),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Reports' })).toBeTruthy();
+    const last = api.calls.filter((c) => c.path === '/api/staff/reports/sales').at(-1)!;
+    expect(last.query.get('locationId')).toBeNull();
+    expect(last.query.get('from')).toBeNull();
+  });
+
+  it('un año fuera de 2000–2100 se marca y no se pide', async () => {
+    const { api } = renderReports();
+    const to = (await screen.findByLabelText('To')) as HTMLInputElement;
+    const before = api.count('GET', '/api/staff/reports/sales');
+    fireEvent.change(to, { target: { value: '9999-12-31' } });
+    expect(screen.getByText('Choose dates between 2000 and 2100.')).toBeTruthy();
+    expect(api.count('GET', '/api/staff/reports/sales')).toBe(before);
   });
 });

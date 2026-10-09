@@ -1,6 +1,8 @@
 import {
   REPORT_GRANULARITY,
   REPORT_MAX_DAYS,
+  REPORT_MAX_YEAR,
+  REPORT_MIN_YEAR,
   type ReportGranularity,
   type SalesReport,
 } from '@ventea/shared';
@@ -37,6 +39,12 @@ export function shiftDay(day: string, delta: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + delta * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** Año dentro de lo que la API acepta (fuera, 400). */
+function inYears(day: string): boolean {
+  const year = Number(day.slice(0, 4));
+  return year >= REPORT_MIN_YEAR && year <= REPORT_MAX_YEAR;
+}
+
 /** Días del rango, inclusive. */
 function spanDays(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS) + 1;
@@ -69,7 +77,7 @@ function hourLabel(hour: number, locale: string): string {
 }
 
 /** Centavos → unidades con punto decimal (CSV: número, sin símbolo ni miles). */
-const csvAmount = (cents: number) => (cents / 100).toFixed(2);
+const csvAmount = (cents: number) => Math.round(cents) / 100;
 
 function parseGranularity(value: string | null): ReportGranularity {
   return (REPORT_GRANULARITY as readonly string[]).includes(value ?? '')
@@ -129,10 +137,21 @@ export function ReportsPage() {
         </span>
         <h1>{t('reports.errorTitle')}</h1>
         <p>{describeError(error, i18n)}</p>
-        <button type="button" className="btn btn--primary" onClick={() => void report.refetch()}>
-          <IconRefresh size={18} />
-          {t('board.retry')}
-        </button>
+        {/* Filtros inválidos en la URL (400): reintentar repetiría lo mismo; se limpian. */}
+        {error instanceof ApiError && error.status === 400 && params.size > 0 ? (
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => setParams(new URLSearchParams(), { replace: true })}
+          >
+            {t('reports.clearFilters')}
+          </button>
+        ) : (
+          <button type="button" className="btn btn--primary" onClick={() => void report.refetch()}>
+            <IconRefresh size={18} />
+            {t('board.retry')}
+          </button>
+        )}
       </div>
     );
   }
@@ -194,11 +213,13 @@ function Report({
   const [draft, setDraft] = useState<{ from: string; to: string } | null>(null);
   const range = draft ?? { from: data.from, to: data.to };
   const rangeError =
-    range.from > range.to
-      ? t('reports.rangeInvalid')
-      : spanDays(range.from, range.to) > REPORT_MAX_DAYS
-        ? t('reports.rangeTooLong')
-        : null;
+    !inYears(range.from) || !inYears(range.to)
+      ? t('reports.yearInvalid', { min: REPORT_MIN_YEAR, max: REPORT_MAX_YEAR })
+      : range.from > range.to
+        ? t('reports.rangeInvalid')
+        : spanDays(range.from, range.to) > REPORT_MAX_DAYS
+          ? t('reports.rangeTooLong')
+          : null;
 
   const setDate = (key: 'from' | 'to', value: string) => {
     const next = { ...range, [key]: value };
@@ -206,7 +227,11 @@ function Report({
       setDraft(next);
       return;
     }
-    const valid = next.from <= next.to && spanDays(next.from, next.to) <= REPORT_MAX_DAYS;
+    const valid =
+      inYears(next.from) &&
+      inYears(next.to) &&
+      next.from <= next.to &&
+      spanDays(next.from, next.to) <= REPORT_MAX_DAYS;
     setDraft(valid ? null : next);
     if (valid) onChange({ from: next.from, to: next.to });
   };
@@ -216,6 +241,12 @@ function Report({
   const currency = data.currency;
   const fmtMoney = (cents: number) => money(cents, currency);
   const filename = (name: string) => `${name}-${data.from}-${data.to}.csv`;
+  const files = {
+    sales: filename(t('reports.file.sales')),
+    hours: filename(t('reports.file.hours')),
+    products: filename(t('reports.file.products')),
+    statuses: filename(t('reports.file.statuses')),
+  };
 
   const series: ChartPoint[] = data.series.map((point) => {
     const labels = periodLabels(point.period, data.granularity, i18n);
@@ -299,6 +330,7 @@ function Report({
               type="date"
               className="field__input"
               value={range.from}
+              min={`${REPORT_MIN_YEAR}-01-01`}
               max={range.to}
               aria-invalid={!!rangeError}
               aria-describedby={rangeError ? `${id}-range-error` : undefined}
@@ -315,6 +347,7 @@ function Report({
               className="field__input"
               value={range.to}
               min={range.from}
+              max={`${REPORT_MAX_YEAR}-12-31`}
               aria-invalid={!!rangeError}
               aria-describedby={rangeError ? `${id}-range-error` : undefined}
               onChange={(event) => setDate('to', event.target.value)}
@@ -419,7 +452,7 @@ function Report({
             point.orders,
             csvAmount(point.salesCents),
           ])}
-          filename={filename('ventas')}
+          filename={files.sales}
           empty={noSales ? t('reports.noData') : null}
         >
           <ColumnChart
@@ -447,7 +480,7 @@ function Report({
             hour.orders,
             csvAmount(hour.salesCents),
           ])}
-          filename={filename('horas')}
+          filename={files.hours}
           empty={noSales ? t('reports.noData') : null}
         >
           <ColumnChart
@@ -475,7 +508,7 @@ function Report({
             product.quantity,
             csvAmount(product.salesCents),
           ])}
-          filename={filename('productos')}
+          filename={files.products}
           empty={products.length === 0 ? t('reports.noData') : null}
         >
           <BarList points={products} />
@@ -488,8 +521,8 @@ function Report({
             { header: t('reports.colOrders'), numeric: true },
           ]}
           rows={statuses.map((row) => [row.label, row.value])}
-          csvRows={data.byStatus.map((row) => [row.status, row.orders])}
-          filename={filename('estados')}
+          csvRows={data.byStatus.map((row) => [t(`status.${row.status}`), row.orders])}
+          filename={files.statuses}
           empty={statuses.length === 0 ? t('reports.noData') : null}
         >
           <BarList points={statuses} />
