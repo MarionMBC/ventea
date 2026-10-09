@@ -302,7 +302,7 @@ Solo el **dueño**. Contratos en `packages/shared/src/contracts/brand.ts`.
 | DELETE | `/api/devices/:id` | cliente · al cerrar sesión; `404` si no es suyo; `204`                                                                  |
 
 - **Upsert por (marca, token):** si el token era de otro cliente de la marca (cambio de cuenta en
-  el mismo teléfono), pasa al actual (`201`). Máximo 10 dispositivos con push por cliente.
+  el mismo teléfono), pasa al actual (`201`). Al cambiar de dueño se descarta el `biometricKeyId`. Máximo 10 dispositivos por cliente (los más viejos se borran) y 30 registros por cliente y hora (`DEVICE_REGISTER_RATE_LIMIT_PER_HOUR`, `429`).
 - **Aviso de estado:** `PATCH /api/staff/orders/:id/status` a `preparing`, `ready`, `completed` o
   `cancelled` manda un push a los dispositivos del cliente **después** de responder y sin
   bloquear (un FCM caído no afecta el pedido). Payload FCM: `notification {title, body}`

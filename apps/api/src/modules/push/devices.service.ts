@@ -16,7 +16,11 @@ export class DevicesService {
   /**
    * Upsert por (marca, token). Si el token ya era de este cliente, lo renueva (`created=false`);
    * si era de otro cliente de la marca (cambio de cuenta en el mismo teléfono), pasa a este:
-   * un teléfono recibe los avisos de quien tiene la sesión abierta.
+   * un teléfono recibe los avisos de quien tiene la sesión abierta. Al cambiar de dueño se
+   * descarta el `biometricKeyId`: la credencial biométrica era del cliente anterior.
+   *
+   * Pasado el máximo por cliente se BORRAN los dispositivos menos usados (los que anclan login
+   * biométrico solo pierden el token): la tabla no crece con cada token nuevo.
    */
   async register(
     tenantId: string,
@@ -32,15 +36,21 @@ export class DevicesService {
       });
 
       if (existing) {
+        const ownerChanged = existing.customerId !== customerId;
         await tx.device.updateMany({
           where: { tenantId, id: existing.id },
-          data: { customerId, platform: input.platform, lastSeenAt: new Date() },
+          data: {
+            customerId,
+            platform: input.platform,
+            lastSeenAt: new Date(),
+            ...(ownerChanged ? { biometricKeyId: null } : {}),
+          },
         });
         const device = await tx.device.findFirstOrThrow({
           where: { tenantId, id: existing.id },
           select: DEVICE_SELECT,
         });
-        return { device, created: existing.customerId !== customerId };
+        return { device, created: ownerChanged };
       }
 
       const device = await tx.device.create({
@@ -51,11 +61,16 @@ export class DevicesService {
         where: { tenantId, customerId, pushToken: { not: null } },
         orderBy: [{ lastSeenAt: 'desc' }, { createdAt: 'desc' }],
         skip: MAX_DEVICES_PER_CUSTOMER,
-        select: { id: true },
+        select: { id: true, biometricKeyId: true },
       });
-      if (stale.length > 0) {
+      const toDelete = stale.filter((d) => !d.biometricKeyId).map((d) => d.id);
+      const toUnlink = stale.filter((d) => d.biometricKeyId).map((d) => d.id);
+      if (toDelete.length > 0) {
+        await tx.device.deleteMany({ where: { tenantId, customerId, id: { in: toDelete } } });
+      }
+      if (toUnlink.length > 0) {
         await tx.device.updateMany({
-          where: { tenantId, id: { in: stale.map((d) => d.id) } },
+          where: { tenantId, customerId, id: { in: toUnlink } },
           data: { pushToken: null },
         });
       }

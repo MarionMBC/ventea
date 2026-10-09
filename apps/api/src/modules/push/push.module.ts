@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { RateLimitGuard, RateLimitStore } from '@/modules/platform/rate-limit.guard';
+
 import { DevicesController } from './devices.controller';
 import { DevicesService } from './devices.service';
 import { FcmPushTransport } from './fcm.transport';
@@ -19,6 +21,8 @@ import { PushService } from './push.service';
     PushCredentialsService,
     PushService,
     { provide: PUSH_TRANSPORT, useClass: FcmPushTransport },
+    RateLimitStore,
+    RateLimitGuard,
   ],
   exports: [PushService, PushCredentialsService],
 })

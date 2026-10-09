@@ -30,6 +30,7 @@ Object.assign(process.env, {
   MEDIA_DIR: require('node:path').join(require('node:os').tmpdir(), 'ventea-e2e-media'),
   MEDIA_QUOTA_MB: '',
   MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: '',
+  DEVICE_REGISTER_RATE_LIMIT_PER_HOUR: '',
   MEDIA_PUBLIC_BASE_URL: '',
   // Push (TASK-016): clave aleatoria de 32 bytes por corrida (nada literal que parezca un
   // secreto). Cifra y descifra en el mismo proceso; el transporte es FakePushTransport.
