@@ -17,12 +17,12 @@ const invite = (overrides: Record<string, unknown> = {}) => ({
 describe('correos del equipo', () => {
   it('invitación ES/EN con el rol y el vencimiento', () => {
     const es = renderEmail('staff_invite', 'es', invite(), LINKS);
-    expect(es.subject).toBe('Te invitaron al panel de Pollos Ana');
+    expect(es.subject).toBe('Te invitaron a un panel de Ventea');
     expect(es.text).toContain('Ana te invitó al panel de Pollos Ana en Ventea como encargado');
     expect(es.text).toContain('12 de octubre de 2026');
     expect(es.html).toContain('href="https://pollos.ventea.tech/admin/join#tok"');
     const en = renderEmail('staff_invite', 'en', invite({ role: 'staff' }), LINKS);
-    expect(en.subject).toBe("You're invited to the Pollos Ana dashboard");
+    expect(en.subject).toBe("You're invited to a Ventea dashboard");
     expect(en.text).toContain('as staff');
   });
 

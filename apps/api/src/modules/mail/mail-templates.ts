@@ -124,7 +124,8 @@ const TEAM_TEMPLATES = {
   staff_invite: (d: Data<'staff_invite'>, lang: BrandLanguage, fmt: (iso: string) => string) =>
     lang === 'en'
       ? {
-          subject: `You're invited to the ${d.tenantName} dashboard`,
+          // Asunto sin el nombre de la marca: va a una dirección no verificada (como la bienvenida).
+          subject: "You're invited to a Ventea dashboard",
           heading: `Join the ${d.tenantName} team`,
           paragraphs: [
             `${d.inviterName} invited you to the ${d.tenantName} dashboard on Ventea as ${ROLE_LABEL.en[d.role]}.`,
@@ -135,7 +136,7 @@ const TEAM_TEMPLATES = {
           footer: `You are receiving this email because the owner of ${d.tenantName} invited this address to their Ventea dashboard. Questions: ${d.supportEmail}`,
         }
       : {
-          subject: `Te invitaron al panel de ${d.tenantName}`,
+          subject: 'Te invitaron a un panel de Ventea',
           heading: `Únete al equipo de ${d.tenantName}`,
           paragraphs: [
             `${d.inviterName} te invitó al panel de ${d.tenantName} en Ventea como ${ROLE_LABEL.es[d.role]}.`,
