@@ -42,6 +42,11 @@ COPY --from=build /repo/apps/api/package.json     ./apps/api/
 COPY --from=build /repo/apps/api/prisma           ./apps/api/prisma
 COPY --from=build /repo/apps/api/prisma.config.ts ./apps/api/
 
+# Medios de las marcas (TASK-016): aca se monta el volumen `media`. El directorio nace con
+# dueño `node` para que un volumen nuevo herede ese dueño y la API (sin root) pueda escribir.
+ENV MEDIA_DIR=/data/media
+RUN mkdir -p /data/media && chown node:node /data/media
+
 # No correr como root: si alguien escapa del proceso, no hereda la maquina.
 USER node
 

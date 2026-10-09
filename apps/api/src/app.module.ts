@@ -4,13 +4,16 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './modules/auth/auth.module';
+import { BrandingModule } from './modules/branding/branding.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { HealthModule } from './modules/health/health.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { MediaModule } from './modules/media/media.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { PushModule } from './modules/push/push.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import {
   SUBSCRIPTION_OPEN_ROUTES,
@@ -37,6 +40,9 @@ import { PrismaModule } from './prisma/prisma.module';
     SubscriptionsModule,
     BillingModule,
     PlatformModule,
+    MediaModule,
+    PushModule,
+    BrandingModule,
   ],
   // Formato de error uniforme `{statusCode, message, error}` en toda la API.
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
@@ -49,7 +55,12 @@ export class AppModule implements NestModule {
     //
     //   health      — tiene que responder aunque la config de tenant esté rota
     //   platform/*  — registro y administración de la plataforma: cruzan tenants por definición
-    consumer.apply(TenantMiddleware).exclude('health', 'platform/{*path}').forRoutes('*');
+    //   media/*     — archivos públicos de medios (TASK-016): la marca va en la ruta, y un
+    //                 `<img>` de la app nativa no puede mandar `X-Tenant-Slug`
+    consumer
+      .apply(TenantMiddleware)
+      .exclude('health', 'platform/{*path}', 'media/{*path}')
+      .forRoutes('*');
 
     // 402 a la API de una marca suspendida (ADR 0007). Corren después del de tenant (orden
     // de registro). Las rutas abiertas (panel del dueño para pagar, pedidos en curso del
@@ -57,7 +68,7 @@ export class AppModule implements NestModule {
     // Misma regla de Nest 12: sin prefijo `api`.
     consumer
       .apply(SubscriptionMiddleware)
-      .exclude('health', 'platform/{*path}', ...SUBSCRIPTION_OPEN_ROUTES)
+      .exclude('health', 'platform/{*path}', 'media/{*path}', ...SUBSCRIPTION_OPEN_ROUTES)
       .forRoutes('*');
     consumer.apply(SubscriptionStateMiddleware).forRoutes(...SUBSCRIPTION_OPEN_ROUTES);
   }

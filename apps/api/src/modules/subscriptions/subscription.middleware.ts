@@ -22,7 +22,8 @@ export const SUSPENDED_MESSAGE = 'Servicio suspendido';
  * - lo que el dueño necesita para entrar al panel a pagar: `staff/*` (login, tablero),
  *   `tenant` (branding del panel), `auth/refresh` y `billing/*` (TASK-005: tarjeta, plan);
  * - lo que el cliente final necesita para seguir sus pedidos en curso: `GET orders`,
- *   `GET orders/:id` y `GET me`. Crear pedidos, el menú, registro y login siguen en 402.
+ *   `GET orders/:id` y `GET me`, y dar de baja su dispositivo push al cerrar sesión
+ *   (`DELETE devices/:id`, TASK-016). Crear pedidos, el menú, registro y login siguen en 402.
  */
 export const SUBSCRIPTION_OPEN_ROUTES: { path: string; method: RequestMethod }[] = [
   { path: 'staff/{*path}', method: RequestMethod.ALL },
@@ -33,6 +34,7 @@ export const SUBSCRIPTION_OPEN_ROUTES: { path: string; method: RequestMethod }[]
   { path: 'orders', method: RequestMethod.GET },
   { path: 'orders/:id', method: RequestMethod.GET },
   { path: 'me', method: RequestMethod.GET },
+  { path: 'devices/:id', method: RequestMethod.DELETE },
 ];
 
 /**

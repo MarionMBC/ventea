@@ -9,7 +9,12 @@ export const publicTenantSchema = z.object({
   branding: z.object({
     primaryColor: z.string(),
     secondaryColor: z.string(),
+    /** Opcional (TASK-016): null si la marca no definió acento. */
+    accentColor: z.string().nullable().optional(),
+    /** URL absoluta (`https://<host>/api/media/…`) o null. */
     logoUrl: z.string().nullable(),
+    /** Ícono cuadrado de la app (TASK-016), URL absoluta o null. */
+    iconUrl: z.string().nullable().optional(),
     appDisplayName: z.string().nullable(),
   }),
   rewardProgram: rewardProgramSchema,

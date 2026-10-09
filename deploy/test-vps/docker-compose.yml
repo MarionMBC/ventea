@@ -52,6 +52,16 @@ services:
       MS_PAYMENTS_KEY: ${MS_PAYMENTS_KEY:-}
       MS_PAYMENTS_PROVIDER: ${MS_PAYMENTS_PROVIDER:-}
       BILLING_CYCLE_INTERVAL_MINUTES: ${BILLING_CYCLE_INTERVAL_MINUTES:-}
+      # Medios y push (TASK-016). MEDIA_DIR es el volumen `media` (entra en el respaldo).
+      # Opcionales: cuota 200 MB por marca, 60 subidas/hora por marca, base = host del request.
+      MEDIA_DIR: /data/media
+      MEDIA_QUOTA_MB: ${MEDIA_QUOTA_MB:-}
+      MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: ${MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      # 32 bytes (openssl rand -base64 32). Vacía = push apagado (no se aceptan credenciales).
+      # Perderla deja ilegibles las credenciales FCM guardadas: va al gestor de secretos.
+      PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+    volumes: [media:/data/media]
     networks: [internal, dokploy-network]
     depends_on:
       postgres: { condition: service_healthy }
@@ -71,3 +81,4 @@ networks:
   dokploy-network: { external: true }
 volumes:
   pgdata:
+  media: # imágenes de las marcas (TASK-016): respaldarlo junto con la base

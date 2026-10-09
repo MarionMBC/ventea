@@ -25,6 +25,14 @@ Object.assign(process.env, {
   BILLING_SCHEDULER_ENABLED: 'false',
   // Altas de tarjeta por IP y día: todos los e2e salen de 127.0.0.1.
   BILLING_IP_RATE_LIMIT_PER_DAY: '1000',
+  // Medios (TASK-016): directorio temporal propio, nunca el de desarrollo. Cuota y rate limit
+  // por defecto (200 MB, 60/h): los tests que los prueban los bajan con su propia app.
+  MEDIA_DIR: require('node:path').join(require('node:os').tmpdir(), 'ventea-e2e-media'),
+  MEDIA_QUOTA_MB: '',
+  MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR: '',
+  MEDIA_PUBLIC_BASE_URL: '',
+  // Push (TASK-016): clave de prueba de 32 bytes (hex). El transporte es FakePushTransport.
+  PUSH_CREDENTIALS_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
 });
 
 module.exports = { E2E_DATABASE_URL };
