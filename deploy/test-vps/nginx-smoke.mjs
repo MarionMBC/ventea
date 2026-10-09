@@ -248,6 +248,8 @@ async function main() {
       const js = /<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(r.body)?.[1];
       const bundle = js ? await raw(B, js) : { status: 0, body: '' };
       check(`${B}${js ?? '/assets/*.js'} bundle 200`, bundle.status === 200, `${bundle.status}`);
+      const map = js ? await raw(B, `${js}.map`) : { status: 0 };
+      check(`${B}${js ?? '/assets/*.js'}.map → 404 (sin sourcemaps públicos)`, map.status === 404, `${map.status}`);
     }
 
     // ── Headers ────────────────────────────────────────────────────────────────────────────

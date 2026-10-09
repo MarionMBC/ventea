@@ -39,7 +39,8 @@ const escapeHtml = (value: string) =>
  * from the bundle, API calls only to the brand's API.
  */
 const apiOrigins = [brand.apiUrl, process.env.VITE_API_URL]
-  .filter((url): url is string => Boolean(url))
+  // Solo URLs absolutas aportan un origen; una relativa (`/api`) ya es 'self'.
+  .filter((url): url is string => Boolean(url) && /^https?:\/\//i.test(url))
   .map((url) => new URL(url).origin);
 const buildCsp = (origins: string[]): string =>
   [
