@@ -14,6 +14,7 @@ import { MediaModule } from './modules/media/media.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { PushModule } from './modules/push/push.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import {
   SUBSCRIPTION_OPEN_ROUTES,
@@ -43,6 +44,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MediaModule,
     PushModule,
     BrandingModule,
+    ReportsModule,
   ],
   // Formato de error uniforme `{statusCode, message, error}` en toda la API.
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],

@@ -72,6 +72,7 @@ model Tenant {
   menuChanges     MenuChange[]
   appConfig       AppConfig?
   appConfigEvents AppConfigEvent[]
+  rewardCatalog   RewardCatalogItem[]
 
   @@map("tenants")
 }
@@ -461,6 +462,7 @@ model MenuItem {
   category       MenuCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   modifierGroups MenuItemModifierGroup[]
   orderLines     OrderLine[]
+  rewardItems    RewardCatalogItem[]
 
   @@index([tenantId, categoryId])
   @@index([tenantId, isAvailable])
@@ -552,7 +554,8 @@ model StaffMember {
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rewardEntries RewardLedgerEntry[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -635,6 +638,8 @@ model Order {
   @@index([tenantId, status])
   @@index([tenantId, customerId, placedAt])
   @@index([tenantId, locationId, placedAt])
+  /// Reportes (TASK-023): rango de fechas de toda la marca, sin filtro de sucursal.
+  @@index([tenantId, placedAt])
   @@map("orders")
 }
 
@@ -728,14 +733,53 @@ model RewardLedgerEntry {
   points    Int
   reason    RewardLedgerReason
   note      String?
+  /// Auditoría (TASK-023): quién del staff hizo el ajuste o el canje desde el panel. Null en
+  /// asientos automáticos (pedido, bono de registro, devolución de canje).
+  staffId   String?
+  /// Motivo interno del ajuste. Nunca sale a la app del cliente (`/api/rewards/ledger`).
+  staffNote String?
+  /// Recompensa del catálogo canjeada en el local (asiento `redemption` sin pedido).
+  rewardId  String?
   createdAt DateTime           @default(now())
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  order    Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  staff    StaffMember?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  reward   RewardCatalogItem? @relation(fields: [rewardId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, customerId, createdAt])
   @@map("reward_ledger_entries")
+}
+
+/// Recompensa canjeable del catálogo de la marca (TASK-023): un producto del menú o un
+/// descuento fijo, por un costo en puntos. La app la muestra; se canjea en el local (panel).
+model RewardCatalogItem {
+  id            String            @id @default(uuid())
+  tenantId      String
+  name          String
+  pointsCost    Int
+  kind          RewardCatalogKind
+  /// `item`: producto del menú que se entrega. SetNull si el producto se borra del todo.
+  menuItemId    String?
+  /// `discount`: monto fijo en centavos.
+  discountCents Int?
+  isActive      Boolean           @default(true)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  menuItem      MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  ledgerEntries RewardLedgerEntry[]
+
+  @@index([tenantId, isActive, sortOrder])
+  @@map("reward_catalog_items")
+}
+
+enum RewardCatalogKind {
+  item
+  discount
 }
 
 enum RewardLedgerReason {
