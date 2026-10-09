@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TERMS_VERSION } from '@/config';
-import { es } from '@/i18n';
+import { en, es } from '@/i18n';
 import { beaconEvents, callsTo, json, mockFetch, PLANS, text } from '@/test/fixtures';
 import { renderEs } from '@/test/render';
 
@@ -289,5 +289,80 @@ describe('Registro (AC2)', () => {
     await waitFor(() =>
       expect(screen.getByRole('link', { name: 'Entrar a mi panel' })).toBeTruthy(),
     );
+  });
+});
+
+describe('Registro: nombres con links (TASK-021)', () => {
+  async function toRestaurantStep(name: string) {
+    await screen.findByRole('radio', { name: /Pro/ });
+    next();
+    fireEvent.change(screen.getByLabelText('Nombre del restaurante'), { target: { value: name } });
+    await screen.findByText('¡Está libre!', {}, { timeout: 2000 });
+    next();
+  }
+
+  it('en el cliente: el nombre del restaurante con una dirección web no avanza y dice qué quitar', async () => {
+    const fetchMock = api();
+    render(<SignupPage search="" />);
+    await toRestaurantStep('Pollos www.evil');
+
+    expect(screen.getByText(es.signup.errors.nameLink)).toBeTruthy();
+    expect(screen.getByLabelText('Nombre del restaurante')).toBeTruthy();
+    expect(screen.queryByLabelText('Tu nombre')).toBeNull();
+    expect(callsTo(fetchMock, '/platform/signup')).toHaveLength(0);
+  });
+
+  it('en el cliente: un punto pegado («Pollo.Express») es un nombre válido', async () => {
+    api();
+    render(<SignupPage search="" />);
+    await toRestaurantStep('Pollo.Express');
+    expect(screen.queryByText(es.signup.errors.nameLink)).toBeNull();
+    expect(screen.getByLabelText('Tu nombre')).toBeTruthy();
+  });
+
+  it('en el cliente: tu nombre con «@» o «/» no se envía', async () => {
+    const fetchMock = api();
+    render(<SignupPage search="" />);
+    await fillRestaurant();
+    fillOwner();
+    fireEvent.change(screen.getByLabelText('Tu nombre'), { target: { value: 'soporte@evil' } });
+    submit();
+    expect(screen.getByText(es.signup.errors.ownerLink)).toBeTruthy();
+    expect(callsTo(fetchMock, '/platform/signup')).toHaveLength(0);
+  });
+
+  it('400 de la API por el nombre del restaurante: mensaje del campo, en el paso del nombre', async () => {
+    api(() =>
+      json(
+        {
+          message: 'Datos inválidos',
+          issues: [{ path: 'restaurantName', message: 'Quita la dirección web' }],
+        },
+        400,
+      ),
+    );
+    render(<SignupPage search="" />);
+    await fillRestaurant();
+    fillOwner();
+    submit();
+    expect(text(await screen.findByRole('alert'))).toContain(es.signup.errors.nameLink);
+    expect(screen.getByLabelText('Nombre del restaurante')).toBeTruthy();
+  });
+
+  it('400 de la API por tu nombre: mensaje del campo, en el paso del dueño', async () => {
+    api(() =>
+      json({ message: 'Datos inválidos', issues: [{ path: 'ownerName', message: 'x' }] }, 400),
+    );
+    render(<SignupPage search="" />);
+    await fillRestaurant();
+    fillOwner();
+    submit();
+    expect(text(await screen.findByRole('alert'))).toContain(es.signup.errors.ownerLink);
+    expect(screen.getByLabelText('Tu nombre')).toBeTruthy();
+  });
+
+  it('los mensajes existen en inglés', () => {
+    expect(en.signup.errors.nameLink).toMatch(/web address/);
+    expect(en.signup.errors.ownerLink).toMatch(/your name/);
   });
 });
