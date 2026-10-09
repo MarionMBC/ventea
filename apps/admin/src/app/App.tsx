@@ -19,6 +19,7 @@ import {
   PlatformProvider,
   type PlatformServices,
 } from '@/features/platform/services';
+import { Emails } from '@/features/platform/Emails';
 import { Funnel } from '@/features/platform/Funnel';
 import { TenantApp } from '@/features/platform/TenantApp';
 import { TenantDetail } from '@/features/platform/TenantDetail';
@@ -111,6 +112,7 @@ export function App({
                         <Route path="marcas/:slug/app" element={<TenantApp />} />
                         <Route path="apps" element={<AppRequests />} />
                         <Route path="embudo" element={<Funnel />} />
+                        <Route path="correos" element={<Emails />} />
                         <Route path="*" element={<Navigate to="/plataforma" replace />} />
                       </Route>
                     </>
