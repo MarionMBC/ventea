@@ -15,9 +15,11 @@
 # siguen yendo enteros a la API.
 #
 # `app.ventea.tech` (TASK-007: landing, registro y panel de plataforma; antes en el apex)
-# lleva los mismos dos routers que una marca. El apex `ventea.tech` y `www.ventea.tech`
-# van solo al web, que responde 301 a app. conservando ruta y query. nginx elige el sitio
-# por el header Host (deploy/nginx.conf). `app` es un slug reservado: ninguna marca lo pisa.
+# lleva los mismos dos routers que una marca. El apex `ventea.tech` (sitio corporativo,
+# apps/site, TASK-008) y `www.ventea.tech` (nginx: 301 al apex) van solo al web, sin `/api`:
+# el sitio no llama a ninguna API. Las rutas viejas del SaaS en el apex (/registro, …) las
+# redirige nginx a app. nginx elige el sitio por el header Host (deploy/nginx.conf). `app`
+# es un slug reservado: ninguna marca lo pisa.
 #
 # Corre por cron cada minuto (install-cron.sh, TASK-004): una marca registrada sola
 # queda publicada con certificado en <= 2 min. Por eso SOLO reescribe el archivo de
@@ -114,8 +116,8 @@ trap 'rm -f "$NEW"' EXIT
     router "$name-api" "Host(\`$h\`) && (PathPrefix(\`/api/\`) || Path(\`/api\`))" ventea-test 100
     router "$name-web" "Host(\`$h\`)" ventea-test-web "$web_priority"
   done
-  # Apex y www: solo web; nginx responde 301 a app. (cada uno necesita su certificado para
-  # que el https:// del redirect funcione).
+  # Apex (sitio corporativo) y www (nginx 301 al apex): solo web, sin /api. Cada uno con su
+  # certificado (el https:// del redirect de www lo necesita).
   for h in $apex_host $www_host; do
     router "ventea-test-$(echo "$h" | tr '.' '-')-web" "Host(\`$h\`)" ventea-test-web 50
   done
@@ -155,6 +157,6 @@ docker run --rm -v "$DYNAMIC_DIR":/d -v "$PWD":/s:ro alpine \
 echo "$(date -u +%FT%TZ) ✓ rutas publicadas:"
 for h in $api_hosts; do echo "  https://$h (API)"; done
 echo "  https://$app_host (landing + registro; panel de plataforma en /admin/plataforma; /api → API)"
-echo "  https://$apex_host (301 → https://$app_host)"
-echo "  https://$www_host (301 → https://$app_host)"
+echo "  https://$apex_host (sitio corporativo; rutas viejas del SaaS → 301 https://$app_host)"
+echo "  https://$www_host (301 → https://$apex_host)"
 for h in $tenant_hosts; do echo "  https://$h (web + panel /admin, /api → API)"; done
