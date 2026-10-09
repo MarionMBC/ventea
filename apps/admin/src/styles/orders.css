@@ -225,6 +225,7 @@
   font-size: var(--fs-sm);
   font-weight: 700;
   line-height: 1.15;
+  white-space: nowrap;
   cursor: pointer;
 }
 

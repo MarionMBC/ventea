@@ -19,15 +19,12 @@ export const es: Messages = {
   'nav.rewards': 'Puntos',
   'nav.staff': 'Equipo',
   'nav.reports': 'Reportes',
-  'nav.activeOrders_one': '{count} pedido activo',
-  'nav.activeOrders_other': '{count} pedidos activos',
 
   'shell.openMenu': 'Abrir menú',
   'shell.closeMenu': 'Cerrar menú',
   'shell.collapse': 'Contraer barra lateral',
   'shell.expand': 'Expandir barra lateral',
   'shell.signOut': 'Cerrar sesión',
-  'shell.account': 'Sesión de {name}',
 
   'role.owner': 'Dueño',
   'role.manager': 'Encargado',
@@ -113,6 +110,9 @@ export const es: Messages = {
   'column.confirmed': 'Nuevos',
   'column.preparing': 'En cocina',
   'column.ready': 'Listos',
+  'column.short.confirmed': 'Nuevos',
+  'column.short.preparing': 'Cocina',
+  'column.short.ready': 'Listos',
 
   'status.draft': 'Borrador',
   'status.pending_payment': 'Esperando pago',
@@ -137,7 +137,6 @@ export const es: Messages = {
   'card.new': 'Nuevo',
   'card.markSeen': 'Nuevo: marcar {code} como visto',
   'card.placedAt': 'Recibido a las {time}',
-  'card.waiting': 'Esperando {elapsed}',
   'card.late': 'Demorado',
   'card.itemNote': 'Nota: {note}',
   'card.orderNote': 'Nota del pedido:',

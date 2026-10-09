@@ -165,7 +165,9 @@ export function OrdersBoard() {
                 aria-pressed={mobileColumn === column.status}
                 onClick={() => setMobileColumn(column.status)}
               >
-                {t(column.title)}
+                {/* Teléfono: rótulo corto visible (no se parte en 2 líneas a 390 px). */}
+                <span aria-hidden="true">{t(column.short)}</span>
+                <span className="sr-only">{t(column.title)}</span>
                 <span className="count">{ordersInColumn(orders, column.status).length}</span>
               </button>
             ))}

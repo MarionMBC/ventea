@@ -9,10 +9,25 @@ import type { TKey } from '@/i18n';
 
 /** Estados que viven en el tablero, en orden de columna. */
 export const BOARD_COLUMNS = [
-  { status: 'confirmed', title: 'column.confirmed', hint: 'board.columnHint.confirmed' },
-  { status: 'preparing', title: 'column.preparing', hint: 'board.columnHint.preparing' },
-  { status: 'ready', title: 'column.ready', hint: 'board.columnHint.ready' },
-] as const satisfies readonly { status: OrderStatus; title: TKey; hint: TKey }[];
+  {
+    status: 'confirmed',
+    title: 'column.confirmed',
+    short: 'column.short.confirmed',
+    hint: 'board.columnHint.confirmed',
+  },
+  {
+    status: 'preparing',
+    title: 'column.preparing',
+    short: 'column.short.preparing',
+    hint: 'board.columnHint.preparing',
+  },
+  {
+    status: 'ready',
+    title: 'column.ready',
+    short: 'column.short.ready',
+    hint: 'board.columnHint.ready',
+  },
+] as const satisfies readonly { status: OrderStatus; title: TKey; short: TKey; hint: TKey }[];
 
 export type BoardStatus = (typeof BOARD_COLUMNS)[number]['status'];
 

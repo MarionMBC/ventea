@@ -236,6 +236,15 @@ describe('Tablero de pedidos', () => {
     expect(window.localStorage.getItem('ventea.admin.sound')).toBe('on');
   });
 
+  it('selector de columna del teléfono: rótulo corto visible, nombre completo accesible', async () => {
+    renderPanel([makeOrder({ code: 'CHC-6100', status: 'preparing' })]);
+    await screen.findByText('CHC-6100');
+    const group = screen.getByRole('group', { name: 'Column to show' });
+    const kitchen = within(group).getByRole('button', { name: /In the kitchen/ });
+    expect(kitchen.querySelector('[aria-hidden="true"]')?.textContent).toBe('Kitchen');
+    expect(kitchen.textContent).toContain('1');
+  });
+
   it('estado vacío', async () => {
     renderPanel([]);
     expect(await screen.findByText('No active orders')).toBeTruthy();

@@ -21,15 +21,12 @@ export const en = {
   'nav.rewards': 'Rewards',
   'nav.staff': 'Team',
   'nav.reports': 'Reports',
-  'nav.activeOrders_one': '{count} active order',
-  'nav.activeOrders_other': '{count} active orders',
 
   'shell.openMenu': 'Open menu',
   'shell.closeMenu': 'Close menu',
   'shell.collapse': 'Collapse sidebar',
   'shell.expand': 'Expand sidebar',
   'shell.signOut': 'Sign out',
-  'shell.account': 'Signed in as {name}',
 
   'role.owner': 'Owner',
   'role.manager': 'Manager',
@@ -116,6 +113,9 @@ export const en = {
   'column.confirmed': 'New',
   'column.preparing': 'In the kitchen',
   'column.ready': 'Ready',
+  'column.short.confirmed': 'New',
+  'column.short.preparing': 'Kitchen',
+  'column.short.ready': 'Ready',
 
   'status.draft': 'Draft',
   'status.pending_payment': 'Awaiting payment',
@@ -140,7 +140,6 @@ export const en = {
   'card.new': 'New',
   'card.markSeen': 'New: mark {code} as seen',
   'card.placedAt': 'Placed at {time}',
-  'card.waiting': 'Waiting {elapsed}',
   'card.late': 'Running late',
   'card.itemNote': 'Note: {note}',
   'card.orderNote': 'Order note:',

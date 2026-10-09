@@ -21,6 +21,25 @@ describe('dictionaries', () => {
     }
   });
 
+  it('every key is used by the panel (no dead translations)', () => {
+    const files = import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}'], {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    });
+    const code = Object.entries(files)
+      .filter(([path]) => !/\/i18n\/(en|es)\.ts$/.test(path))
+      .map(([, source]) => source)
+      .join('\n');
+    expect(Object.keys(files).length).toBeGreaterThan(20);
+    // Keys built at runtime: `role.${role}`, `plan.${code}`, `fulfillment.${type}`…
+    const dynamic = [...code.matchAll(/`([a-z]+)\.\$\{/gi)].map((m) => `${m[1]}.`);
+    const unused = Object.keys(en)
+      .map((key) => key.replace(/_(one|other)$/, ''))
+      .filter((key) => !code.includes(`'${key}'`) && !dynamic.some((p) => key.startsWith(p)));
+    expect([...new Set(unused)]).toEqual([]);
+  });
+
   it('plural keys always come in _one/_other pairs', () => {
     const keys = Object.keys(en);
     for (const key of keys.filter((k) => k.endsWith('_one'))) {
