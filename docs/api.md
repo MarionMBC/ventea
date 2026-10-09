@@ -22,10 +22,11 @@ atendiendo** (menú, pedidos, todo) hasta `currentPeriodEnd + 7 días` (`graceEn
 (`packages/shared/src/contracts`): la API valida con ellos y las apps los usan como tipos.
 
 **Códigos estables de error (TASK-017):** el cuerpo de error es `{statusCode, message, error}`;
-los límites del plan agregan `code: "plan_limit"` y `limit: {resource: locations · branded_app,
+los límites del plan agregan `code: "plan_limit"` y `limit: {resource: locations · branded_app · staff,
 plan (código), planName, max}` (`max: null` = el plan no lo incluye). `message` sigue en español; los clientes
 traducen por `code` (`packages/shared/src/contracts/errors.ts`). Hoy: alta de sucursal y cambio de
-plan con sucursales de más (`locations`, 403/409) y solicitud de app propia (`branded_app`, 403).
+plan con sucursales de más (`locations`, 403/409) y solicitud de app propia (`branded_app`, 403), invitar o reactivar
+usuarios del panel con el cupo lleno (`staff`, 403; TASK-022).
 
 ## Autenticación
 
@@ -301,6 +302,53 @@ Solo el **dueño**. Contratos en `packages/shared/src/contracts/brand.ts`.
 - **Solicitud:** crea la `AppConfig` con `bundleId = app.ventea.<slug sin guiones>` y `publisher`
   por plan (Pro → `ventea`, Cadena → `client`, [ADR 0008](adr/0008-publicacion-apps-por-marca.md)),
   estado `requested` y un `AppConfigEvent`.
+
+## Sucursales desde el panel (`/api/staff/locations`, TASK-022)
+
+Lee cualquier staff; escriben owner y manager. Cada escritura con advisory lock por marca.
+
+| Método | Ruta                       | Notas                                                                                                                                                |
+| ------ | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/staff/locations`     | todas (con inactivas) + `hasOrders` + `usage {used, max, plan, planName}` (activas contra el plan)                                                   |
+| POST   | `/api/staff/locations`     | `{name, address, phone?, openingHours?, isActive?, acceptsOrders?, latitude?, longitude?}` → `201`; activa sobre el tope del plan → `403 plan_limit` |
+| PATCH  | `/api/staff/locations/:id` | parcial; reactivar sobre el tope → `403 plan_limit`; desactivar la última activa → `409`                                                             |
+| DELETE | `/api/staff/locations/:id` | `204`; con pedidos o la última activa → `409`                                                                                                        |
+
+`openingHours`: `[{day 0-6, opens "HH:MM", closes "HH:MM"}]`, ≤ 2 tramos por día; `closes < opens` = cierra
+pasada la medianoche. `acceptsOrders: false` = la sucursal se lista en la app (`GET /api/locations` lo
+expone) pero `POST /api/orders` responde `400`; `GET /api/menu` sin `locationId` prefiere una que acepte.
+
+## Equipo (`/api/staff/team`, TASK-022)
+
+Solo el dueño. Roles asignables `manager` · `staff`. Cupo del plan (`plans.maxStaff`: Básico 3, Pro 10,
+Cadena sin límite) = miembros activos + invitaciones pendientes.
+
+| Método | Ruta                                         | Notas                                                                                                        |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/staff/team`                            | `{members[] (con isSelf), invitations[] (pendientes), usage}`                                                |
+| POST   | `/api/staff/team/invitations`                | `{email, role}` → `201 {invitation, token, expiresAt}`; ya es miembro → `409`; cupo lleno → `403`            |
+| DELETE | `/api/staff/team/invitations/:id`            | revoca → `204`                                                                                               |
+| PATCH  | `/api/staff/team/members/:id`                | `{role?, isActive?}` → `204`; a sí mismo o dejar la marca sin dueño activo → `409`; reactivar sin cupo `403` |
+| POST   | `/api/staff/team/members/:id/password-reset` | `201 {token, expiresAt}`; a sí mismo o desactivado → `409`                                                   |
+
+Públicos (quien recibe el enlace), token SIEMPRE en el cuerpo, rate limit por IP
+(`TEAM_LINK_ATTEMPT_RATE_LIMIT_PER_HOUR`, 30); crear enlaces, por marca (`TEAM_LINK_RATE_LIMIT_PER_HOUR`, 30):
+
+| Método | Ruta                                     | Notas                                                       |
+| ------ | ---------------------------------------- | ----------------------------------------------------------- |
+| POST   | `/api/staff/auth/invitation/lookup`      | `{token}` → `{email, role, brandName, expiresAt}`           |
+| POST   | `/api/staff/auth/invitation/accept`      | `{token, name, password}` → sesión de staff (como el login) |
+| POST   | `/api/staff/auth/password-reset/lookup`  | `{token}` → `{email, name, expiresAt}`                      |
+| POST   | `/api/staff/auth/password-reset/confirm` | `{token, password}` → sesión de staff; corta las anteriores |
+
+- **Tokens:** 32 bytes base64url, la base guarda su sha256; un solo uso, 72 h; uno nuevo revoca el
+  anterior (mismo email / mismo miembro). Inválido, vencido, usado, revocado o de otra marca → el
+  mismo `404`. El panel arma el enlace con el token en el fragmento (`/admin/join#…`,
+  `/admin/reset-password#…`). Sin correo todavía: el dueño copia el enlace (`TeamService.deliver`,
+  `TODO(TASK-021)`).
+- **Sesiones:** el JWT de staff lleva `ver` (`StaffMember.tokenVersion`); el guard compara contra la
+  base en cada request y toma el rol de la base. Cambio de rol, desactivación y contraseña nueva lo
+  suben: las sesiones vivas del miembro mueren en el acto (`401`).
 
 ## Push (`/api/devices`, TASK-016)
 
