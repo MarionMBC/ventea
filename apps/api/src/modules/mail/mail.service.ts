@@ -20,7 +20,8 @@ import type { PrismaClientExtended, PrismaDb } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
 
 import { parseRecipient } from './mail-address';
-import { renderEmail, SECRET_LINK_KINDS, type EmailTemplateData } from './mail-templates';
+import { openSecretLink, sealSecretLink, secretLinkField, withoutSecretLink } from './mail-secret';
+import { renderEmail, type EmailTemplateData } from './mail-templates';
 import { MAIL_TRANSPORT, type MailTransport } from './mail-transport';
 import { MailSettings } from './mail.settings';
 
@@ -91,6 +92,11 @@ export class MailService implements BeforeApplicationShutdown {
     private readonly settings: MailSettings,
   ) {}
 
+  /** Hay SMTP: los correos salen (si no, quedan `skipped`). */
+  get configured(): boolean {
+    return this.transport.configured;
+  }
+
   /** `true` si se creó; `false` si ya existía uno con esa `dedupeKey`. */
   async enqueue(mail: EnqueueMail, db?: PrismaDb): Promise<boolean> {
     const to = parseRecipient(mail.to);
@@ -100,6 +106,19 @@ export class MailService implements BeforeApplicationShutdown {
     }
     // Se arma ya: datos inválidos fallan acá (en el llamador), no horas después en el envío.
     const { subject } = renderEmail(mail.kind, mail.language, mail.payload, this.settings.links);
+    let payload: unknown = mail.payload;
+    if (secretLinkField(mail.kind)) {
+      // TASK-022: el link de un solo uso nunca se guarda en claro (ver mail-secret.ts).
+      if (!this.settings.secretLinkKey) {
+        throw new Error(`Sin clave para guardar el link del correo ${mail.kind}`);
+      }
+      payload = sealSecretLink(
+        mail.kind,
+        mail.payload,
+        this.settings.secretLinkKey,
+        mail.dedupeKey,
+      );
+    }
     const { count } = await (db ?? this.prisma).emailMessage.createMany({
       data: [
         {
@@ -108,7 +127,7 @@ export class MailService implements BeforeApplicationShutdown {
           to,
           subject,
           language: mail.language,
-          payload: mail.payload as Prisma.InputJsonValue,
+          payload: payload as Prisma.InputJsonValue,
           dedupeKey: mail.dedupeKey,
         },
       ],
@@ -210,7 +229,7 @@ export class MailService implements BeforeApplicationShutdown {
   private async reclaimStale(now: Date): Promise<void> {
     const stale = await this.prisma.emailMessage.findMany({
       where: { status: 'sending', updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
-      select: { id: true, attempts: true, updatedAt: true },
+      select: { id: true, attempts: true, updatedAt: true, kind: true, payload: true },
       take: 100,
     });
     for (const row of stale) {
@@ -220,7 +239,7 @@ export class MailService implements BeforeApplicationShutdown {
         where: { id: row.id, status: 'sending', updatedAt: row.updatedAt },
         data:
           attempts >= MAX_ATTEMPTS
-            ? { status: 'failed', attempts, error: STALE_ERROR }
+            ? { status: 'failed', attempts, error: STALE_ERROR, ...withoutSecretLink(row) }
             : {
                 status: 'pending',
                 attempts,
@@ -235,6 +254,16 @@ export class MailService implements BeforeApplicationShutdown {
 
   /** Plataforma: vuelve a encolar un correo `failed` (404 si no existe, 409 si no falló). */
   async resend(id: string): Promise<PlatformEmail> {
+    const target = await this.prisma.emailMessage.findUnique({
+      where: { id },
+      select: { kind: true },
+    });
+    if (target && secretLinkField(target.kind)) {
+      // TASK-022: el link ya no está (se borra al fallar) y su token solo vive como hash.
+      throw new ConflictException(
+        'Este correo llevaba un enlace de un solo uso: el dueño regenera el enlace desde Equipo',
+      );
+    }
     const { count } = await this.prisma.emailMessage.updateMany({
       where: { id, status: 'failed' },
       data: { status: 'pending', attempts: 0, nextAttemptAt: new Date(), error: null },
@@ -302,12 +331,17 @@ export class MailService implements BeforeApplicationShutdown {
       rendered = renderEmail(
         message.kind,
         message.language === 'en' ? 'en' : 'es',
-        message.payload,
+        openSecretLink(
+          message.kind,
+          message.payload,
+          this.settings.secretLinkKey,
+          message.dedupeKey,
+        ),
         this.settings.links,
       );
     } catch (error) {
       // Datos que no arman el correo: reintentar no lo arregla.
-      await this.fail(id, attempts, describe(error), true, now);
+      await this.fail(message, attempts, describe(error), true, now);
       return;
     }
 
@@ -321,7 +355,7 @@ export class MailService implements BeforeApplicationShutdown {
         html: rendered.html,
       });
     } catch (error) {
-      await this.fail(id, attempts, describe(error), attempts >= MAX_ATTEMPTS, now);
+      await this.fail(message, attempts, describe(error), attempts >= MAX_ATTEMPTS, now);
       return;
     }
     await this.prisma.emailMessage.update({
@@ -338,7 +372,7 @@ export class MailService implements BeforeApplicationShutdown {
   }
 
   private async fail(
-    id: string,
+    message: { id: string; kind: string; payload: Prisma.JsonValue },
     attempts: number,
     reason: string,
     permanent: boolean,
@@ -346,10 +380,11 @@ export class MailService implements BeforeApplicationShutdown {
   ): Promise<void> {
     const error = redactSensitive(reason).slice(0, MAX_ERROR_LENGTH);
     const delay = RETRY_DELAYS_MS[Math.min(attempts - 1, RETRY_DELAYS_MS.length - 1)] ?? 0;
+    const { id } = message;
     await this.prisma.emailMessage.update({
       where: { id },
       data: permanent
-        ? { status: 'failed', attempts, error }
+        ? { status: 'failed', attempts, error, ...withoutSecretLink(message) }
         : { status: 'pending', attempts, error, nextAttemptAt: new Date(now.getTime() + delay) },
     });
     this.logger.warn(
@@ -379,20 +414,6 @@ export class MailService implements BeforeApplicationShutdown {
     this.inFlight.add(task);
     void task.finally(() => this.inFlight.delete(task));
   }
-}
-
-/**
- * Correo con un link secreto de un solo uso (TASK-022) que ya no se va a reenviar (`sent` o
- * `skipped`): el payload guardado pierde el link, así la outbox no conserva tokens válidos. Un
- * `failed` lo conserva porque la plataforma puede reenviarlo (vence igual a las 72 h).
- */
-function withoutSecretLink(message: { kind: string; payload: Prisma.JsonValue }): {
-  payload?: Prisma.InputJsonValue;
-} {
-  const key = (SECRET_LINK_KINDS as Record<string, string | undefined>)[message.kind];
-  const payload = message.payload;
-  if (!key || !payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
-  return { payload: { ...payload, [key]: '[redacted]' } as Prisma.InputJsonValue };
 }
 
 /** Los logs no llevan direcciones (un rechazo SMTP suele citar al destinatario). */
