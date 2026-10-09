@@ -9,6 +9,8 @@ import { mediaRefSchema } from './media.js';
 
 /** Tope de precio (10 millones en unidades mayores): evita overflow de Int32 al sumar. */
 const MAX_CENTS = 1_000_000_000;
+/** El mismo tope, para que los clientes lo validen con su propio mensaje. */
+export const MENU_MAX_CENTS = MAX_CENTS;
 const centsSchema = z.number().int().nonnegative().max(MAX_CENTS);
 const nameSchema = (max: number) => z.string().trim().min(1, 'Nombre requerido').max(max);
 const uuidList = (max: number) =>
