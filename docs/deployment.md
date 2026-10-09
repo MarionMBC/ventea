@@ -34,15 +34,15 @@ Las imágenes que suben las marcas (fotos del menú, logo, ícono) viven en el *
 directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los dos compose
 (`deploy/test-vps/docker-compose.yml` y `deploy/docker-compose.prod.yml`) lo declaran.
 
-| Variable                           | Default                                | Qué hace                                                                            |
-| ---------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
-| `MEDIA_DIR`                        | `/data/media` (prod) · `./media` (dev) | raíz de los archivos                                                                |
-| `MEDIA_QUOTA_MB`                   | `200`                                  | cuota por marca (imagen + miniatura)                                                |
-| `MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR` | `60`                                   | subidas por marca y hora (en memoria, por proceso)                                  |
-| `MEDIA_PROCESSING_CONCURRENCY`     | `2`                                    | imágenes que sharp procesa a la vez por proceso; el resto espera                    |
-| `MEDIA_PROCESSING_WAIT_MS`         | `20000`                                | espera máxima por un lugar (después, `503`; más de 20 en fila, `503` en el acto)    |
-| `MEDIA_PUBLIC_BASE_URL`            | host del request                       | base fija de las URLs absolutas (CDN o dominio canónico)                            |
-| `PUSH_CREDENTIALS_KEY`             | vacía = push apagado                   | 32 bytes (`openssl rand -base64 32`) para cifrar las credenciales FCM de cada marca |
+| Variable                           | Default                                | Qué hace                                                                                                                                                                                                                                   |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MEDIA_DIR`                        | `/data/media` (prod) · `./media` (dev) | raíz de los archivos                                                                                                                                                                                                                       |
+| `MEDIA_QUOTA_MB`                   | `200`                                  | cuota por marca (imagen + miniatura)                                                                                                                                                                                                       |
+| `MEDIA_UPLOAD_RATE_LIMIT_PER_HOUR` | `60`                                   | subidas por marca y hora (en memoria, por proceso)                                                                                                                                                                                         |
+| `MEDIA_PROCESSING_CONCURRENCY`     | `2`                                    | imágenes que sharp procesa a la vez por proceso; el resto espera                                                                                                                                                                           |
+| `MEDIA_PROCESSING_WAIT_MS`         | `20000`                                | espera máxima por un lugar (después, `503`; más de 20 en fila, `503` en el acto)                                                                                                                                                           |
+| `MEDIA_PUBLIC_BASE_URL`            | host del request                       | base fija de las URLs absolutas (CDN o dominio canónico). Vacía a propósito en test-vps: cada marca usa su host. Sin ella, solo se refleja un Host de `TENANT_BASE_DOMAIN` (apex o subdominio) o de `PUBLIC_ORIGIN`; otro → URLs relativas |
+| `PUSH_CREDENTIALS_KEY`             | vacía = push apagado                   | 32 bytes (`openssl rand -base64 32`) para cifrar las credenciales FCM de cada marca                                                                                                                                                        |
 
 - **Respaldo:** el volumen `media` entra en el respaldo junto con la base: `backup.sh` deja un
   `ventea-media-<fecha>.tar.gz` al lado del `.sql.gz`. Restaurar la base sin los medios deja

@@ -53,7 +53,9 @@ No hay revocación del lado del servidor: cerrar sesión es descartar los tokens
   (null si no hay), `appDisplayName`, `logoUrl` e `iconUrl`. Las URLs de imágenes subidas a
   Ventea salen **absolutas** (`https://<host del request>/api/media/<tenantId>/<hash>.webp`, o
   `MEDIA_PUBLIC_BASE_URL` si está definida): sirven igual en el web, la app nativa y el generador
-  de apps. Una URL heredada de antes de TASK-016 sale tal cual.
+  de apps. El host del request se usa solo si es de la plataforma (`TENANT_BASE_DOMAIN` y sus
+  subdominios, o el de `PUBLIC_ORIGIN`); con otro Host las URLs salen **relativas**
+  (`/api/media/…`). Una URL heredada de antes de TASK-016 sale tal cual.
 - **`/api/menu`** no muestra ítems ni categorías borrados desde el panel; `imageUrl` absoluta como
   arriba.
 

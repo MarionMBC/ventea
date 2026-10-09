@@ -8,6 +8,7 @@ import { detectImageFormat } from '@/modules/media/image-signature';
 import { MediaStorage } from '@/modules/media/media-storage';
 import {
   absoluteMediaUrl,
+  isAllowedHost,
   MEDIA_FILE_PATTERN,
   mediaPath,
   parseMediaRef,
@@ -89,10 +90,39 @@ describe('URLs de medios', () => {
       'https://legado.test/logo.png',
     );
     expect(absoluteMediaUrl(null, 'https://a.test')).toBeNull();
-    expect(publicBaseUrl('https://cdn.test///', 'http', 'x')).toBe('https://cdn.test');
-    expect(publicBaseUrl('', 'https', 'carolina.ventea.tech')).toBe('https://carolina.ventea.tech');
-    expect(publicBaseUrl(undefined, 'http', 'evil.test/"><script>')).toBe('http://localhost');
-    expect(publicBaseUrl(undefined, 'javascript', 'a.test')).toBe('http://a.test');
+    const prod = { baseDomain: 'ventea.tech', production: true };
+    expect(publicBaseUrl('https://cdn.test///', 'http', 'x', prod)).toBe('https://cdn.test');
+    expect(publicBaseUrl('', 'https', 'carolina.ventea.tech', prod)).toBe(
+      'https://carolina.ventea.tech',
+    );
+    expect(publicBaseUrl(undefined, 'javascript', 'API.ventea.tech', prod)).toBe(
+      'http://api.ventea.tech',
+    );
+  });
+
+  it('Host fuera de la plataforma → base vacía (URLs relativas), nunca el host del cliente', () => {
+    const prod = { baseDomain: 'ventea.tech', production: true };
+    for (const host of [
+      'evil.test',
+      'ventea.tech.evil.test',
+      'evilventea.tech',
+      'evil.test/"><script>',
+      'localhost:3000',
+      '127.0.0.1',
+      undefined,
+    ]) {
+      expect(publicBaseUrl(undefined, 'https', host, prod)).toBe('');
+    }
+    expect(publicBaseUrl(undefined, 'https', 'ventea.tech', prod)).toBe('https://ventea.tech');
+    expect(absoluteMediaUrl(mediaPath(TENANT, HASH), '')).toBe(mediaPath(TENANT, HASH));
+  });
+
+  it('PUBLIC_ORIGIN (instalación dedicada) y localhost solo fuera de producción', () => {
+    const single = { publicOrigin: 'https://pedidos.carolina.cl', production: true };
+    expect(isAllowedHost('pedidos.carolina.cl', single)).toBe(true);
+    expect(isAllowedHost('otro.carolina.cl', single)).toBe(false);
+    expect(isAllowedHost('127.0.0.1:51234', { production: false })).toBe(true);
+    expect(isAllowedHost('localhost', { production: true })).toBe(false);
   });
 });
 
