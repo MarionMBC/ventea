@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { textContrastOn, type Brand } from '@ventea/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { App, createQueryClient } from '@/app/App';
 import { createApiClient } from '@/lib/api';
 import { createSessionStore } from '@/lib/session';
-import { createFakeApi, json, STAFF_SESSION } from '@/test/fixtures';
+import { createFakeApi, json, STAFF_SESSION, type Handler } from '@/test/fixtures';
 import { makeMenu, menuHandler } from '@/test/menu-fixtures';
 
 import { brandPatch } from './BrandPage';
@@ -60,11 +60,14 @@ function makeBrand(overrides: Partial<Brand> = {}): Brand {
 function renderBrand({
   role = 'owner',
   brand = makeBrand(),
-}: { role?: 'owner' | 'manager' | 'staff'; brand?: Brand } = {}) {
+  before,
+}: { role?: 'owner' | 'manager' | 'staff'; brand?: Brand; before?: Handler } = {}) {
   const state = { brand, menu: makeMenu() };
   const api = createFakeApi();
   const menu = menuHandler(state);
-  api.setOverride((req) => {
+  api.setOverride(async (req) => {
+    const early = await before?.(req);
+    if (early) return early;
     if (req.path === '/api/staff/brand' && req.method === 'GET') return json(state.brand);
     if (req.path === '/api/staff/brand' && req.method === 'PATCH') {
       const next = { ...state.brand, ...(req.body as Partial<Brand>) };
@@ -148,7 +151,7 @@ describe('Mi marca', () => {
     // Color claro: advierte en vivo, sin guardar.
     fireEvent.change(hex, { target: { value: 'ffd400' } });
     expect(screen.getByText(/Black text reads better/)).toBeTruthy();
-    expect(figure.style.getPropertyValue('--pv-on-primary')).toBe('#111111');
+    expect(figure.style.getPropertyValue('--pv-on-primary')).toBe('#120f0e');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(
@@ -222,6 +225,114 @@ describe('Mi marca', () => {
     expect(screen.queryByRole('link', { name: 'App Store' })).toBeNull();
     expect(screen.getByText('Your developer account')).toBeTruthy();
     expect(screen.getByText('1.2.0')).toBeTruthy();
+  });
+});
+
+describe('Mi marca: subidas y guardado sin perder cambios', () => {
+  /** Subidas que responden cuando el test quiere, cada una con su URL. */
+  function deferredUploads() {
+    const pending: ((response: Response) => void)[] = [];
+    let n = 0;
+    const before: Handler = (req) =>
+      req.path === '/api/staff/media'
+        ? new Promise<Response>((resolve) => pending.push(resolve))
+        : undefined;
+    const release = async (index: number) => {
+      n += 1;
+      await act(async () =>
+        pending[index]!(
+          json(
+            {
+              url: `http://localhost/api/media/t/up-${n}.webp`,
+              thumbUrl: `http://localhost/api/media/t/up-${n}.thumb.webp`,
+              width: 512,
+              height: 512,
+            },
+            201,
+          ),
+        ),
+      );
+    };
+    return { before, release, count: () => pending.length };
+  }
+
+  const pick = (group: string) => {
+    const input = screen
+      .getByRole('group', { name: group })
+      .querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], `${group}.png`, { type: 'image/png' })] },
+    });
+  };
+
+  it('escribir mientras sube el logo no se pierde al terminar la subida', async () => {
+    const uploads = deferredUploads();
+    renderBrand({ before: uploads.before });
+    const name = (await screen.findByLabelText('App name')) as HTMLInputElement;
+    pick('Logo');
+    await waitFor(() => expect(uploads.count()).toBe(1));
+    fireEvent.change(name, { target: { value: 'Nuevo Nombre' } });
+    await uploads.release(0);
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('group', { name: 'Logo' }))
+          .getByRole('img', { name: 'Logo preview' })
+          .getAttribute('src'),
+      ).toBe('http://localhost/api/media/t/up-1.webp'),
+    );
+    expect(name.value).toBe('Nuevo Nombre');
+  });
+
+  it('logo e ícono subiendo a la vez: quedan los dos', async () => {
+    const uploads = deferredUploads();
+    const { api } = renderBrand({ before: uploads.before });
+    await screen.findByLabelText('App name');
+    pick('Logo');
+    pick('App icon');
+    await waitFor(() => expect(uploads.count()).toBe(2));
+    await uploads.release(1);
+    await uploads.release(0);
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await screen.findByText('Brand saved. Your app and online menu now use it.');
+    expect(api.calls.find((c) => c.method === 'PATCH')!.body).toEqual({
+      logoUrl: 'http://localhost/api/media/t/up-2.webp',
+      iconUrl: 'http://localhost/api/media/t/up-1.webp',
+    });
+  });
+
+  it('un hex a medio escribir bloquea Guardar', async () => {
+    renderBrand();
+    fireEvent.change(await screen.findByLabelText('App name'), { target: { value: 'Otro' } });
+    const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Primary color'), { target: { value: '#12' } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Primary color'), { target: { value: '#123456' } });
+    expect(save.disabled).toBe(false);
+  });
+
+  it('mientras guarda no se puede editar (nada se pierde en silencio)', async () => {
+    let release: (response: Response) => void = () => {};
+    renderBrand({
+      before: (req) =>
+        req.method === 'PATCH' && req.path === '/api/staff/brand'
+          ? new Promise<Response>((resolve) => (release = resolve))
+          : undefined,
+    });
+    const name = (await screen.findByLabelText('App name')) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Otro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(name.matches(':disabled')).toBe(true));
+    await act(async () => release(json(makeBrand({ appDisplayName: 'Otro' }))));
+    await waitFor(() => expect(name.matches(':disabled')).toBe(false));
+    expect(name.value).toBe('Otro');
+  });
+
+  it('la vista previa pinta los botones como la app: Carolina #e23b2e → #d9392c con blanco', async () => {
+    renderBrand();
+    const figure = (await screen.findByRole('img', { name: /Preview/ })).closest('figure')!;
+    expect(figure.style.getPropertyValue('--pv-primary')).toBe('#d9392c');
+    expect(figure.style.getPropertyValue('--pv-on-primary')).toBe('#ffffff');
   });
 });
 

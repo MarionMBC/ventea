@@ -5,11 +5,18 @@
 }
 
 .brand__main,
-.brand__form {
+.brand__form,
+.brand__fieldset {
   display: grid;
   align-content: start;
   gap: 16px;
   min-width: 0;
+}
+
+.brand__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .brand__preview {

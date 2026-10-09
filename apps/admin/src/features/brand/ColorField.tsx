@@ -39,6 +39,7 @@ export function ColorField({
   onChange,
   saved,
   optional,
+  onInvalid,
 }: {
   field: BrandWarning['field'];
   label: string;
@@ -48,6 +49,8 @@ export function ColorField({
   saved: { color: string | null; warnings: BrandWarning[] };
   /** El acento puede no estar: se ofrece quitarlo / agregarlo. */
   optional?: boolean;
+  /** Avisa si el hex escrito está a medias o mal: el formulario no debe guardarse así. */
+  onInvalid?: (field: BrandWarning['field'], invalid: boolean) => void;
 }) {
   const { t } = useI18n();
   const id = useId();
@@ -92,7 +95,10 @@ export function ColorField({
           className="color-field__swatch"
           value={value && HEX6.test(value) ? value.toLowerCase() : '#000000'}
           aria-label={t('brand.pickColor', { label })}
-          onChange={(event) => onChange(event.target.value.toLowerCase())}
+          onChange={(event) => {
+            onInvalid?.(field, false);
+            onChange(event.target.value.toLowerCase());
+          }}
         />
         <input
           id={`${id}-hex`}
@@ -107,6 +113,8 @@ export function ColorField({
             const next = event.target.value.trim();
             const withHash = next && !next.startsWith('#') ? `#${next}` : next;
             setText(withHash);
+            const valid = withHash === '' || HEX6.test(withHash);
+            onInvalid?.(field, !valid || withHash === '');
             if (HEX6.test(withHash)) onChange(withHash.toLowerCase());
           }}
         />
@@ -114,7 +122,10 @@ export function ColorField({
           <button
             type="button"
             className="btn btn--quiet btn--small"
-            onClick={() => onChange(null)}
+            onClick={() => {
+              onInvalid?.(field, false);
+              onChange(null);
+            }}
           >
             {t('brand.removeAccent')}
           </button>

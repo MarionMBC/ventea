@@ -85,6 +85,8 @@ export function BrandPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
   const [uploading, setUploading] = useState(0);
+  /** Campos de color con un hex a medio escribir: bloquean Guardar. */
+  const [badHex, setBadHex] = useState<ReadonlySet<string>>(new Set());
   const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,10 +134,20 @@ export function BrandPage() {
   const warnings = brand.data.warnings;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    setDraft({ ...current, [key]: value });
+    // Funcional: una subida que termina después (logo, ícono) no pisa lo escrito mientras tanto
+    // ni la otra subida.
+    setDraft((prev) => ({ ...(prev ?? saved), [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
     setFlash(null);
   };
+  const hexInvalid = (field: string, invalid: boolean) =>
+    setBadHex((prev) => {
+      if (prev.has(field) === invalid) return prev;
+      const next = new Set(prev);
+      if (invalid) next.add(field);
+      else next.delete(field);
+      return next;
+    });
   const busyUpload = (busy: boolean) => setUploading((n) => Math.max(0, n + (busy ? 1 : -1)));
 
   const validate = () => {
@@ -159,7 +171,7 @@ export function BrandPage() {
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!dirty || update.isPending || uploading > 0 || !validate()) return;
+    if (!dirty || update.isPending || uploading > 0 || badHex.size > 0 || !validate()) return;
     update.mutate(patch, {
       onSuccess: () => {
         setDraft(null);
@@ -171,6 +183,7 @@ export function BrandPage() {
   const discard = () => {
     setDraft(null);
     setErrors({});
+    setBadHex(new Set());
     update.reset();
   };
 
@@ -213,203 +226,209 @@ export function BrandPage() {
 
         <div className="brand__main">
           <form id={formId} className="brand__form" onSubmit={onSubmit} noValidate>
-            <article className="card" aria-labelledby="brand-identity">
-              <div className="card__head">
-                <span className="card__icon" aria-hidden="true">
-                  <IconStar size={20} />
-                </span>
-                <h2 id="brand-identity">{t('brand.identity')}</h2>
-              </div>
-              <div className="field">
-                <label className="field__label" htmlFor={`${formId}-name`}>
-                  {t('brand.appName')}
-                </label>
-                <input
-                  id={`${formId}-name`}
-                  className="field__input"
-                  value={current.appDisplayName}
-                  maxLength={30}
-                  aria-invalid={!!errors.appDisplayName}
-                  aria-describedby={[`${formId}-name-hint`, errorRef('appDisplayName')]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onChange={(event) => set('appDisplayName', event.target.value)}
-                />
-                <p id={`${formId}-name-hint`} className="field__hint">
-                  {t('brand.appNameHint', { count: 30 - current.appDisplayName.length })}
-                </p>
-                {fieldError('appDisplayName')}
-              </div>
-              <div className="brand__images">
-                <ImageUpload
-                  label={t('brand.logo')}
-                  hint={t('brand.logoHint')}
-                  value={current.logoUrl}
-                  onChange={(url) => set('logoUrl', url)}
-                  onBusyChange={busyUpload}
-                  shape="square"
-                />
-                <ImageUpload
-                  label={t('brand.icon')}
-                  hint={t('brand.iconHint')}
-                  value={current.iconUrl}
-                  onChange={(url) => set('iconUrl', url)}
-                  onBusyChange={busyUpload}
-                  shape="square"
-                />
-              </div>
-            </article>
-
-            <article className="card" aria-labelledby="brand-colors">
-              <div className="card__head">
-                <span className="card__icon" aria-hidden="true">
-                  <IconPalette size={20} />
-                </span>
-                <h2 id="brand-colors">{t('brand.colors')}</h2>
-              </div>
-              <ColorField
-                field="primaryColor"
-                label={t('brand.primary')}
-                hint={t('brand.primaryHint')}
-                value={current.primaryColor}
-                onChange={(value) => value && set('primaryColor', value)}
-                saved={savedColor('primaryColor')}
-              />
-              <ColorField
-                field="secondaryColor"
-                label={t('brand.secondary')}
-                hint={t('brand.secondaryHint')}
-                value={current.secondaryColor}
-                onChange={(value) => value && set('secondaryColor', value)}
-                saved={savedColor('secondaryColor')}
-              />
-              <ColorField
-                field="accentColor"
-                label={t('brand.accent')}
-                hint={t('brand.accentHint')}
-                value={current.accentColor}
-                onChange={(value) => set('accentColor', value)}
-                saved={savedColor('accentColor')}
-                optional
-              />
-            </article>
-
-            <article className="card" aria-labelledby="brand-store">
-              <div className="card__head">
-                <span className="card__icon" aria-hidden="true">
-                  <IconSmartphone size={20} />
-                </span>
-                <h2 id="brand-store">{t('brand.store')}</h2>
-              </div>
-              <div className="field">
-                <label className="field__label" htmlFor={`${formId}-desc`}>
-                  {t('brand.storeDescription')}{' '}
-                  <span className="field__optional">{t('common.optional')}</span>
-                </label>
-                <input
-                  id={`${formId}-desc`}
-                  className="field__input"
-                  value={current.storeShortDescription}
-                  maxLength={80}
-                  aria-describedby={`${formId}-desc-hint`}
-                  onChange={(event) => set('storeShortDescription', event.target.value)}
-                />
-                <p id={`${formId}-desc-hint`} className="field__hint">
-                  {t('brand.storeDescriptionHint', {
-                    count: 80 - current.storeShortDescription.length,
-                  })}
-                </p>
-              </div>
-              <div className="form-row">
+            {/* Mientras se guarda no se edita: lo que se escriba no se perdería en silencio. */}
+            <fieldset className="brand__fieldset" disabled={update.isPending}>
+              <article className="card" aria-labelledby="brand-identity">
+                <div className="card__head">
+                  <span className="card__icon" aria-hidden="true">
+                    <IconStar size={20} />
+                  </span>
+                  <h2 id="brand-identity">{t('brand.identity')}</h2>
+                </div>
                 <div className="field">
-                  <label className="field__label" htmlFor={`${formId}-email`}>
-                    {t('brand.supportEmail')}{' '}
+                  <label className="field__label" htmlFor={`${formId}-name`}>
+                    {t('brand.appName')}
+                  </label>
+                  <input
+                    id={`${formId}-name`}
+                    className="field__input"
+                    value={current.appDisplayName}
+                    maxLength={30}
+                    aria-invalid={!!errors.appDisplayName}
+                    aria-describedby={[`${formId}-name-hint`, errorRef('appDisplayName')]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onChange={(event) => set('appDisplayName', event.target.value)}
+                  />
+                  <p id={`${formId}-name-hint`} className="field__hint">
+                    {t('brand.appNameHint', { count: 30 - current.appDisplayName.length })}
+                  </p>
+                  {fieldError('appDisplayName')}
+                </div>
+                <div className="brand__images">
+                  <ImageUpload
+                    label={t('brand.logo')}
+                    hint={t('brand.logoHint')}
+                    value={current.logoUrl}
+                    onChange={(url) => set('logoUrl', url)}
+                    onBusyChange={busyUpload}
+                    shape="square"
+                  />
+                  <ImageUpload
+                    label={t('brand.icon')}
+                    hint={t('brand.iconHint')}
+                    value={current.iconUrl}
+                    onChange={(url) => set('iconUrl', url)}
+                    onBusyChange={busyUpload}
+                    shape="square"
+                  />
+                </div>
+              </article>
+
+              <article className="card" aria-labelledby="brand-colors">
+                <div className="card__head">
+                  <span className="card__icon" aria-hidden="true">
+                    <IconPalette size={20} />
+                  </span>
+                  <h2 id="brand-colors">{t('brand.colors')}</h2>
+                </div>
+                <ColorField
+                  field="primaryColor"
+                  label={t('brand.primary')}
+                  hint={t('brand.primaryHint')}
+                  value={current.primaryColor}
+                  onChange={(value) => value && set('primaryColor', value)}
+                  saved={savedColor('primaryColor')}
+                  onInvalid={hexInvalid}
+                />
+                <ColorField
+                  field="secondaryColor"
+                  label={t('brand.secondary')}
+                  hint={t('brand.secondaryHint')}
+                  value={current.secondaryColor}
+                  onChange={(value) => value && set('secondaryColor', value)}
+                  saved={savedColor('secondaryColor')}
+                  onInvalid={hexInvalid}
+                />
+                <ColorField
+                  field="accentColor"
+                  label={t('brand.accent')}
+                  hint={t('brand.accentHint')}
+                  value={current.accentColor}
+                  onChange={(value) => set('accentColor', value)}
+                  saved={savedColor('accentColor')}
+                  onInvalid={hexInvalid}
+                  optional
+                />
+              </article>
+
+              <article className="card" aria-labelledby="brand-store">
+                <div className="card__head">
+                  <span className="card__icon" aria-hidden="true">
+                    <IconSmartphone size={20} />
+                  </span>
+                  <h2 id="brand-store">{t('brand.store')}</h2>
+                </div>
+                <div className="field">
+                  <label className="field__label" htmlFor={`${formId}-desc`}>
+                    {t('brand.storeDescription')}{' '}
                     <span className="field__optional">{t('common.optional')}</span>
                   </label>
                   <input
-                    id={`${formId}-email`}
+                    id={`${formId}-desc`}
                     className="field__input"
-                    type="email"
-                    autoComplete="email"
-                    value={current.supportEmail}
-                    aria-invalid={!!errors.supportEmail}
-                    aria-describedby={errorRef('supportEmail')}
-                    onChange={(event) => set('supportEmail', event.target.value)}
+                    value={current.storeShortDescription}
+                    maxLength={80}
+                    aria-describedby={`${formId}-desc-hint`}
+                    onChange={(event) => set('storeShortDescription', event.target.value)}
                   />
-                  {fieldError('supportEmail')}
+                  <p id={`${formId}-desc-hint`} className="field__hint">
+                    {t('brand.storeDescriptionHint', {
+                      count: 80 - current.storeShortDescription.length,
+                    })}
+                  </p>
+                </div>
+                <div className="form-row">
+                  <div className="field">
+                    <label className="field__label" htmlFor={`${formId}-email`}>
+                      {t('brand.supportEmail')}{' '}
+                      <span className="field__optional">{t('common.optional')}</span>
+                    </label>
+                    <input
+                      id={`${formId}-email`}
+                      className="field__input"
+                      type="email"
+                      autoComplete="email"
+                      value={current.supportEmail}
+                      aria-invalid={!!errors.supportEmail}
+                      aria-describedby={errorRef('supportEmail')}
+                      onChange={(event) => set('supportEmail', event.target.value)}
+                    />
+                    {fieldError('supportEmail')}
+                  </div>
+                  <div className="field">
+                    <label className="field__label" htmlFor={`${formId}-web`}>
+                      {t('brand.website')}{' '}
+                      <span className="field__optional">{t('common.optional')}</span>
+                    </label>
+                    <input
+                      id={`${formId}-web`}
+                      className="field__input"
+                      type="url"
+                      inputMode="url"
+                      placeholder="https://"
+                      value={current.websiteUrl}
+                      aria-invalid={!!errors.websiteUrl}
+                      aria-describedby={errorRef('websiteUrl')}
+                      onChange={(event) => set('websiteUrl', event.target.value)}
+                    />
+                    {fieldError('websiteUrl')}
+                  </div>
                 </div>
                 <div className="field">
-                  <label className="field__label" htmlFor={`${formId}-web`}>
-                    {t('brand.website')}{' '}
-                    <span className="field__optional">{t('common.optional')}</span>
+                  <label className="field__label" htmlFor={`${formId}-lang`}>
+                    {t('brand.language')}
                   </label>
-                  <input
-                    id={`${formId}-web`}
+                  <select
+                    id={`${formId}-lang`}
                     className="field__input"
-                    type="url"
-                    inputMode="url"
-                    placeholder="https://"
-                    value={current.websiteUrl}
-                    aria-invalid={!!errors.websiteUrl}
-                    aria-describedby={errorRef('websiteUrl')}
-                    onChange={(event) => set('websiteUrl', event.target.value)}
-                  />
-                  {fieldError('websiteUrl')}
+                    value={current.language}
+                    aria-describedby={`${formId}-lang-hint`}
+                    onChange={(event) => set('language', event.target.value as BrandLanguage)}
+                  >
+                    {BRAND_LANGUAGE.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {t(`langName.${lang}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <p id={`${formId}-lang-hint`} className="field__hint">
+                    {t('brand.languageHint')}
+                  </p>
                 </div>
-              </div>
-              <div className="field">
-                <label className="field__label" htmlFor={`${formId}-lang`}>
-                  {t('brand.language')}
-                </label>
-                <select
-                  id={`${formId}-lang`}
-                  className="field__input"
-                  value={current.language}
-                  aria-describedby={`${formId}-lang-hint`}
-                  onChange={(event) => set('language', event.target.value as BrandLanguage)}
+              </article>
+
+              {update.error && (
+                <p className="form-error" role="alert">
+                  {describeError(update.error, i18n)}
+                </p>
+              )}
+
+              <div className={`savebar${dirty ? ' is-dirty' : ''}`}>
+                <span className="savebar__text" role="status">
+                  {uploading > 0
+                    ? t('upload.uploading')
+                    : dirty
+                      ? t('brand.unsaved')
+                      : t('brand.allSaved')}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={discard}
+                  disabled={!dirty || update.isPending}
                 >
-                  {BRAND_LANGUAGE.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {t(`langName.${lang}`)}
-                    </option>
-                  ))}
-                </select>
-                <p id={`${formId}-lang-hint`} className="field__hint">
-                  {t('brand.languageHint')}
-                </p>
+                  {t('brand.discard')}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={!dirty || update.isPending || uploading > 0 || badHex.size > 0}
+                >
+                  {update.isPending ? t('common.saving') : t('common.save')}
+                </button>
               </div>
-            </article>
-
-            {update.error && (
-              <p className="form-error" role="alert">
-                {describeError(update.error, i18n)}
-              </p>
-            )}
-
-            <div className={`savebar${dirty ? ' is-dirty' : ''}`}>
-              <span className="savebar__text" role="status">
-                {uploading > 0
-                  ? t('upload.uploading')
-                  : dirty
-                    ? t('brand.unsaved')
-                    : t('brand.allSaved')}
-              </span>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={discard}
-                disabled={!dirty || update.isPending}
-              >
-                {t('brand.discard')}
-              </button>
-              <button
-                type="submit"
-                className="btn btn--primary"
-                disabled={!dirty || update.isPending || uploading > 0}
-              >
-                {update.isPending ? t('common.saving') : t('common.save')}
-              </button>
-            </div>
+            </fieldset>
           </form>
 
           <AppSection brand={brand.data} onRequested={() => setFlash(t('ownApp.requested'))} />
