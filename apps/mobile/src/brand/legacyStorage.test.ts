@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { memoryStorage } from '../api/storage';
 import { BrandConfigError, parseBrandConfig } from './brandConfig';
-import { migrateLegacyStorage } from './legacyStorage';
+import { migrateLegacyStorage, runLegacyMigration } from './legacyStorage';
 
 const target = (name: string) => `ventea.carolina-hot-chicken.${name}`;
 
@@ -36,6 +36,14 @@ describe('legacy storage migration', () => {
     expect(migrateLegacyStorage(storage, 'ventea.', target)).toEqual([]);
     expect(migrateLegacyStorage(null, 'chc.', target)).toEqual([]);
     expect(storage.getItem('chc.session')).toBe('old');
+  });
+
+  test('only the native app migrates; a web preview leaves chc.* alone', () => {
+    const storage = memoryStorage();
+    storage.setItem('chc.session', 'old');
+    expect(runLegacyMigration(false, storage, 'chc.', target)).toEqual([]);
+    expect(storage.getItem('chc.session')).toBe('old');
+    expect(runLegacyMigration(true, storage, 'chc.', target)).toEqual(['session']);
   });
 
   test('brand file accepts a short prefix ending in a dot', () => {

@@ -1,5 +1,5 @@
 import { localStorageOrNull, type KeyValueStorage } from '../api/storage';
-import { BUILD_BRAND, storageKey } from './runtime';
+import { BUILD_BRAND, IS_NATIVE, storageKey } from './runtime';
 
 /**
  * One-shot storage migration for a brand that already had its own app
@@ -7,7 +7,7 @@ import { BUILD_BRAND, storageKey } from './runtime';
  * template keeps them under `ventea.<slug>.*`; without this, updating the app
  * from the store would sign everybody out and drop their favourites.
  *
- * Runs only when the brand file declares `legacyStoragePrefix`, and only for
+ * Runs only in the native app, when the brand file declares `legacyStoragePrefix`, and only for
  * keys that still exist: each one is copied (never over a newer value) and
  * removed, so the second launch finds nothing to do. Imported first in
  * `main.tsx`, before the session store reads its key.
@@ -40,4 +40,15 @@ export const migrateLegacyStorage = (
   return moved;
 };
 
-migrateLegacyStorage(localStorageOrNull(), BUILD_BRAND.legacyStoragePrefix, storageKey);
+/**
+ * Only inside the native binary: that is where the previous app's WebView left
+ * its data. A web preview on any host never touches `chc.*` keys.
+ */
+export const runLegacyMigration = (
+  native: boolean,
+  storage: KeyValueStorage | null,
+  prefix: string | undefined,
+  target: (name: string) => string,
+): string[] => (native ? migrateLegacyStorage(storage, prefix, target) : []);
+
+runLegacyMigration(IS_NATIVE, localStorageOrNull(), BUILD_BRAND.legacyStoragePrefix, storageKey);
