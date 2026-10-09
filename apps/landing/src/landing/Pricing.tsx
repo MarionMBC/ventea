@@ -1,50 +1,52 @@
 import type { BillingInterval, Plan } from '@ventea/shared';
 
 import { TRIAL_DAYS } from '@/config';
+import { signupHref, useIntlLocale, useLocale, useT } from '@/i18n';
 import { formatUsd, priceFor, yearlySavingsCents } from '@/lib/format';
-import { planFeatures, planTagline } from '@/lib/plans';
+import { planFeatures, planName, planTagline } from '@/lib/plans';
 import type { PlansState } from '@/lib/usePlans';
 
 import { IntervalToggle } from './IntervalToggle';
 
-/** Link al registro con el plan y el intervalo elegidos (el registro los lee de la URL). */
-export function signupHref(plan: string, interval: BillingInterval): string {
-  return `/registro?plan=${encodeURIComponent(plan)}&intervalo=${interval === 'year' ? 'anual' : 'mensual'}`;
-}
-
 function PlanCard({ plan, interval }: { plan: Plan; interval: BillingInterval }) {
+  const t = useT();
+  const p = t.pricing;
+  const locale = useLocale();
+  const intl = useIntlLocale();
+  const usd = (cents: number) => formatUsd(cents, intl);
   const featured = plan.code === 'pro';
   const price = priceFor(plan, interval);
   const savings = yearlySavingsCents(plan);
   const titleId = `plan-${plan.code}`;
+  const name = planName(plan, t);
 
   return (
     <li className={`plan${featured ? ' plan--featured' : ''}`} aria-labelledby={titleId}>
       <div className="plan__head">
         <h3 className="plan__name" id={titleId}>
-          {plan.name}
+          {name}
         </h3>
-        {featured && <p className="plan__badge">Recomendado</p>}
+        {featured && <p className="plan__badge">{p.recommended}</p>}
       </div>
-      <p className="plan__tagline">{planTagline(plan.code)}</p>
+      <p className="plan__tagline">{planTagline(plan.code, t)}</p>
       <p className="plan__price" data-testid={`price-${plan.code}`}>
-        <span className="plan__amount">{formatUsd(price)}</span>
-        <span className="plan__per"> USD / {interval === 'year' ? 'año' : 'mes'}</span>
+        <span className="plan__amount">{usd(price)}</span>
+        <span className="plan__per"> USD / {p.per[interval]}</span>
       </p>
       <p className="plan__note">
         {interval === 'year'
-          ? `Equivale a ${formatUsd(Math.round(price / 12))} al mes · ahorra ${formatUsd(savings)}`
-          : `O ${formatUsd(plan.priceYearlyCents)} al año, con 2 meses gratis`}
+          ? p.yearlyNote(usd(Math.round(price / 12)), usd(savings))
+          : p.monthlyNote(usd(plan.priceYearlyCents))}
       </p>
       <a
         className={`btn btn--block ${featured ? 'btn--sun' : 'btn--outline'}`}
-        href={signupHref(plan.code, interval)}
+        href={signupHref(locale, plan.code, interval)}
       >
-        Probar {plan.name} gratis
-        <span className="sr-only"> durante {TRIAL_DAYS} días</span>
+        {p.cta(name)}
+        <span className="sr-only">{p.ctaSuffix(TRIAL_DAYS)}</span>
       </a>
       <ul className="plan__features">
-        {planFeatures(plan).map((feature) => (
+        {planFeatures(plan, t).map((feature) => (
           <li key={feature}>{feature}</li>
         ))}
       </ul>
@@ -62,24 +64,23 @@ export function Pricing({
   interval: BillingInterval;
   onIntervalChange: (interval: BillingInterval) => void;
 }) {
+  const t = useT();
+  const p = t.pricing;
   return (
     <section className="section pricing" id="precios" aria-labelledby="precios-title">
       <div className="container">
         <header className="section__head pricing__head" data-reveal>
-          <p className="eyebrow">Precios y planes</p>
+          <p className="eyebrow">{p.eyebrow}</p>
           <h2 className="display section__title" id="precios-title">
-            Una tarifa fija. Cero comisión por pedido.
+            {p.title}
           </h2>
-          <p className="section__lead">
-            Todos los planes empiezan con {TRIAL_DAYS} días gratis, sin tarjeta. Cambie de plan
-            cuando lo necesite.
-          </p>
+          <p className="section__lead">{p.lead(TRIAL_DAYS)}</p>
         </header>
 
         <IntervalToggle value={interval} onChange={onIntervalChange} />
 
         {plans.status === 'loading' && (
-          <ul className="plans" aria-busy="true" aria-label="Cargando precios">
+          <ul className="plans" aria-busy="true" aria-label={p.loadingLabel}>
             {[0, 1, 2].map((n) => (
               <li key={n} className="plan plan--skeleton" aria-hidden="true" />
             ))}
@@ -88,9 +89,11 @@ export function Pricing({
 
         {plans.status === 'error' && (
           <div className="notice notice--error" role="alert">
-            <p>No pudimos cargar los precios. {plans.message}</p>
+            <p>
+              {p.loadError} {t.common.apiDetail(plans.message, plans.httpStatus)}
+            </p>
             <button type="button" className="btn btn--outline" onClick={plans.retry}>
-              Reintentar
+              {t.common.retry}
             </button>
           </div>
         )}
@@ -103,10 +106,7 @@ export function Pricing({
           </ul>
         )}
 
-        <p className="fine-print">
-          Precios en dólares estadounidenses (USD). Sin costo de instalación ni permanencia. El pago
-          del plan se coordina con nuestro equipo al terminar la prueba.
-        </p>
+        <p className="fine-print">{p.fine}</p>
       </div>
     </section>
   );

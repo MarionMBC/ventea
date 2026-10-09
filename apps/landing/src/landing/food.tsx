@@ -83,11 +83,14 @@ export const DEMO_RESTAURANT = {
   orderNumber: 'CB-1042',
 } as const;
 
-export const DEMO_MENU: { dish: Dish; name: string; detail: string; price: number }[] = [
-  { dish: 'burger', name: 'Hamburguesa de la casa', detail: 'Doble carne, cheddar', price: 245 },
-  { dish: 'tacos', name: 'Tacos al pastor', detail: 'Tres tacos, piña, cilantro', price: 160 },
-  { dish: 'chicken', name: 'Pollo crujiente', detail: 'Tres piezas y papas', price: 210 },
-  { dish: 'bowl', name: 'Bowl de pollo', detail: 'Arroz, aguacate, maíz', price: 185 },
+/** Platos del menú de ejemplo. Nombre y detalle, por idioma, en `t.menu[dish]`. */
+export type MenuDish = 'burger' | 'tacos' | 'chicken' | 'bowl';
+
+export const DEMO_MENU: { dish: MenuDish; price: number }[] = [
+  { dish: 'burger', price: 245 },
+  { dish: 'tacos', price: 160 },
+  { dish: 'chicken', price: 210 },
+  { dish: 'bowl', price: 185 },
 ];
 
 /** El pedido de ejemplo: hamburguesa + tacos. */
@@ -108,6 +111,10 @@ export const REWARDS = {
 export const DEMO_EARNED = Math.floor(DEMO_TOTAL * REWARDS.pointsPerUnit);
 export const DEMO_BALANCE = REWARDS.welcomeBonus + DEMO_EARNED;
 
+/**
+ * Monto en lempiras: `L 405.00`. Igual en los dos idiomas (en-US y es-HN agrupan con coma y usan
+ * punto decimal), así el prerender y el cliente coinciden.
+ */
 export function lempiras(amount: number): string {
   return `L ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

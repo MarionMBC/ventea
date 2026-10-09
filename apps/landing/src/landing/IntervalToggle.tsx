@@ -1,6 +1,8 @@
 import type { BillingInterval } from '@ventea/shared';
 import { useId } from 'react';
 
+import { useT } from '@/i18n';
+
 /** Mensual / anual como grupo de radios: navegable con flechas y anunciado como tal. */
 export function IntervalToggle({
   value,
@@ -9,14 +11,15 @@ export function IntervalToggle({
   value: BillingInterval;
   onChange: (interval: BillingInterval) => void;
 }) {
+  const t = useT().toggle;
   const name = useId();
   const options: { value: BillingInterval; label: string; extra?: string }[] = [
-    { value: 'month', label: 'Mensual' },
-    { value: 'year', label: 'Anual', extra: '2 meses gratis' },
+    { value: 'month', label: t.monthly },
+    { value: 'year', label: t.yearly, extra: t.yearlyExtra },
   ];
   return (
     <fieldset className="toggle">
-      <legend className="sr-only">Forma de pago</legend>
+      <legend className="sr-only">{t.legend}</legend>
       {options.map((option) => (
         <label
           key={option.value}

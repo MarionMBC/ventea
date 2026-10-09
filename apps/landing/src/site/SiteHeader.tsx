@@ -1,20 +1,27 @@
 import { useEffect, useState } from 'react';
 
+import { signupHref, useLocale, useT } from '@/i18n';
 import { Brand } from '@/landing/Brand';
 
+import { LanguageSwitch } from './LanguageSwitch';
+
 const LINKS = [
-  { href: '#experiencia', label: 'Producto' },
-  { href: '#puntos', label: 'Puntos' },
-  { href: '#como-funciona', label: 'Cómo funciona' },
-  { href: '#precios', label: 'Precios' },
-  { href: '#preguntas', label: 'Preguntas' },
-];
+  { href: '#experiencia', key: 'product' },
+  { href: '#puntos', key: 'points' },
+  { href: '#como-funciona', key: 'how' },
+  { href: '#precios', key: 'pricing' },
+  { href: '#preguntas', key: 'faq' },
+] as const;
 
 /**
  * Barra fija de la landing. Al bajar del hero pasa de transparente sobre marino a clara. En
  * móvil, menú desplegable (botón con aria-expanded; Escape lo cierra) y el CTA siempre visible.
+ * El cambio de idioma va en la barra en escritorio y dentro del menú en móvil (en 390 px no
+ * entra junto al CTA).
  */
 export function SiteHeader() {
+  const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -42,28 +49,32 @@ export function SiteHeader() {
     >
       <div className="container topbar__inner">
         <Brand tone={light ? 'light' : 'dark'} />
-        <nav className="topbar__nav" id="menu-principal" aria-label="Secciones">
+        <nav className="topbar__nav" id="menu-principal" aria-label={t.header.sectionsLabel}>
           <ul>
             {LINKS.map((link) => (
               <li key={link.href}>
                 <a href={link.href} onClick={() => setOpen(false)}>
-                  {link.label}
+                  {t.header.links[link.key]}
                 </a>
               </li>
             ))}
             <li className="topbar__login">
               <a href="#acceso" onClick={() => setOpen(false)}>
-                Iniciar sesión
+                {t.header.signIn}
               </a>
+            </li>
+            <li className="topbar__lang-item">
+              <LanguageSwitch full />
             </li>
           </ul>
         </nav>
         <div className="topbar__end">
+          <LanguageSwitch className="topbar__lang" />
           <a className="topbar__signin" href="#acceso">
-            Iniciar sesión
+            {t.header.signIn}
           </a>
-          <a className="btn btn--sun btn--sm" href="/registro">
-            Registrarme
+          <a className="btn btn--sun btn--sm" href={signupHref(locale)}>
+            {t.header.signUp}
           </a>
           <button
             type="button"
@@ -72,7 +83,7 @@ export function SiteHeader() {
             aria-controls="menu-principal"
             onClick={() => setOpen((o) => !o)}
           >
-            <span className="sr-only">{open ? 'Cerrar menú' : 'Abrir menú'}</span>
+            <span className="sr-only">{open ? t.header.closeMenu : t.header.openMenu}</span>
             <span className="topbar__burger" aria-hidden="true" />
           </button>
         </div>

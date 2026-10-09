@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
 
+import { useT, type Messages } from '@/i18n';
+
 import {
   DEMO_BALANCE,
   DEMO_EARNED,
@@ -21,12 +23,20 @@ import {
  */
 export type PhoneScreen = 'menu' | 'cart' | 'confirmed' | 'points';
 
-export const SCREEN_LABEL: Record<PhoneScreen, string> = {
-  menu: 'Menú del restaurante de ejemplo con fotos y precios en lempiras',
-  cart: `Pedido para llevar con pago al retirar, total ${lempiras(DEMO_TOTAL)} y ${DEMO_EARNED} puntos por ganar`,
-  confirmed: `Pedido ${DEMO_RESTAURANT.orderNumber} recibido, en estado Nuevo`,
-  points: `Saldo de ${DEMO_BALANCE} puntos: ${REWARDS.welcomeBonus} de bienvenida y ${DEMO_EARNED} del pedido`,
-};
+/** Descripción accesible de cada pantalla, en el idioma de la vista. */
+export function screenLabel(screen: PhoneScreen, t: Messages): string {
+  const l = t.phone.screenLabel;
+  switch (screen) {
+    case 'menu':
+      return l.menu;
+    case 'cart':
+      return l.cart(lempiras(DEMO_TOTAL), DEMO_EARNED);
+    case 'confirmed':
+      return l.confirmed(DEMO_RESTAURANT.orderNumber);
+    case 'points':
+      return l.points(DEMO_BALANCE, REWARDS.welcomeBonus, DEMO_EARNED);
+  }
+}
 
 const ORDER: PhoneScreen[] = ['menu', 'cart', 'confirmed', 'points'];
 
@@ -45,6 +55,8 @@ export function Phone({
   eager?: boolean;
   className?: string;
 }) {
+  const t = useT();
+  const p = t.phone;
   const active = ORDER.indexOf(screen);
   const state = (s: PhoneScreen) => {
     const i = ORDER.indexOf(s);
@@ -52,7 +64,7 @@ export function Phone({
   };
 
   return (
-    <div className={`phone ${className}`} role="img" aria-label={SCREEN_LABEL[screen]}>
+    <div className={`phone ${className}`} role="img" aria-label={screenLabel(screen, t)}>
       <div className="phone__frame" aria-hidden="true">
         <div className="phone__island" />
         <div className="phone__status">
@@ -63,7 +75,7 @@ export function Phone({
           <span className="phone__avatar">{DEMO_RESTAURANT.initials}</span>
           <span className="phone__who">
             <strong>{DEMO_RESTAURANT.name}</strong>
-            <small>Para llevar · Comer aquí</small>
+            <small>{p.modes}</small>
           </span>
           <span className={`phone__bag${added ? ' has-items' : ''}`}>
             <svg viewBox="0 0 24 24">
@@ -77,21 +89,21 @@ export function Phone({
           {/* Menú */}
           <section className={`pscreen pscreen--menu ${state('menu')}`}>
             <div className="pscreen__chips">
-              <span className="is-on">Populares</span>
-              <span>Hamburguesas</span>
-              <span>Tacos</span>
+              <span className="is-on">{p.chips[0]}</span>
+              <span>{p.chips[1]}</span>
+              <span>{p.chips[2]}</span>
             </div>
             <ul className="pmenu">
               {DEMO_MENU.map((item, index) => (
                 <li
-                  key={item.name}
+                  key={item.dish}
                   className={`pmenu__item${added && index < 2 ? ' is-added' : ''}`}
                   style={{ '--i': index } as CSSProperties}
                 >
                   <DishPhoto dish={item.dish} sizes="64px" eager={eager} className="pmenu__photo" />
                   <span className="pmenu__text">
-                    <strong>{item.name}</strong>
-                    <small>{item.detail}</small>
+                    <strong>{t.menu[item.dish].name}</strong>
+                    <small>{t.menu[item.dish].detail}</small>
                     <em>{lempiras(item.price)}</em>
                   </span>
                   <span className="pmenu__add">{added && index < 2 ? '✓' : '+'}</span>
@@ -99,35 +111,35 @@ export function Phone({
               ))}
             </ul>
             <div className="pscreen__points-chip">
-              <span>★</span> {REWARDS.welcomeBonus} puntos de bienvenida
+              <span>★</span> {p.welcomeChip(REWARDS.welcomeBonus)}
             </div>
           </section>
 
           {/* Carrito */}
           <section className={`pscreen pscreen--cart ${state('cart')}`}>
-            <p className="pscreen__title">Su pedido</p>
+            <p className="pscreen__title">{p.cartTitle}</p>
             <ul className="pcart">
               {DEMO_ORDER.map((item) => (
-                <li key={item.name}>
+                <li key={item.dish}>
                   <DishPhoto dish={item.dish} sizes="44px" eager={eager} className="pcart__photo" />
-                  <span>1 × {item.name}</span>
+                  <span>1 × {t.menu[item.dish].name}</span>
                   <em>{lempiras(item.price)}</em>
                 </li>
               ))}
             </ul>
             <div className="pcart__mode">
-              <span className="is-on">Para llevar</span>
-              <span>Comer aquí</span>
+              <span className="is-on">{p.takeout}</span>
+              <span>{p.dineIn}</span>
             </div>
-            <p className="pcart__pay">Paga al retirar en el local</p>
+            <p className="pcart__pay">{p.payAtPickup}</p>
             <div className="pcart__total">
-              <span>Total</span>
+              <span>{p.total}</span>
               <strong>{lempiras(DEMO_TOTAL)}</strong>
             </div>
             <p className="pcart__earn">
-              <span>★</span> Gana {DEMO_EARNED} puntos con este pedido
+              <span>★</span> {p.earn(DEMO_EARNED)}
             </p>
-            <span className="pscreen__cta">Confirmar pedido</span>
+            <span className="pscreen__cta">{p.confirm}</span>
           </section>
 
           {/* Pedido recibido */}
@@ -137,35 +149,33 @@ export function Phone({
                 <path d="M5 12.5l4.5 4.5L19 7.5" />
               </svg>
             </span>
-            <p className="pscreen__title">
-              {track === 2 ? '¡Listo para retirar!' : '¡Pedido recibido!'}
-            </p>
+            <p className="pscreen__title">{track === 2 ? p.readyForPickup : p.received}</p>
             <p className="pconfirm__num">#{DEMO_RESTAURANT.orderNumber}</p>
             <ol className="ptrack">
-              {(['Nuevo', 'En cocina', 'Listo'] as const).map((label, index) => (
+              {p.track.map((label, index) => (
                 <li key={label} className={index <= track ? 'is-done' : undefined}>
                   {label}
                 </li>
               ))}
             </ol>
-            <p className="pconfirm__note">Siga el estado de su pedido desde aquí.</p>
+            <p className="pconfirm__note">{p.trackNote}</p>
           </section>
 
           {/* Puntos */}
           <section className={`pscreen pscreen--points ${state('points')}`}>
-            <p className="ppoints__label">Sus puntos</p>
+            <p className="ppoints__label">{p.pointsLabel}</p>
             <p className="ppoints__value">{DEMO_BALANCE}</p>
             <div className="ppoints__bar">
               <span style={{ width: '100%' }} />
             </div>
-            <p className="ppoints__hint">Ya puede canjearlos en su próximo pedido</p>
+            <p className="ppoints__hint">{p.pointsHint}</p>
             <ul className="pledger">
               <li>
-                <span>Pedido #{DEMO_RESTAURANT.orderNumber}</span>
+                <span>{p.ledgerOrder(DEMO_RESTAURANT.orderNumber)}</span>
                 <strong>+{DEMO_EARNED}</strong>
               </li>
               <li>
-                <span>Bono de bienvenida</span>
+                <span>{p.welcomeBonus}</span>
                 <strong>+{REWARDS.welcomeBonus}</strong>
               </li>
             </ul>

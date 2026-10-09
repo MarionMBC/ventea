@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useT } from '@/i18n';
+
 import { DEMO_ORDER, DEMO_RESTAURANT, DEMO_TOTAL, lempiras } from './food';
 import { useInView, useReducedMotion } from './motion';
 import { Phone } from './Phone';
@@ -7,16 +9,17 @@ import { Phone } from './Phone';
 /**
  * Sección C — el pedido viaja del teléfono del cliente al tablero del restaurante. Columnas,
  * estados y botones son los del panel real (apps/admin, features/orders/transitions.ts):
- * Nuevos → En cocina → Listos, con «Empezar», «Listo» y «Entregado». La animación corre una
- * vez al entrar en pantalla; con movimiento reducido se muestra el pedido ya en «Nuevos».
+ * Nuevos → En cocina → Listos, con «Empezar», «Listo» y «Entregado» (en inglés, traducidos en
+ * `t.direct`). La animación corre una vez al entrar en pantalla; con movimiento reducido se
+ * muestra el pedido ya en «Nuevos».
  */
-const COLUMNS = ['Nuevos', 'En cocina', 'Listos'] as const;
-const ACTION = ['Empezar', 'Listo', 'Entregado'] as const;
 
 /** 0 = en camino · 1 Nuevos · 2 En cocina · 3 Listos */
 type Phase = 0 | 1 | 2 | 3;
 
 export function DirectOrders() {
+  const t = useT();
+  const d = t.direct;
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref, 0.4);
   const reduced = useReducedMotion();
@@ -30,7 +33,7 @@ export function DirectOrders() {
       window.setTimeout(() => setPhase(2), 3000),
       window.setTimeout(() => setPhase(3), 4800),
     ];
-    return () => timers.forEach((t) => window.clearTimeout(t));
+    return () => timers.forEach((id) => window.clearTimeout(id));
   }, [seen, reduced]);
 
   const column = Math.max(phase - 1, 0);
@@ -39,14 +42,11 @@ export function DirectOrders() {
     <section className="section direct" id="pedidos" aria-labelledby="direct-title">
       <div className="container">
         <header className="section__head direct__head" data-reveal>
-          <p className="eyebrow">Pedidos directos</p>
+          <p className="eyebrow">{d.eyebrow}</p>
           <h2 className="display section__title" id="direct-title">
-            Más relación con sus clientes. Menos intermediarios.
+            {d.title}
           </h2>
-          <p className="section__lead">
-            El pedido que confirma su cliente aparece en el tablero de su cocina, con aviso sonoro
-            si lo activa. Su equipo lo avanza con un toque y el cliente ve el estado en su teléfono.
-          </p>
+          <p className="section__lead">{d.lead}</p>
         </header>
 
         <div
@@ -63,21 +63,17 @@ export function DirectOrders() {
             <span className="direct__packet" />
           </div>
 
-          <div
-            className="board"
-            role="img"
-            aria-label={`Tablero de pedidos del restaurante: el pedido ${DEMO_RESTAURANT.orderNumber} pasa de Nuevos a En cocina y a Listos.`}
-          >
+          <div className="board" role="img" aria-label={d.boardLabel(DEMO_RESTAURANT.orderNumber)}>
             <div className="board__top" aria-hidden="true">
-              <strong>Pedidos</strong>
+              <strong>{d.boardTitle}</strong>
               <span className="board__tab is-on">
-                Activos <em>{phase > 0 ? 1 : 0}</em>
+                {d.tabActive} <em>{phase > 0 ? 1 : 0}</em>
               </span>
-              <span className="board__tab">Historial de hoy</span>
-              <span className="board__sound">🔔 Sonido: activado</span>
+              <span className="board__tab">{d.tabHistory}</span>
+              <span className="board__sound">{d.sound}</span>
             </div>
             <div className="board__cols" aria-hidden="true">
-              {COLUMNS.map((name, index) => (
+              {d.columns.map((name, index) => (
                 <div key={name} className="board__col">
                   <p className="board__col-name">
                     {name} <span>{phase > 0 && column === index ? 1 : 0}</span>
@@ -90,17 +86,17 @@ export function DirectOrders() {
                     >
                       <header>
                         <strong>#{DEMO_RESTAURANT.orderNumber}</strong>
-                        <span>hace 1 min</span>
+                        <span>{d.ago}</span>
                       </header>
-                      <p className="ticket__mode">Para llevar</p>
+                      <p className="ticket__mode">{d.takeout}</p>
                       <ul>
                         {DEMO_ORDER.map((item) => (
-                          <li key={item.name}>1 × {item.name}</li>
+                          <li key={item.dish}>1 × {t.menu[item.dish].name}</li>
                         ))}
                       </ul>
                       <footer>
                         <span>{lempiras(DEMO_TOTAL)}</span>
-                        <span className="ticket__action">{ACTION[index]}</span>
+                        <span className="ticket__action">{d.actions[index]}</span>
                       </footer>
                     </article>
                   )}
@@ -111,16 +107,11 @@ export function DirectOrders() {
         </div>
 
         <ul className="direct__facts" data-reveal>
-          <li>
-            <strong>Para llevar o comer en el local.</strong> El cliente elige al confirmar.
-          </li>
-          <li>
-            <strong>Pago al retirar.</strong> Directo en su caja, sin intermediarios.
-          </li>
-          <li>
-            <strong>Estados claros.</strong> Nuevo, En cocina, Listo y Entregado, a la vista de su
-            equipo y de su cliente.
-          </li>
+          {d.facts.map((fact) => (
+            <li key={fact.strong}>
+              <strong>{fact.strong}</strong> {fact.text}
+            </li>
+          ))}
         </ul>
       </div>
     </section>

@@ -58,12 +58,4 @@ export function useSlugCheck(slug: string): {
   return { status, markTaken: () => setResult({ slug, status: 'taken' }) };
 }
 
-export const SLUG_MESSAGE: Record<SlugStatus, string> = {
-  empty: 'Elige la dirección de tu restaurante.',
-  checking: 'Revisando si está libre…',
-  available: '¡Está libre!',
-  taken: 'Esa dirección ya la usa otro restaurante. Prueba con otra.',
-  reserved: 'Esa dirección está reservada. Prueba con otra.',
-  invalid: 'Usa de 3 a 63 letras minúsculas, números o guiones (sin espacios ni acentos).',
-  unknown: 'No pudimos revisarla ahora; la confirmamos al crear tu cuenta.',
-};
+// Los mensajes de cada estado, por idioma, en `t.signup.slug` (src/i18n).
