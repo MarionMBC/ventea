@@ -273,6 +273,9 @@ export const es: Messages = {
   'upload.hint': 'PNG, JPG o WebP de hasta 5 MB. También puedes soltar el archivo acá.',
   'upload.badType': 'Ese archivo no es una imagen admitida. Usa PNG, JPG o WebP.',
   'upload.tooBig': 'La imagen pesa más de {max} MB. Elige una más liviana.',
+  'upload.tooLarge':
+    'La imagen es demasiado grande: hasta {max} MB y 24 megapíxeles. Elige una más chica o redúcela.',
+  'upload.busy': 'El servidor está ocupado procesando imágenes. Intenta de nuevo en unos segundos.',
   'upload.rateLimited': 'Demasiadas subidas en la última hora. Espera un poco e intenta de nuevo.',
   'upload.quota': 'Tu marca llegó al límite de espacio para imágenes. Borra las que ya no uses.',
 

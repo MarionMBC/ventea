@@ -176,6 +176,28 @@ describe('Menú: edición', () => {
     expect(calls(api, 'POST', /\/staff\/media$/)).toHaveLength(0);
   });
 
+  it.each([
+    [
+      413,
+      'The image is too large: up to 5 MB and 24 megapixels. Choose a smaller one or resize it.',
+    ],
+    [503, 'The server is busy processing images. Try again in a few seconds.'],
+  ])('la API rechaza la subida con %i: mensaje traducido', async (status, message) => {
+    renderMenu({
+      before: (req) =>
+        req.path === '/api/staff/media' ? apiError(status, 'Mensaje de la API') : undefined,
+    });
+    await screen.findByText('Reaper Sandwich');
+    fireEvent.click(screen.getByRole('button', { name: 'New product' }));
+    const drawer = screen.getByRole('dialog', { name: 'New product' });
+    const input = drawer.querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] },
+    });
+    expect((await within(drawer).findByRole('alert')).textContent).toBe(message);
+    expect(within(drawer).getByRole('button', { name: 'Choose image' })).toBeTruthy();
+  });
+
   it('editar manda solo lo que cambió (la foto heredada no se reenvía)', async () => {
     const { api } = renderMenu();
     await screen.findByText('Reaper Sandwich');

@@ -652,7 +652,11 @@ describe('apps de las marcas', () => {
       buildNumber: null,
       storeUrls: { android: null, ios: null },
       requestedAt: '2026-10-09T12:00:00.000Z',
-      push: { configured: false, projectId: null, updatedAt: null },
+      push: { configured: false, projectId: null, updatedAt: null } as {
+        configured: boolean;
+        projectId: string | null;
+        updatedAt: string | null;
+      },
       events: [
         {
           type: 'requested',

@@ -276,6 +276,9 @@ export const en = {
   'upload.hint': 'PNG, JPG or WebP up to 5 MB. You can also drop the file here.',
   'upload.badType': 'That file isn’t a supported image. Use PNG, JPG or WebP.',
   'upload.tooBig': 'The image is larger than {max} MB. Choose a smaller one.',
+  'upload.tooLarge':
+    'The image is too large: up to {max} MB and 24 megapixels. Choose a smaller one or resize it.',
+  'upload.busy': 'The server is busy processing images. Try again in a few seconds.',
   'upload.rateLimited': 'Too many uploads in the last hour. Wait a bit and try again.',
   'upload.quota': 'Your brand reached its image storage limit. Remove images you no longer use.',
 

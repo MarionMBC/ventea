@@ -25,9 +25,12 @@ export function fileProblem(file: File, t: I18n['t']): string | null {
 /** Error de la subida en el idioma del panel, con los casos propios de imágenes. */
 function uploadError(error: unknown, i18n: I18n): string {
   if (error instanceof ApiError) {
-    if (error.status === 413) return i18n.t('upload.tooBig', { max: MAX_MB });
+    // 413: más de 5 MB (multer) o más de 24 megapíxeles (la API al decodificar).
+    if (error.status === 413) return i18n.t('upload.tooLarge', { max: MAX_MB });
     if (error.status === 415) return i18n.t('upload.badType');
     if (error.status === 429) return i18n.t('upload.rateLimited');
+    // 503: la API está procesando muchas imágenes a la vez; reintentar en un momento sirve.
+    if (error.status === 503) return i18n.t('upload.busy');
     if (error.status === 403 && !error.kind && i18n.lang !== 'es') return i18n.t('upload.quota');
   }
   return describeError(error, i18n);
