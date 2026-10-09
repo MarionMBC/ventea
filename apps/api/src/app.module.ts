@@ -4,6 +4,7 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './modules/auth/auth.module';
+import { BrandingModule } from './modules/branding/branding.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CustomersModule } from './modules/customers/customers.module';
@@ -41,6 +42,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PlatformModule,
     MediaModule,
     PushModule,
+    BrandingModule,
   ],
   // Formato de error uniforme `{statusCode, message, error}` en toda la API.
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
