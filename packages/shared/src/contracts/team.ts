@@ -69,10 +69,27 @@ export const createInvitationSchema = z.strictObject({
   role: z.enum(ASSIGNABLE_ROLE),
 });
 
+/**
+ * Qué pasó con el correo del enlace (TASK-022): `queued` se envía; `not_configured` no hay SMTP
+ * (queda registrado sin enviar); `trial` la marca está en prueba sin pago (solo link copiable);
+ * `daily_limit` llegó al tope diario de correos del equipo; `unavailable` no se puede armar un
+ * link seguro en este despliegue. En todos los casos el panel muestra el link para copiar.
+ */
+export const TEAM_MAIL_STATUS = [
+  'queued',
+  'not_configured',
+  'trial',
+  'daily_limit',
+  'unavailable',
+] as const;
+export type TeamMailStatus = (typeof TEAM_MAIL_STATUS)[number];
+
 /** El token se muestra UNA vez: la base solo guarda su hash. */
 export const teamLinkSchema = z.object({
   token: teamTokenSchema,
   expiresAt: z.coerce.date(),
+  /** Opcional: una API anterior no lo manda (el panel no promete correo). */
+  mail: z.enum(TEAM_MAIL_STATUS).optional(),
 });
 
 export const createdInvitationSchema = teamLinkSchema.extend({

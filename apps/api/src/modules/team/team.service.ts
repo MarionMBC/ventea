@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   teamLinkPath,
   type AcceptInvitationInput,
@@ -12,6 +13,7 @@ import {
   type TeamInvitation,
   type TeamLink,
   type TeamLinkKind,
+  type TeamMailStatus,
   type TenantContext,
   type TenantRole,
   type UpdateMemberInput,
@@ -69,7 +71,14 @@ export class TeamService {
     private readonly auth: AuthService,
     private readonly mail: MailService,
     private readonly mailSettings: MailSettings,
-  ) {}
+    config: ConfigService,
+  ) {
+    const limit = Number.parseInt(config.get<string>('TEAM_MAIL_DAILY_LIMIT') ?? '', 10);
+    this.dailyMailLimit =
+      Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_TEAM_MAIL_DAILY_LIMIT;
+  }
+
+  private readonly dailyMailLimit: number;
 
   // ─── Dueño ──────────────────────────────────────────────────────────────────
 
@@ -133,7 +142,7 @@ export class TeamService {
       });
     });
     this.audit(actor, 'invitation_created', invitation.id);
-    this.deliver({
+    const mail = await this.deliver({
       kind: 'invitation',
       tenantId,
       refId: invitation.id,
@@ -143,7 +152,7 @@ export class TeamService {
       role: invitation.role,
       inviterId: actor.staffId,
     });
-    return { invitation, token, expiresAt: invitation.expiresAt };
+    return { invitation, token, expiresAt: invitation.expiresAt, mail };
   }
 
   async revokeInvitation(actor: StaffPrincipal, id: string): Promise<void> {
@@ -247,7 +256,7 @@ export class TeamService {
       };
     });
     this.audit(actor, 'password_reset_created', id);
-    this.deliver({
+    const mail = await this.deliver({
       kind: 'reset',
       tenantId,
       refId: reset.id,
@@ -256,7 +265,7 @@ export class TeamService {
       expiresAt: reset.expiresAt,
       memberName: reset.name,
     });
-    return { token, expiresAt: reset.expiresAt };
+    return { token, expiresAt: reset.expiresAt, mail };
   }
 
   // ─── Públicos (quien recibió el enlace) ─────────────────────────────────────
@@ -417,8 +426,16 @@ export class TeamService {
    * `isSafeLink`), los nombres van neutralizados (`neutralizeLinks`) y, enviado u omitido, el
    * link sale del registro de la outbox. Idioma: el de la marca.
    */
-  private deliver(link: TeamLinkDelivery): void {
+  private async deliver(link: TeamLinkDelivery): Promise<TeamMailStatus> {
     const kind = link.kind === 'invitation' ? 'staff_invite' : 'staff_password_reset';
+    const status = await this.mailStatus(link.tenantId);
+    // Prueba sin pago, tope diario o link imposible: solo el link copiable del panel.
+    if (status !== 'queued' && status !== 'not_configured') {
+      this.logger.log(
+        JSON.stringify({ action: 'team_mail_not_sent', tenantId: link.tenantId, kind, status }),
+      );
+      return status;
+    }
     this.mail.enqueueInBackground(kind, async () => {
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: link.tenantId },
@@ -469,8 +486,35 @@ export class TeamService {
         },
       ];
     });
+    return status;
+  }
+
+  /**
+   * ¿Sale el correo del enlace? (review TASK-022) Una marca en prueba sin pago no manda correos a
+   * direcciones arbitrarias desde el SMTP de Ventea (registro self-service, dueño sin verificar), y
+   * cada marca tiene un tope diario de correos del equipo: reinvitar o revocar no lo devuelve
+   * (se cuentan los correos creados). Sin SMTP se registra igual (`skipped`).
+   */
+  private async mailStatus(tenantId: string): Promise<TeamMailStatus> {
+    if (!this.mailSettings.linksAvailable || !this.mailSettings.secretLinkKey) return 'unavailable';
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { tenantId },
+      select: { status: true },
+    });
+    if (subscription?.status === 'trialing') return 'trial';
+    const since = new Date(Date.now() - DAY_MS);
+    const sentToday = await this.prisma.emailMessage.count({
+      where: { tenantId, kind: { in: TEAM_MAIL_KINDS }, createdAt: { gte: since } },
+    });
+    if (sentToday >= this.dailyMailLimit) return 'daily_limit';
+    return this.mail.configured ? 'queued' : 'not_configured';
   }
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TEAM_MAIL_KINDS = ['staff_invite', 'staff_password_reset'];
+/** Correos del equipo por marca en 24 h (`TEAM_MAIL_DAILY_LIMIT`). */
+const DEFAULT_TEAM_MAIL_DAILY_LIMIT = 20;
 
 /** Lo que hace falta para mandar un enlace por correo. */
 interface TeamLinkDelivery {
