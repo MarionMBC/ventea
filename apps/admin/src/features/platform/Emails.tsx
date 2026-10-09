@@ -28,6 +28,8 @@ const KIND_LABEL: Record<string, string> = {
   trial_ending: 'Prueba por vencer',
   past_due: 'Pago pendiente',
   past_due_reminder: 'Recordatorio de pago',
+  staff_invite: 'Invitación al equipo',
+  staff_password_reset: 'Contraseña nueva (equipo)',
 };
 
 /** Un tipo que este panel no conoce (API más nueva) se muestra tal cual. */

@@ -850,7 +850,7 @@ describe('correos (TASK-021)', () => {
   const SENT = {
     ...FAILED,
     id: uuid(901),
-    kind: 'staff_invite',
+    kind: 'future_kind',
     status: 'sent',
     attempts: 1,
     error: null,
@@ -878,7 +878,7 @@ describe('correos (TASK-021)', () => {
     const table = await screen.findByRole('table');
     expect(within(table).getByText('Solicitud de app')).toBeTruthy();
     // Un tipo que el panel no conoce se muestra tal cual.
-    expect(within(table).getByText('staff_invite')).toBeTruthy();
+    expect(within(table).getByText('future_kind')).toBeTruthy();
     expect(within(table).getByText(/connect ETIMEDOUT/)).toBeTruthy();
     expect(within(table).getAllByRole('button', { name: 'Reenviar' })).toHaveLength(1);
 

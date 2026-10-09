@@ -15,7 +15,8 @@ export function teamLink(
 
 /**
  * Enlace de un solo uso recién creado (invitación o contraseña nueva) para copiar y compartir.
- * Todavía no hay correo (TASK-021): el dueño lo manda por donde quiera. Se muestra una sola vez.
+ * La API también lo manda por correo (TASK-021); si no llega (o no hay SMTP), el dueño lo copia
+ * y lo comparte por donde quiera. Se muestra una sola vez.
  */
 export function LinkPanel({
   kind,

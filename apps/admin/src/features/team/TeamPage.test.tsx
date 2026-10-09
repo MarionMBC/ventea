@@ -147,7 +147,7 @@ describe('Equipo', () => {
     });
     const link = within(ready).getByLabelText('Single-use link') as HTMLInputElement;
     expect(link.value).toBe(`${window.location.origin}/admin/join#${TOKEN}`);
-    expect(within(ready).getByText(/We don’t send emails yet/)).toBeTruthy();
+    expect(within(ready).getByText(/We also email it to nuevo@example.com/)).toBeTruthy();
     fireEvent.click(within(ready).getByRole('button', { name: 'Copy link' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(link.value));
     expect(await within(ready).findByRole('button', { name: 'Link copied' })).toBeTruthy();

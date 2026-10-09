@@ -123,7 +123,7 @@ export const teamLocationsEn = {
   'team.inviteReady': 'Invitation for {email} is ready',
   'team.linkTitle': 'Share this link',
   'team.linkNoEmail':
-    'We don’t send emails yet: copy the link and share it with {email} (for example, by WhatsApp). It expires {date} and works only once.',
+    'We also email it to {email}. If it doesn’t arrive, copy the link and share it (for example, by WhatsApp). It expires {date} and works only once.',
   'team.linkOnce': 'For security we show it only now. If you lose it, create a new one.',
   'team.linkLabel': 'Single-use link',
   'team.copy': 'Copy link',
@@ -279,7 +279,7 @@ export const teamLocationsEs: TeamLocationsMessages = {
   'team.inviteReady': 'La invitación para {email} está lista',
   'team.linkTitle': 'Comparta este enlace',
   'team.linkNoEmail':
-    'Todavía no enviamos correos: copia el enlace y compártelo con {email} (por ejemplo, por WhatsApp). Vence el {date} y sirve una sola vez.',
+    'También se lo enviamos por correo a {email}. Si no le llega, copia el enlace y compártelo (por ejemplo, por WhatsApp). Vence el {date} y sirve una sola vez.',
   'team.linkOnce': 'Por seguridad solo lo mostramos ahora. Si lo pierdes, crea uno nuevo.',
   'team.linkLabel': 'Enlace de un solo uso',
   'team.copy': 'Copiar enlace',
