@@ -61,6 +61,10 @@ describe('reemplazos en Android', () => {
       '<color name="ic_launcher_background">#E23B2E</color>',
     );
     expect(() => setLauncherBackground(fixture('ic_launcher_background.xml'), 'red')).toThrow();
+    // Un archivo de marca puede traer #abc: se expande, no rompe el build.
+    expect(setLauncherBackground(fixture('ic_launcher_background.xml'), '#e3b')).toContain(
+      '<color name="ic_launcher_background">#EE33BB</color>',
+    );
   });
 
   test('si la plantilla cambia, falla en voz alta', () => {

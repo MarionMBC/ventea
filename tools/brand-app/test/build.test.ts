@@ -14,6 +14,7 @@ import {
 import type { BrandConfig } from '../src/config';
 import {
   distinguishedName,
+  ensureOwnKeystore,
   externalKeystore,
   keytoolGenArgs,
   parseProperties,
@@ -162,6 +163,20 @@ describe('firma', () => {
       keyAlias: 'demo',
       keyPassword: 'p4ss',
     });
+  });
+
+  test('si keytool falla, no queda un .properties huérfano que bloquee la próxima corrida', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'own-keystore-'));
+    await expect(
+      ensureOwnKeystore({
+        dir,
+        slug: 'demo-burgers',
+        appName: 'Demo',
+        keytool: 'no-existe-keytool-xyz',
+      }),
+    ).rejects.toThrow();
+    expect(existsSync(path.join(dir, 'demo-burgers.properties'))).toBe(false);
+    expect(existsSync(path.join(dir, 'demo-burgers.jks'))).toBe(false);
   });
 
   test('keystore externo: se lee en su sitio, storeFile relativo al .properties', () => {

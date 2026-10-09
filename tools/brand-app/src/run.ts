@@ -1,8 +1,35 @@
 import { spawn } from 'node:child_process';
 
+/**
+ * Variables que ningún proceso hijo hereda: vite, cap, gradle y git cargan plugins de
+ * terceros, y el token de administrador de plataforma o la cuenta del dueño no son asunto
+ * suyo. Si un hijo necesita una (keytool), se le pasa explícita en `env`.
+ */
+export const SECRET_ENV = [
+  'VENTEA_PLATFORM_TOKEN',
+  'VENTEA_OWNER_EMAIL',
+  'VENTEA_OWNER_PASSWORD',
+  'VENTEA_KS_PASS',
+] as const;
+
+/** Entorno de un hijo: el del proceso sin los secretos, más `extra` (`undefined` = quitar). */
+export function childEnv(
+  extra: Record<string, string | undefined> = {},
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base };
+  for (const key of SECRET_ENV) delete env[key];
+  for (const [key, value] of Object.entries(extra)) {
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
+  return env;
+}
+
 export interface RunOptions {
   cwd?: string;
-  env?: NodeJS.ProcessEnv;
+  /** Variables extra para el hijo (`undefined` la quita); el resto sale de `childEnv()`. */
+  env?: Record<string, string | undefined>;
   /** Captura stdout en vez de mostrarlo (para parsear la salida de aapt2/apksigner). */
   capture?: boolean;
   /** Solo para los `.bat`/`.cmd` de Windows (gradlew.bat); los argumentos son fijos. */
@@ -29,7 +56,7 @@ export function run(command: string, args: string[], options: RunOptions = {}): 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
-      env: options.env ?? process.env,
+      env: childEnv(options.env),
       shell: options.shell ?? false,
       stdio: ['ignore', options.capture ? 'pipe' : 'inherit', 'pipe'],
       windowsHide: true,

@@ -11,21 +11,33 @@ export class ApiError extends Error {
   }
 }
 
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 /**
- * `https://api.ventea.tech`, `…/` o `…/api` → `https://api.ventea.tech/api`. Solo http(s) y
- * sin credenciales en la URL.
+ * https siempre; http solo hacia la propia máquina (API local de desarrollo). Por estas URLs
+ * viajan el token de plataforma y la contraseña del dueño: nunca en claro por la red.
  */
-export function apiBase(origin: string): string {
+export function secureUrl(value: string, what = 'La URL'): URL {
   let url: URL;
   try {
-    url = new URL(origin);
+    url = new URL(value);
   } catch {
-    throw new Error(`URL de API inválida: "${origin}"`);
+    throw new Error(`${what} no es una URL válida: "${value}"`);
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error(`La API debe ser http(s): "${origin}"`);
+  const local = url.protocol === 'http:' && LOOPBACK.has(url.hostname);
+  if (url.protocol !== 'https:' && !local) {
+    throw new Error(`${what} debe ser https (http solo para localhost): "${value}"`);
   }
-  if (url.username || url.password) throw new Error('La URL de la API no lleva credenciales');
+  if (url.username || url.password) throw new Error(`${what} no lleva credenciales`);
+  return url;
+}
+
+/**
+ * `https://api.ventea.tech`, `…/` o `…/api` → `https://api.ventea.tech/api`. https (http solo
+ * localhost) y sin credenciales en la URL.
+ */
+export function apiBase(origin: string): string {
+  const url = secureUrl(origin, 'La API');
   const pathname = url.pathname.replace(/\/+$/, '').replace(/\/api$/, '');
   return `${url.origin}${pathname}/api`;
 }

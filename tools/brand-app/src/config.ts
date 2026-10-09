@@ -135,10 +135,9 @@ export function resolveVersion(options: {
 }
 
 /**
- * - `--build-number` manda.
- * - Con la plataforma: el último que registró + 1.
- * - Con archivo: el siguiente al último generado en local, y nunca menos que el `buildNumber`
- *   del archivo (el mínimo de una app ya publicada).
+ * El build number nunca baja: el siguiente a lo último que registró la plataforma, al último
+ * generado en local, y como mínimo el `buildNumber` del archivo de marca (lo ya publicado).
+ * `--build-number` puede saltar hacia adelante, nunca por debajo de ese piso.
  */
 export function resolveBuildNumber(options: {
   flag: number | null;
@@ -146,9 +145,37 @@ export function resolveBuildNumber(options: {
   fileMinimum?: number | null;
   localLast: number | null;
 }): number {
-  if (options.flag !== null) return options.flag;
-  if (options.platform !== null) return options.platform + 1;
-  return Math.max(options.fileMinimum ?? 1, (options.localLast ?? 0) + 1);
+  const floor = Math.max(
+    (options.platform ?? 0) + 1,
+    options.fileMinimum ?? 1,
+    (options.localLast ?? 0) + 1,
+  );
+  if (options.flag !== null && options.flag < floor) {
+    throw new Error(
+      `--build-number ${options.flag} es menor que el siguiente permitido (${floor}): ` +
+        'Android y iOS rechazan un build number que no sube',
+    );
+  }
+  return options.flag ?? floor;
+}
+
+/** El build-config tiene que ser de la marca pedida: si no, se firmaría con el keystore de otra. */
+export function assertSameTenant(config: BuildConfig, slug: string): void {
+  if (config.tenant.slug !== slug) {
+    throw new Error(`La plataforma devolvió la marca "${config.tenant.slug}", no "${slug}"`);
+  }
+}
+
+/** Archivo de marca si existe (modo api: aporta el mínimo de una app ya publicada). */
+export function optionalBrandFile(brandsDir: string, slug: string): BrandFile | null {
+  let file: string;
+  try {
+    file = findBrandFile(brandsDir, slug);
+  } catch (error) {
+    if ((error as Error).message.startsWith('Ningún archivo')) return null;
+    throw error;
+  }
+  return readBrandFile(file);
 }
 
 /** El build number más alto ya generado en local (`dist-apps/<slug>/<version>+<build>`). */

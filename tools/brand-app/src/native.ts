@@ -112,13 +112,21 @@ export function setAndroidStrings(xml: string, appName: string, bundleId: string
   return out;
 }
 
+/** `#abc` / `#AABBCC` → `#AABBCC` (Android acepta `#RGB`, pero así queda uno solo formato). */
+export function normalizeHex(color: string): string {
+  const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(color);
+  if (!match) throw new Error(`Color inválido: ${color}`);
+  const digits = match[1]!.length === 3 ? [...match[1]!].map((d) => d + d).join('') : match[1]!;
+  return `#${digits.toUpperCase()}`;
+}
+
 /** `res/values/ic_launcher_background.xml`: capa de fondo del ícono adaptativo. */
 export function setLauncherBackground(xml: string, color: string): string {
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error(`Color inválido: ${color}`);
+  const hex = normalizeHex(color);
   return replaceRequired(
     xml,
     /(<color name="ic_launcher_background">)[^<]*(<\/color>)/,
-    `<color name="ic_launcher_background">${color.toUpperCase()}</color>`,
+    `<color name="ic_launcher_background">${hex}</color>`,
     'ic_launcher_background.xml',
     'ic_launcher_background',
   );

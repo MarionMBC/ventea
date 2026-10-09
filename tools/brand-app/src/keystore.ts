@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { keystoreFiles } from './paths';
@@ -140,11 +140,22 @@ export async function ensureOwnKeystore(options: {
   const password = randomBytes(24).toString('base64url');
   // Primero las credenciales (0600): si keytool falla, se ve cuál falta y nada queda a medias.
   await writeSecret(properties, signingProperties(files.keystore, alias, password));
-  await run(options.keytool ?? 'keytool', keytoolGenArgs(files.keystore, alias, options.appName), {
-    env: { ...process.env, VENTEA_KS_PASS: password },
-    capture: true,
-  });
-  await restrict(files.keystore);
+  try {
+    await run(
+      options.keytool ?? 'keytool',
+      keytoolGenArgs(files.keystore, alias, options.appName),
+      {
+        env: { VENTEA_KS_PASS: password },
+        capture: true,
+      },
+    );
+    await restrict(files.keystore);
+  } catch (error) {
+    // Sin keystore, el .properties recién creado no sirve y bloquearía la próxima corrida
+    // («restaurar del respaldo»): se borra. Si el .jks llegó a crearse, quedan los dos.
+    if (!existsSync(files.keystore)) rmSync(properties, { force: true });
+    throw error;
+  }
   return { keystore: files.keystore, properties, alias, created: true, external: false };
 }
 

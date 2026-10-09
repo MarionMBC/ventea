@@ -85,25 +85,64 @@ describe('ícono desde imagen', () => {
     expect((await pixel(masters.foreground, 512, 512)).a).toBe(255);
   });
 
-  test('descarga: solo imágenes http(s) de hasta 5 MB', async () => {
-    const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#fff' } })
+  const API = 'https://api.ventea.tech';
+  const tinyPng = () =>
+    sharp({ create: { width: 2, height: 2, channels: 3, background: '#fff' } })
       .png()
       .toBuffer();
+
+  test('descarga: png/jpeg/webp de la API de la marca, hasta 5 MB', async () => {
+    const png = await tinyPng();
     const ok = async () => new Response(png, { headers: { 'content-type': 'image/png' } });
-    expect((await downloadImage('https://x.test/i.png', ok)).length).toBe(png.length);
-    await expect(downloadImage('file:///etc/passwd', ok)).rejects.toThrow('http(s)');
-    const html = async () => new Response('<html>', { headers: { 'content-type': 'text/html' } });
-    await expect(downloadImage('https://x.test/i', html)).rejects.toThrow('no es una imagen');
+    expect((await downloadImage(`${API}/api/media/t/i.png`, API, ok)).length).toBe(png.length);
+    const missing = async () => new Response('', { status: 404 });
+    await expect(downloadImage(`${API}/i`, API, missing)).rejects.toThrow('404');
     const big = async () =>
       new Response(png, {
         headers: { 'content-type': 'image/png', 'content-length': String(MAX_ICON_BYTES + 1) },
       });
-    await expect(downloadImage('https://x.test/i', big)).rejects.toThrow('5 MB');
-    const missing = async () => new Response('', { status: 404 });
-    await expect(downloadImage('https://x.test/i', missing)).rejects.toThrow('404');
+    await expect(downloadImage(`${API}/i`, API, big)).rejects.toThrow('5 MB');
   });
 
-  test('brandMasters descarga de la URL que se le da, no de la de la marca', async () => {
+  test('descarga: nada de SVG, HTML, otros hosts ni http fuera de localhost', async () => {
+    const png = await tinyPng();
+    const as = (type: string) => async () =>
+      new Response(png, { headers: { 'content-type': type } });
+    await expect(downloadImage(`${API}/i.svg`, API, as('image/svg+xml'))).rejects.toThrow(
+      'png, jpeg o webp',
+    );
+    await expect(downloadImage(`${API}/i`, API, as('text/html'))).rejects.toThrow(
+      'png, jpeg o webp',
+    );
+    await expect(downloadImage('https://evil.test/i.png', API, as('image/png'))).rejects.toThrow(
+      'fuera de la API',
+    );
+    await expect(
+      downloadImage('http://api.ventea.tech/i.png', 'http://api.ventea.tech', as('image/png')),
+    ).rejects.toThrow('https');
+    await expect(downloadImage('file:///etc/passwd', API, as('image/png'))).rejects.toThrow();
+    const local = 'http://localhost:3000';
+    expect((await downloadImage(`${local}/i.png`, local, as('image/png'))).length).toBe(png.length);
+  });
+
+  test('descarga: sin content-length corta la lectura al pasar 5 MB', async () => {
+    let pulled = 0;
+    const chunk = new Uint8Array(1024 * 1024);
+    const endless = async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(chunk);
+          },
+        }),
+        { headers: { 'content-type': 'image/png' } },
+      );
+    await expect(downloadImage(`${API}/i`, API, endless)).rejects.toThrow('5 MB');
+    expect(pulled).toBeLessThan(10);
+  });
+
+  test('brandMasters descarga de la URL y del origen que se le dan', async () => {
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#00ff00' } })
       .png()
       .toBuffer();
@@ -115,15 +154,20 @@ describe('ícono desde imagen', () => {
     const config = {
       ...brand('X', '#E23B2E'),
       tenantSlug: 'x',
-      apiUrl: 'https://api.ventea.tech',
+      apiUrl: API,
       bundleId: 'a.b',
       logoUrl: null,
-      iconUrl: 'https://api.ventea.tech/api/media/t/i.webp',
+      iconUrl: `${API}/api/media/t/i.webp`,
       defaultLanguage: 'es' as const,
       currency: 'USD',
       push: { enabled: false },
     };
-    await brandMasters(config, 'http://localhost:3000/api/media/t/i.webp', fetchImpl);
+    await brandMasters(
+      config,
+      'http://localhost:3000/api/media/t/i.webp',
+      'http://localhost:3000',
+      fetchImpl,
+    );
     expect(urls).toEqual(['http://localhost:3000/api/media/t/i.webp']);
   });
 });

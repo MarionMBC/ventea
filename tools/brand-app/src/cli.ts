@@ -14,9 +14,12 @@ import {
 } from './android';
 import { APP_USAGE, parseAppArgs, UsageError, type AppArgs } from './args';
 import {
+  apiOrigin,
+  assertSameTenant,
   brandFromBuildConfig,
   findBrandFile,
   lastLocalBuildNumber,
+  optionalBrandFile,
   mobileVersion,
   readBrandFile,
   resolveBuildNumber,
@@ -76,6 +79,8 @@ interface Resolved {
   version: string;
   buildNumber: number;
   pushEnabled: boolean;
+  /** Única API de la que se acepta descargar el ícono. */
+  iconOrigin: string;
 }
 
 function withLegacyPrefix(brand: BrandConfig, prefix: string | null): BrandConfig {
@@ -95,6 +100,8 @@ async function resolveConfig(args: AppArgs): Promise<Resolved> {
   if (args.configFrom === 'api') {
     const api = new PlatformApi(args.apiUrl!, process.env.VENTEA_PLATFORM_TOKEN ?? '');
     const buildConfig = await api.buildConfig(args.tenant);
+    assertSameTenant(buildConfig, args.tenant);
+    const local = optionalBrandFile(path.join(MOBILE_DIR, 'brands'), args.tenant);
     const brand = withLegacyPrefix(
       brandFromBuildConfig(buildConfig, { appApiUrl: args.appApiUrl, pushEnabled }),
       args.legacyStoragePrefix,
@@ -104,14 +111,16 @@ async function resolveConfig(args: AppArgs): Promise<Resolved> {
       buildConfig,
       api,
       pushEnabled,
+      iconOrigin: apiOrigin(buildConfig.apiBaseUrl),
       version: resolveVersion({
         flag: args.version,
-        platform: buildConfig.app.version,
+        platform: buildConfig.app.version ?? local?.version ?? null,
         fallback: mobileVersion(MOBILE_DIR),
       }),
       buildNumber: resolveBuildNumber({
         flag: args.buildNumber,
         platform: buildConfig.app.buildNumber,
+        fileMinimum: local?.buildNumber ?? null,
         localLast: lastLocalBuildNumber(slugDist),
       }),
     };
@@ -132,6 +141,7 @@ async function resolveConfig(args: AppArgs): Promise<Resolved> {
     buildConfig: null,
     api: null,
     pushEnabled,
+    iconOrigin: read.brand.apiUrl,
     version: resolveVersion({
       flag: args.version,
       platform: read.version,
@@ -151,6 +161,7 @@ async function brandNative(args: AppArgs, resolved: Resolved, paths: BrandPaths)
   const masters = await brandMasters(
     brand,
     resolved.buildConfig?.branding.iconUrl ?? brand.iconUrl,
+    resolved.iconOrigin,
   );
   if (args.platform === 'android') {
     const app = path.join(paths.android, 'app');
@@ -190,9 +201,11 @@ async function brandNative(args: AppArgs, resolved: Resolved, paths: BrandPaths)
 
 /** Bundle web de la marca, sin `VITE_API_URL` de desarrollo que se cuele al binario. */
 async function buildWeb(paths: BrandPaths): Promise<void> {
-  const env: NodeJS.ProcessEnv = { ...process.env, VENTEA_BRAND_FILE: paths.brandFile };
-  delete env.VITE_API_URL;
-  delete env.VITE_DEFAULT_TENANT_SLUG;
+  const env = {
+    VENTEA_BRAND_FILE: paths.brandFile,
+    VITE_API_URL: undefined,
+    VITE_DEFAULT_TENANT_SLUG: undefined,
+  };
   await run(
     process.execPath,
     [

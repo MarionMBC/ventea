@@ -33,7 +33,7 @@ export async function gradleBuild(
   const gradlew = windows ? `"${path.join(androidDir, 'gradlew.bat')}"` : './gradlew';
   await run(gradlew, [...gradleTasks(release), '--no-daemon', '--console=plain'], {
     cwd: androidDir,
-    env: { ...process.env, ...env },
+    env,
     // gradlew.bat solo corre con shell; los argumentos son fijos (sin entrada del usuario).
     shell: windows,
   });

@@ -8,6 +8,8 @@ import { describe, expect, test } from 'vitest';
 import { parseAppArgs, UsageError } from '../src/args';
 import {
   apiOrigin,
+  assertSameTenant,
+  optionalBrandFile,
   brandFromBuildConfig,
   findBrandFile,
   lastLocalBuildNumber,
@@ -136,6 +138,18 @@ describe('build-config → brand.config.json', () => {
     expect(brand.push.enabled).toBe(true);
   });
 
+  test('el build-config tiene que ser de la marca pedida', () => {
+    expect(() => assertSameTenant(buildConfig, 'carolina-hot-chicken')).not.toThrow();
+    expect(() => assertSameTenant(buildConfig, 'demo-burgers')).toThrow('no "demo-burgers"');
+  });
+
+  test('archivo de marca opcional en modo api', () => {
+    expect(
+      optionalBrandFile(path.join(MOBILE_DIR, 'brands'), 'carolina-hot-chicken'),
+    ).toMatchObject({ buildNumber: 4, version: '1.2.0' });
+    expect(optionalBrandFile(path.join(MOBILE_DIR, 'brands'), 'sin-archivo')).toBeNull();
+  });
+
   test('un build-config incompleto se rechaza', () => {
     expect(() => parseBuildConfig({ tenant: { slug: 'x' } })).toThrow('build-config inválido');
   });
@@ -186,8 +200,16 @@ describe('versión y build number', () => {
   });
 
   test('el build number siempre sube', () => {
-    expect(resolveBuildNumber({ flag: 9, platform: 3, localLast: 20 })).toBe(9);
-    expect(resolveBuildNumber({ flag: null, platform: 3, localLast: 20 })).toBe(4);
+    expect(resolveBuildNumber({ flag: 30, platform: 3, localLast: 20 })).toBe(30);
+    expect(resolveBuildNumber({ flag: null, platform: 3, localLast: null })).toBe(4);
+    expect(resolveBuildNumber({ flag: null, platform: 3, localLast: 20 })).toBe(21);
+    // Plataforma sin número pero archivo de marca con lo publicado (Carolina): no baja a 1.
+    expect(
+      resolveBuildNumber({ flag: null, platform: null, fileMinimum: 4, localLast: null }),
+    ).toBe(4);
+    expect(resolveBuildNumber({ flag: null, platform: 7, fileMinimum: 4, localLast: null })).toBe(
+      8,
+    );
     expect(resolveBuildNumber({ flag: null, platform: null, localLast: null })).toBe(1);
     expect(
       resolveBuildNumber({ flag: null, platform: null, fileMinimum: 4, localLast: null }),
@@ -195,6 +217,14 @@ describe('versión y build number', () => {
     expect(resolveBuildNumber({ flag: null, platform: null, fileMinimum: 4, localLast: 6 })).toBe(
       7,
     );
+  });
+
+  test('--build-number por debajo del piso se rechaza', () => {
+    expect(() => resolveBuildNumber({ flag: 3, platform: 3, localLast: null })).toThrow('menor');
+    expect(() =>
+      resolveBuildNumber({ flag: 2, platform: null, fileMinimum: 4, localLast: null }),
+    ).toThrow('menor');
+    expect(() => resolveBuildNumber({ flag: 5, platform: null, localLast: 5 })).toThrow('menor');
   });
 
   test('último build local por carpeta <versión>+<build>', () => {

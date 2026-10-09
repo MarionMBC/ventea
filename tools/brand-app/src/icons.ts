@@ -5,7 +5,7 @@ import sharp from 'sharp';
 
 import { parseHex, readableOn } from '../../../apps/mobile/src/brand/color';
 import type { BrandConfig } from './config';
-import type { Fetch } from './http';
+import { secureUrl, type Fetch } from './http';
 
 /**
  * Íconos y splash de cada marca con sharp, a partir del ícono de Mi marca (`iconUrl`) o, si no
@@ -129,39 +129,68 @@ export async function mastersFromImage(image: Buffer, primary: string): Promise<
   return { full, foreground, background: primary };
 }
 
-/** Descarga `iconUrl`: solo http(s), sin seguir redirecciones, como mucho 5 MB e imagen. */
-export async function downloadImage(url: string, fetchImpl: Fetch = fetch): Promise<Buffer> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error(`iconUrl no es http(s): ${url}`);
+/** Tipos de ícono admitidos (los mismos que la subida de medios; nada de SVG). */
+export const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+
+/**
+ * Descarga `iconUrl`. Solo del origen de la API que dio la configuración (los medios de la
+ * marca viven ahí), https (http solo localhost), sin seguir redirecciones, png/jpeg/webp, y
+ * corta la lectura en cuanto pasa de 5 MB aunque no venga `content-length`.
+ */
+export async function downloadImage(
+  url: string,
+  allowedOrigin: string,
+  fetchImpl: Fetch = fetch,
+): Promise<Buffer> {
+  const parsed = secureUrl(url, 'iconUrl');
+  if (parsed.origin !== new URL(allowedOrigin).origin) {
+    throw new Error(`iconUrl fuera de la API de la marca (${allowedOrigin}): ${url}`);
   }
   const response = await fetchImpl(url, {
     redirect: 'error',
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`No se pudo descargar el ícono (${response.status}): ${url}`);
-  const type = response.headers.get('content-type') ?? '';
-  if (!type.startsWith('image/')) {
-    throw new Error(`El ícono no es una imagen (${type || 'sin tipo'})`);
+  const type = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+  if (!(ICON_TYPES as readonly string[]).includes(type)) {
+    throw new Error(`El ícono debe ser png, jpeg o webp (${type || 'sin tipo'})`);
   }
   const declared = Number(response.headers.get('content-length') ?? 0);
   if (declared > MAX_ICON_BYTES) throw new Error('El ícono pasa de 5 MB');
-  const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.length > MAX_ICON_BYTES) throw new Error('El ícono pasa de 5 MB');
-  return buffer;
+  if (!response.body) throw new Error('El ícono vino vacío');
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_ICON_BYTES) {
+      await reader.cancel();
+      throw new Error('El ícono pasa de 5 MB');
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
- * `iconUrl` es de dónde se descarga: con `--app-api-url` el de `brand` ya apunta a la API de la
- * app, y el archivo está en la que respondió el build-config.
+ * `iconUrl` es de dónde se descarga y `allowedOrigin` la API que respondió el build-config:
+ * con `--app-api-url` el ícono de `brand` ya apunta a la API de la app, pero el archivo está
+ * en la que dio la configuración.
  */
 export async function brandMasters(
   brand: BrandConfig,
   iconUrl: string | null = brand.iconUrl,
+  allowedOrigin: string = brand.apiUrl,
   fetchImpl: Fetch = fetch,
 ): Promise<IconMasters> {
   if (!iconUrl) return generatedMasters(brand);
-  return mastersFromImage(await downloadImage(iconUrl, fetchImpl), brand.colors.primary);
+  return mastersFromImage(
+    await downloadImage(iconUrl, allowedOrigin, fetchImpl),
+    brand.colors.primary,
+  );
 }
 
 /** Recorta con una máscara SVG (squircle del legacy o círculo). */

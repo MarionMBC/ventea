@@ -132,7 +132,7 @@ function fakeApi(
   const fetchImpl = async (url: string, init?: RequestInit) => {
     const headers = new Headers(init?.headers);
     const method = init?.method ?? 'GET';
-    const route = url.replace('http://api.test/api', '');
+    const route = url.replace('https://api.test/api', '');
     calls.push({
       method,
       url: route,
@@ -163,7 +163,7 @@ function fakeApi(
       }
       uploads += 1;
       return json(
-        { url: `http://api.test/api/media/t/${uploads}.webp`, thumbUrl: 'x', width: 1, height: 1 },
+        { url: `https://api.test/api/media/t/${uploads}.webp`, thumbUrl: 'x', width: 1, height: 1 },
         201,
       );
     }
@@ -188,7 +188,7 @@ function map(dir: string): ImageMap {
 }
 
 const base = {
-  apiUrl: 'http://api.test',
+  apiUrl: 'https://api.test',
   tenant: 'carolina-hot-chicken',
   email: 'o@x.test',
   password: 'pw',
@@ -211,13 +211,13 @@ describe('importación', () => {
     expect(patches).toEqual([
       expect.objectContaining({
         url: '/staff/menu/items/11111111-1111-4111-8111-111111111111',
-        body: { imageUrl: 'http://api.test/api/media/t/1.webp' },
+        body: { imageUrl: 'https://api.test/api/media/t/1.webp' },
       }),
       expect.objectContaining({
         url: '/staff/brand',
         body: {
-          logoUrl: 'http://api.test/api/media/t/2.webp',
-          iconUrl: 'http://api.test/api/media/t/2.webp',
+          logoUrl: 'https://api.test/api/media/t/2.webp',
+          iconUrl: 'https://api.test/api/media/t/2.webp',
         },
       }),
     ]);
