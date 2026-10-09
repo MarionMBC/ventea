@@ -1,3 +1,5 @@
+import { homeHref, useLocale, useT } from '@/i18n';
+
 /**
  * Logotipo oficial de Ventea (isotipo + «ventea»), el mismo de marketing.ventea.tech. Los
  * colores del logo no se tocan: marino #0B1E3A y turquesa #03ADAE sobre fondo claro; sobre
@@ -57,9 +59,12 @@ export function Isotype({
   );
 }
 
-export function Brand({ href = '/', tone = 'light' }: { href?: string; tone?: 'light' | 'dark' }) {
+/** Logo que lleva al inicio del idioma de la vista (`/` o `/es/`). */
+export function Brand({ href, tone = 'light' }: { href?: string; tone?: 'light' | 'dark' }) {
+  const t = useT();
+  const locale = useLocale();
   return (
-    <a className="brand" href={href} aria-label="Ventea, inicio">
+    <a className="brand" href={href ?? homeHref(locale)} aria-label={t.common.brandHome}>
       <Logo tone={tone} className="brand__logo" />
     </a>
   );

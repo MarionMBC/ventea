@@ -1,5 +1,7 @@
 import { TERMINAL_ORDER_STATUSES, type OrderStatus, type StaffOrder } from '@ventea/shared';
 
+import type { TKey } from '@/i18n';
+
 /**
  * Flujo del mostrador. Espeja `apps/api/src/modules/orders/order-status.ts`: la API es
  * la que decide (409 si no corresponde); esto solo elige qué botón mostrar.
@@ -7,10 +9,25 @@ import { TERMINAL_ORDER_STATUSES, type OrderStatus, type StaffOrder } from '@ven
 
 /** Estados que viven en el tablero, en orden de columna. */
 export const BOARD_COLUMNS = [
-  { status: 'confirmed', title: 'Nuevos' },
-  { status: 'preparing', title: 'En cocina' },
-  { status: 'ready', title: 'Listos' },
-] as const satisfies readonly { status: OrderStatus; title: string }[];
+  {
+    status: 'confirmed',
+    title: 'column.confirmed',
+    short: 'column.short.confirmed',
+    hint: 'board.columnHint.confirmed',
+  },
+  {
+    status: 'preparing',
+    title: 'column.preparing',
+    short: 'column.short.preparing',
+    hint: 'board.columnHint.preparing',
+  },
+  {
+    status: 'ready',
+    title: 'column.ready',
+    short: 'column.short.ready',
+    hint: 'board.columnHint.ready',
+  },
+] as const satisfies readonly { status: OrderStatus; title: TKey; short: TKey; hint: TKey }[];
 
 export type BoardStatus = (typeof BOARD_COLUMNS)[number]['status'];
 
@@ -19,13 +36,14 @@ export const HISTORY_STATUSES = ['completed', 'cancelled'] as const;
 
 export interface StatusAction {
   to: OrderStatus;
-  label: string;
+  /** Texto del botón (clave de i18n). */
+  label: TKey;
 }
 
 const PRIMARY_ACTION: Partial<Record<OrderStatus, StatusAction>> = {
-  confirmed: { to: 'preparing', label: 'Empezar' },
-  preparing: { to: 'ready', label: 'Listo' },
-  ready: { to: 'completed', label: 'Entregado' },
+  confirmed: { to: 'preparing', label: 'action.start' },
+  preparing: { to: 'ready', label: 'action.ready' },
+  ready: { to: 'completed', label: 'action.deliver' },
 };
 
 /** El siguiente paso normal del pedido, o null si ya no avanza. */
@@ -42,18 +60,9 @@ export function isBoardStatus(status: OrderStatus): status is BoardStatus {
   return (ACTIVE_STATUSES as readonly OrderStatus[]).includes(status);
 }
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  draft: 'Borrador',
-  pending_payment: 'Esperando pago',
-  confirmed: 'Nuevo',
-  preparing: 'En cocina',
-  ready: 'Listo',
-  completed: 'Entregado',
-  cancelled: 'Cancelado',
-};
-
-export function statusLabel(status: OrderStatus): string {
-  return STATUS_LABEL[status];
+/** Clave de i18n del estado: confirmed = Nuevo, preparing = En cocina, ready = Listo… */
+export function statusLabel(status: OrderStatus): TKey {
+  return `status.${status}`;
 }
 
 /**

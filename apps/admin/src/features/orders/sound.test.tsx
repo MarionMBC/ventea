@@ -36,11 +36,11 @@ describe('Sonido bloqueado por el navegador', () => {
       />,
     );
 
-    const unlock = await screen.findByRole('button', { name: 'Toca para activar el sonido' });
-    expect(screen.getByRole('button', { name: 'Sonido: activado' })).toBeTruthy();
+    const unlock = await screen.findByRole('button', { name: 'Tap to enable sound' });
+    expect(screen.getByRole('button', { name: 'Sound', pressed: true })).toBeTruthy();
     fireEvent.click(unlock);
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Toca para activar el sonido' })).toBeNull(),
+      expect(screen.queryByRole('button', { name: 'Tap to enable sound' })).toBeNull(),
     );
   });
 });

@@ -184,6 +184,8 @@
   font-family: var(--font-display);
   font-weight: 850;
   font-size: 1.5rem;
+  /* «$590 / year» no se parte en dos líneas (en inglés es más largo que «/ año»). */
+  white-space: nowrap;
 }
 
 .plan-pick__price small {

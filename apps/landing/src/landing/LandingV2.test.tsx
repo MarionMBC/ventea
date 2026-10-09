@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CONTACT_EMAIL, DEMO_URL } from '@/config';
 import { beaconEvents, json, mockFetch, PLANS, text } from '@/test/fixtures';
+import { renderEs as render } from '@/test/render';
 import { PanelAccess } from '@/site/PanelAccess';
 import { WhatsAppButton } from '@/site/WhatsAppButton';
 
@@ -20,39 +21,47 @@ async function renderLanding() {
   return view;
 }
 
-describe('Capturas reales del producto (TASK-007 AC2, TASK-010)', () => {
-  it('panel y app de Carolina: AVIF+WebP con dimensiones, lazy y texto alternativo', async () => {
+describe('Capturas reales del producto (TASK-013)', () => {
+  it('panel e historial: AVIF+WebP con dimensiones, lazy y texto alternativo', async () => {
     const { container } = await renderLanding();
-    const shots = [...container.querySelectorAll<HTMLImageElement>('#panel img, #identidad img')];
-    expect(shots).toHaveLength(3);
+    const shots = [
+      ...container.querySelectorAll<HTMLImageElement>('#pedidos .browser img, #panel img'),
+    ];
+    expect(shots).toHaveLength(2);
     for (const img of shots) {
-      expect(Number(img.getAttribute('width'))).toBeGreaterThan(0);
-      expect(Number(img.getAttribute('height'))).toBeGreaterThan(0);
+      expect(img.getAttribute('width')).toBe('1200');
+      expect(img.getAttribute('height')).toBe('750');
       expect(img.getAttribute('loading')).toBe('lazy');
-      expect(img.getAttribute('alt')!.length).toBeGreaterThan(20);
+      expect(img.getAttribute('alt')!.length).toBeGreaterThan(40);
       expect(img.getAttribute('src')).toMatch(/\.webp/);
-      const source = img.parentElement!.querySelector('source');
-      expect(source?.getAttribute('type')).toBe('image/avif');
+      expect(img.parentElement!.querySelector('source')?.getAttribute('type')).toBe('image/avif');
     }
   });
 
-  it('mención neutral de Carolina y el restaurante de ejemplo presentado como tal', async () => {
+  it('teléfonos con capturas de la app: imagen accesible con su descripción, sin maquetas', async () => {
+    const { container } = await renderLanding();
+    const phones = [...container.querySelectorAll('.shotphone')];
+    expect(phones.length).toBeGreaterThanOrEqual(6);
+    for (const phone of phones) {
+      expect(phone.getAttribute('role')).toBe('img');
+      expect(phone.getAttribute('aria-label')).toMatch(/Carolina Hot Chicken/);
+      for (const img of phone.querySelectorAll('img')) {
+        expect(img.getAttribute('src')).toMatch(/carolina-(home|menu|product|tracking|profile)/);
+        expect(img.getAttribute('alt')).toBe('');
+      }
+    }
+    expect(container.querySelector('.phone__frame, .board, .ring')).toBeNull();
+  });
+
+  it('mención neutral de Carolina, capturas presentadas como tales y sin «demo en vivo»', async () => {
     const { container } = await renderLanding();
     expect(text(container)).toContain('Carolina Hot Chicken ya recibe pedidos con Ventea');
-    expect(text(container)).toContain('Demostración con un restaurante de ejemplo');
+    expect(text(container)).toContain(
+      'Capturas reales de la app de Carolina Hot Chicken. Cuenta y pedido de ejemplo.',
+    );
+    expect(text(container)).not.toContain('Casa Brasa');
     // El menú web de las marcas todavía no está publicado: no se enlaza una «demo en vivo».
     expect(container.querySelector(`a[href="${DEMO_URL}"]`)).toBeNull();
-  });
-
-  it('las fotos de platillos son decorativas o con alt, con srcset y tamaño fijo', async () => {
-    const { container } = await renderLanding();
-    const photos = [...container.querySelectorAll<HTMLImageElement>('img[srcset]')];
-    expect(photos.length).toBeGreaterThan(4);
-    for (const img of photos) {
-      expect(img.getAttribute('width')).toBe('320');
-      expect(img.getAttribute('height')).toBe('320');
-      expect(img.getAttribute('alt')).not.toBeNull();
-    }
   });
 });
 

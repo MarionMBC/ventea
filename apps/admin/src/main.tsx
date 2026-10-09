@@ -7,10 +7,11 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
 import './styles/orders.css';
+import './styles/pages.css';
 import './styles/platform.css';
 
 const container = document.getElementById('root');
-if (!container) throw new Error('Falta #root en index.html');
+if (!container) throw new Error('Missing #root in index.html');
 
 createRoot(container).render(
   <React.StrictMode>

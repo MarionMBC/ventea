@@ -11,6 +11,11 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const VERSION = 'v1';
 const IV_BYTES = 12;
+/**
+ * Tag fijo de 16 bytes en las dos puntas: sin `authTagLength`, Node acepta en `setAuthTag` un
+ * tag truncado (hasta 4 bytes) y la integridad baja a 32 bits.
+ */
+const TAG_BYTES = 16;
 
 /** Lee la clave de la variable de entorno. `null` si falta o no mide 32 bytes. */
 export function parseCredentialsKey(raw: string | undefined): Buffer | null {
@@ -24,7 +29,7 @@ export function parseCredentialsKey(raw: string | undefined): Buffer | null {
 
 export function encryptCredentials(plain: string, key: Buffer, tenantId: string): string {
   const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength: TAG_BYTES });
   cipher.setAAD(Buffer.from(tenantId, 'utf8'));
   const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -38,9 +43,14 @@ export function decryptCredentials(stored: string, key: Buffer, tenantId: string
   const [version, iv, tag, data] = stored.split('.');
   if (version !== VERSION || !iv || !tag || !data)
     throw new Error('Credenciales push con formato desconocido');
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
+  const ivBytes = Buffer.from(iv, 'base64url');
+  const tagBytes = Buffer.from(tag, 'base64url');
+  if (ivBytes.length !== IV_BYTES || tagBytes.length !== TAG_BYTES) {
+    throw new Error('Credenciales push con IV o tag de largo inválido');
+  }
+  const decipher = createDecipheriv('aes-256-gcm', key, ivBytes, { authTagLength: TAG_BYTES });
   decipher.setAAD(Buffer.from(tenantId, 'utf8'));
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  decipher.setAuthTag(tagBytes);
   return Buffer.concat([
     decipher.update(Buffer.from(data, 'base64url')),
     decipher.final(),

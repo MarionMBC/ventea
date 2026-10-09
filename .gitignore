@@ -54,3 +54,6 @@ dist-ssr/
 
 # apps nativas generadas por marca (TASK-019): binarios, copias de trabajo y metadatos
 dist-apps/
+
+# medios subidos en desarrollo (MEDIA_DIR por defecto, TASK-016)
+apps/api/media/

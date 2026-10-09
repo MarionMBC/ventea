@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { registerDeviceSchema, type Device, type RegisterDeviceInput } from '@ventea/shared';
@@ -16,6 +17,7 @@ import type { Response } from 'express';
 import type { CustomerPrincipal } from '@/common/auth/auth.context';
 import { CurrentCustomer, CustomerAuth } from '@/common/decorators/auth.decorators';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe';
+import { RateLimit, RateLimitGuard } from '@/modules/platform/rate-limit.guard';
 
 import { DevicesService } from './devices.service';
 
@@ -26,8 +28,18 @@ import { DevicesService } from './devices.service';
 export class DevicesController {
   constructor(private readonly devices: DevicesService) {}
 
-  /** `201` con el dispositivo nuevo (o recién pasado a este cliente); `200` si ya era suyo. */
+  /**
+   * `201` con el dispositivo nuevo (o recién pasado a este cliente); `200` si ya era suyo.
+   * Rate limit por cliente (la sesión ya la verificó el guard de la clase).
+   */
   @Post()
+  @RateLimit({
+    bucket: 'device-register',
+    envKey: 'DEVICE_REGISTER_RATE_LIMIT_PER_HOUR',
+    defaultPerHour: 30,
+    key: 'principal',
+  })
+  @UseGuards(RateLimitGuard)
   async register(
     @CurrentCustomer() customer: CustomerPrincipal,
     @Body(new ZodValidationPipe(registerDeviceSchema)) input: RegisterDeviceInput,

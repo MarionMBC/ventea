@@ -54,21 +54,50 @@ export function absoluteMediaUrl(stored: string | null | undefined, base: string
   return stored.startsWith(MEDIA_PATH_PREFIX) ? `${base}${stored}` : stored;
 }
 
-const HOST_PATTERN = /^[a-z0-9.-]+(:\d{1,5})?$/i;
+const HOST_PATTERN = /^([a-z0-9.-]+)(:\d{1,5})?$/i;
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+/** De qué hosts se acepta reflejar el `Host` del request en URLs absolutas. */
+export interface HostPolicy {
+  /** `TENANT_BASE_DOMAIN`: se aceptan el apex y cualquier subdominio (marcas, `app.`, `api.`). */
+  baseDomain?: string;
+  /** `PUBLIC_ORIGIN` (instalación dedicada): su host también vale. */
+  publicOrigin?: string;
+  /** Fuera de producción valen además `localhost` y `127.0.0.1` (desarrollo y tests). */
+  production: boolean;
+}
+
+export function isAllowedHost(host: string | undefined, policy: HostPolicy): boolean {
+  const match = host ? HOST_PATTERN.exec(host) : null;
+  if (!match) return false;
+  const hostname = match[1]!.toLowerCase();
+  const base = policy.baseDomain?.trim().toLowerCase();
+  if (base && (hostname === base || hostname.endsWith(`.${base}`))) return true;
+  if (policy.publicOrigin) {
+    try {
+      if (new URL(policy.publicOrigin).hostname.toLowerCase() === hostname) return true;
+    } catch {
+      // PUBLIC_ORIGIN mal escrito: no habilita nada
+    }
+  }
+  return !policy.production && LOCAL_HOSTS.has(hostname);
+}
 
 /**
  * Base pública (`protocolo://host`) para armar URLs absolutas. `MEDIA_PUBLIC_BASE_URL` manda si
- * está (CDN o dominio fijo); si no, el host del request (detrás de Traefik, con `trust proxy`).
- * Un Host con caracteres raros no se refleja en la respuesta.
+ * está (CDN o dominio fijo); si no, el host del request (detrás de Traefik, con `trust proxy`),
+ * solo si es un host de la plataforma (`isAllowedHost`). Con un Host desconocido devuelve `''`:
+ * las URLs salen relativas (`/api/media/…`) en vez de apuntar a un dominio que mandó el cliente.
  */
 export function publicBaseUrl(
   configured: string | undefined,
   protocol: string,
   host: string | undefined,
+  policy: HostPolicy,
 ): string {
   const fixed = configured?.trim().replace(/\/+$/, '');
   if (fixed) return fixed;
-  const safeHost = host && HOST_PATTERN.test(host) ? host : 'localhost';
+  if (!isAllowedHost(host, policy)) return '';
   const safeProtocol = protocol === 'https' ? 'https' : 'http';
-  return `${safeProtocol}://${safeHost}`;
+  return `${safeProtocol}://${host!.toLowerCase()}`;
 }

@@ -49,7 +49,7 @@ export function Footer({ route }: { route: Route }) {
                 <a href={config.marketingUrl}>{t.products.marketing.name}</a>
               </li>
               <li>
-                <a href={config.restaurantsUrl}>{t.products.restaurants.name}</a>
+                <a href={config.restaurantsUrl[route.locale]}>{t.products.restaurants.name}</a>
               </li>
             </ul>
             <h2 className="footer__title footer__title--spaced">{t.footer.contactTitle}</h2>

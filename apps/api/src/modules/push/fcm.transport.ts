@@ -64,8 +64,11 @@ export class FcmPushTransport implements PushTransport {
     }
 
     if (response.ok) return 'sent';
-    const code = await fcmErrorCode(response);
-    if (response.status === 404 || code === 'UNREGISTERED' || code === 'INVALID_ARGUMENT') {
+    const { code, tokenRejected } = await fcmError(response);
+    // Solo se descarta el token cuando FCM dice que ESE token no sirve. Un 404 por projectId mal
+    // o un INVALID_ARGUMENT del payload son fallas nuestras: borrar tokens por eso dejaría sin
+    // avisos a todos los clientes de la marca, sin vuelta atrás.
+    if (code === 'UNREGISTERED' || (code === 'INVALID_ARGUMENT' && tokenRejected)) {
       return 'invalid_token';
     }
     if (response.status === 401) this.tokens.delete(cacheKey(credentials));
@@ -119,16 +122,31 @@ function base64url(text: string): string {
   return Buffer.from(text, 'utf8').toString('base64url');
 }
 
-/** `errorCode` de FCM (`UNREGISTERED`, `INVALID_ARGUMENT`…) o el `status` de Google. */
-async function fcmErrorCode(response: Response): Promise<string | null> {
+interface FcmErrorBody {
+  error?: {
+    status?: string;
+    details?: { errorCode?: string; fieldViolations?: { field?: string }[] }[];
+  };
+}
+
+/**
+ * `errorCode` de FCM (`UNREGISTERED`, `INVALID_ARGUMENT`…, o el `status` de Google si no viene)
+ * y si algún `fieldViolations` apunta a `message.token`.
+ */
+async function fcmError(
+  response: Response,
+): Promise<{ code: string | null; tokenRejected: boolean }> {
   try {
-    const body = (await response.json()) as {
-      error?: { status?: string; details?: { errorCode?: string }[] };
-    };
-    const detail = body.error?.details?.find((d) => typeof d.errorCode === 'string')?.errorCode;
-    return detail ?? body.error?.status ?? null;
+    const body = (await response.json()) as FcmErrorBody;
+    const details = body.error?.details ?? [];
+    const code =
+      details.find((d) => typeof d.errorCode === 'string')?.errorCode ?? body.error?.status ?? null;
+    const tokenRejected = details.some((d) =>
+      (d.fieldViolations ?? []).some((v) => v.field === 'message.token'),
+    );
+    return { code, tokenRejected };
   } catch {
-    return null;
+    return { code: null, tokenRejected: false };
   }
 }
 

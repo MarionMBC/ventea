@@ -1,19 +1,46 @@
-import type { StaffOrder } from '@ventea/shared';
-import { useId, useState } from 'react';
+import type { FulfillmentType, OrderStatus, StaffOrder } from '@ventea/shared';
+import { useId, useState, type ComponentType } from 'react';
 
+import { useI18n } from '@/i18n';
+import { minutesSince } from '@/lib/format';
 import {
-  customerName,
-  formatClock,
-  formatAmount,
-  formatElapsed,
-  fulfillmentLabel,
-  minutesSince,
-} from '@/lib/format';
+  IconArrowRight,
+  IconBag,
+  IconCheck,
+  IconClock,
+  IconNote,
+  IconPhone,
+  IconTruck,
+  IconUtensils,
+} from '@/ui/icons';
 
 import { canCancel, primaryAction, type StatusAction } from './transitions';
 
-/** Un pedido nuevo que lleva más de esto sin empezarse se marca como demorado. */
-const LATE_AFTER_MIN = 10;
+/**
+ * Minutos desde que entró el pedido a partir de los que el reloj de la tarjeta se pone en
+ * ámbar (`warn`) y en rojo (`late`), según la columna. Solo visual: no cambia nada del flujo.
+ * El «nuevo sin empezar ≥ 10 min = demorado» es el criterio que ya usaba el tablero.
+ */
+const URGENCY: Partial<Record<OrderStatus, { warn: number; late: number }>> = {
+  confirmed: { warn: 5, late: 10 },
+  preparing: { warn: 15, late: 25 },
+  ready: { warn: 10, late: 20 },
+};
+
+export type Urgency = 'ok' | 'warn' | 'late';
+
+export function urgencyOf(status: OrderStatus, minutes: number): Urgency {
+  const limits = URGENCY[status];
+  if (!limits) return 'ok';
+  if (minutes >= limits.late) return 'late';
+  return minutes >= limits.warn ? 'warn' : 'ok';
+}
+
+const FULFILLMENT_ICON: Record<FulfillmentType, ComponentType<{ size?: number }>> = {
+  pickup: IconBag,
+  dine_in: IconUtensils,
+  delivery: IconTruck,
+};
 
 interface OrderCardProps {
   order: StaffOrder;
@@ -34,12 +61,14 @@ export function OrderCard({
   onChangeStatus,
   onSeen,
 }: OrderCardProps) {
+  const { t, rich, money, clock, elapsed, customerName } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const titleId = useId();
   const action = primaryAction(order.status);
-  const minutes = minutesSince(order.placedAt, now);
-  const isLate = order.status === 'confirmed' && minutes >= LATE_AFTER_MIN;
-  const money = (cents: number) => formatAmount(cents, currency);
+  const urgency = urgencyOf(order.status, minutesSince(order.placedAt, now));
+  const amount = (cents: number) => money(cents, currency);
+  const TypeIcon = FULFILLMENT_ICON[order.fulfillmentType];
+  const placedAt = t('card.placedAt', { time: clock(order.placedAt) });
 
   return (
     <article
@@ -56,28 +85,34 @@ export function OrderCard({
             type="button"
             className="badge badge--fresh"
             onClick={() => onSeen(order.id)}
-            aria-label={`Nuevo: marcar ${order.code} como visto`}
+            aria-label={t('card.markSeen', { code: order.code })}
           >
-            Nuevo
+            {t('card.new')}
           </button>
         )}
-        <span className="badge badge--type">{fulfillmentLabel(order.fulfillmentType)}</span>
+        <span className={`timer timer--${urgency}`} title={placedAt}>
+          <IconClock size={16} />
+          <time dateTime={order.placedAt.toISOString()}>{elapsed(order.placedAt, now)}</time>
+          <span className="sr-only">
+            , {placedAt}
+            {urgency === 'late' && `, ${t('card.late')}`}
+          </span>
+        </span>
       </header>
 
-      <p className="order-card__time">
-        <time dateTime={order.placedAt.toISOString()}>{formatClock(order.placedAt)}</time>
-        <span aria-hidden="true"> · </span>
-        <span className={isLate ? 'is-late' : undefined}>{formatElapsed(order.placedAt, now)}</span>
-      </p>
-
-      <p className="order-card__customer">
-        <span className="order-card__customer-name">{customerName(order.customer)}</span>
+      <div className="order-card__meta">
+        <span className={`chip chip--${order.fulfillmentType}`}>
+          <TypeIcon size={16} />
+          {t(`fulfillment.${order.fulfillmentType}`)}
+        </span>
+        <span className="order-card__customer">{customerName(order.customer)}</span>
         {order.customer?.phone && (
           <a className="order-card__phone" href={`tel:${order.customer.phone}`}>
+            <IconPhone size={14} />
             {order.customer.phone}
           </a>
         )}
-      </p>
+      </div>
 
       <ul className="order-card__lines">
         {order.lines.map((line) => (
@@ -90,7 +125,9 @@ export function OrderCard({
                   {line.selectedOptions.map((option) => option.nameSnapshot).join(', ')}
                 </span>
               )}
-              {line.notes && <span className="note">Nota: {line.notes}</span>}
+              {line.notes && (
+                <span className="note">{t('card.itemNote', { note: line.notes })}</span>
+              )}
             </div>
           </li>
         ))}
@@ -98,32 +135,47 @@ export function OrderCard({
 
       {order.customerNotes && (
         <p className="note note--order">
-          <strong>Nota del pedido:</strong> {order.customerNotes}
+          <IconNote size={18} />
+          <span>
+            <strong>{t('card.orderNote')}</strong> {order.customerNotes}
+          </span>
         </p>
       )}
 
       <dl className="order-card__totals">
         {order.pointsRedeemed > 0 && (
           <div className="order-card__points">
-            <dt>Puntos canjeados</dt>
+            <dt>{t('card.pointsRedeemed')}</dt>
             <dd>
-              {order.pointsRedeemed} pts (−{money(order.discountCents)})
+              {t('card.pointsValue', {
+                points: order.pointsRedeemed,
+                amount: amount(order.discountCents),
+              })}
             </dd>
           </div>
         )}
         <div className="order-card__total">
-          <dt>Total</dt>
-          <dd>{money(order.totalCents)}</dd>
+          <dt>{t('card.total')}</dt>
+          <dd>{amount(order.totalCents)}</dd>
         </div>
       </dl>
 
       {confirmingCancel ? (
-        <div className="order-card__confirm" role="group" aria-label="Confirmar cancelación">
+        <div className="order-card__confirm" role="group" aria-label={t('card.confirmGroup')}>
           <p>
-            ¿Cancelar el pedido <strong>{order.code}</strong>?
-            {order.pointsRedeemed > 0 && ` Se devuelven ${order.pointsRedeemed} puntos al cliente.`}
+            {rich('card.confirmCancel', { code: <strong>{order.code}</strong> })}
+            {order.pointsRedeemed > 0 &&
+              ` ${t('card.confirmPoints', { count: order.pointsRedeemed })}`}
           </p>
           <div className="order-card__actions">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              autoFocus
+              onClick={() => setConfirmingCancel(false)}
+            >
+              {t('card.confirmNo')}
+            </button>
             <button
               type="button"
               className="btn btn--danger"
@@ -135,43 +187,36 @@ export function OrderCard({
                   .closest('section')
                   ?.querySelector<HTMLElement>('h2');
                 setConfirmingCancel(false);
-                onChangeStatus(order, { to: 'cancelled', label: 'Cancelar' });
+                onChangeStatus(order, { to: 'cancelled', label: 'action.cancel' });
                 heading?.focus();
               }}
             >
-              Sí, cancelar
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              autoFocus
-              onClick={() => setConfirmingCancel(false)}
-            >
-              No, volver
+              {t('card.confirmYes')}
             </button>
           </div>
         </div>
       ) : (
         <div className="order-card__actions">
-          {action && (
-            <button
-              type="button"
-              className={`btn btn--primary btn--to-${action.to}`}
-              disabled={isPending}
-              onClick={() => onChangeStatus(order, action)}
-            >
-              {action.label}
-            </button>
-          )}
           {canCancel(order.status) && (
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--quiet btn--small order-card__cancel"
               disabled={isPending}
               onClick={() => setConfirmingCancel(true)}
-              aria-label={`Cancelar pedido ${order.code}`}
+              aria-label={t('card.cancelAria', { code: order.code })}
             >
-              Cancelar
+              {t('action.cancel')}
+            </button>
+          )}
+          {action && (
+            <button
+              type="button"
+              className={`btn btn--primary order-card__advance btn--to-${action.to}`}
+              disabled={isPending}
+              onClick={() => onChangeStatus(order, action)}
+            >
+              {t(action.label)}
+              {action.to === 'completed' ? <IconCheck size={20} /> : <IconArrowRight size={20} />}
             </button>
           )}
         </div>
