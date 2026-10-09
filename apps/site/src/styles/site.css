@@ -210,7 +210,9 @@
   background-image:
     linear-gradient(var(--line-dark) 1px, transparent 1px),
     linear-gradient(90deg, var(--line-dark) 1px, transparent 1px);
-  background-size: 100% 25%, 25% 100%;
+  background-size:
+    100% 25%,
+    25% 100%;
   background-position: 0 0;
 }
 
@@ -369,11 +371,25 @@
   line-height: 1.55;
 }
 
+/* CTAs del hero: a ancho completo en móvil; en fila desde 600 px; apilados con el MISMO ancho
+   cuando la columna del hero es angosta (960–1279 px). */
 .hero__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-top: 40px;
+}
+
+@media (min-width: 600px) {
+  .hero__actions {
+    grid-template-columns: repeat(2, max-content);
+  }
+}
+
+@media (min-width: 960px) and (max-width: 1279px) {
+  .hero__actions {
+    grid-template-columns: max-content;
+  }
 }
 
 .hero__art {
@@ -385,7 +401,7 @@
 
 .hero__tagline {
   margin-top: 12px;
-  color: var(--on-dark-subtle);
+  color: var(--on-dark-muted);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   letter-spacing: 0.08em;
@@ -1004,8 +1020,37 @@
   }
 }
 
+/* Sin JS (HTML prerenderizado, `data-static`): los cinco servicios completos, uno debajo del
+   otro; los botones no hacen nada todavía. */
+.svc[data-static] .svc__button {
+  cursor: default;
+}
+
+.svc[data-static] .svc__icon {
+  display: none;
+}
+
 @media (min-width: 900px) {
-  .svc {
+  .svc[data-static] {
+    display: block;
+    border-top: 1px solid var(--navy);
+  }
+
+  .svc[data-static] .svc__item {
+    display: block;
+  }
+
+  .svc[data-static] .svc__head {
+    border-top: 0;
+  }
+
+  .svc[data-static] .svc__panel {
+    margin-bottom: 32px;
+  }
+}
+
+@media (min-width: 900px) {
+  .svc:not([data-static]) {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     column-gap: clamp(32px, 4vw, 64px);
@@ -1437,6 +1482,7 @@
 
 .product__flow li {
   display: grid;
+  align-content: start;
   gap: 6px;
   padding: 14px 12px 14px 0;
   border-bottom: 1px solid var(--border);
@@ -1461,6 +1507,9 @@
 
 .plans__list li {
   display: grid;
+  grid-template-rows: auto 2.4rem auto;
+  align-content: start;
+  align-items: center;
   gap: 2px;
   padding: 14px;
   border-right: 1px solid var(--border);
@@ -1540,27 +1589,43 @@
     order: 1;
   }
 
+  /* Cocina a todo el ancho arriba; debajo, el teléfono y los datos técnicos lado a lado (sin
+     solapes que tapen columnas del tablero ni huecos bajo la captura). */
   .product__media--duo {
-    grid-template-columns: minmax(0, 1fr) 190px;
+    grid-template-columns: 200px minmax(0, 1fr);
+    column-gap: 32px;
+    row-gap: 32px;
     align-items: start;
   }
 
   .product__media--duo .shot--wide {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .product__media--duo .shot--wide figcaption {
-    padding-right: 80px;
+    grid-column: 1 / -1;
   }
 
   .product__media--duo .shot--phone {
-    position: relative;
-    z-index: 1;
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .product__media--duo .product__facts--media {
     grid-column: 2;
-    grid-row: 1;
-    width: auto;
-    margin: 72px -8px 0 -72px;
+    grid-template-columns: 1fr;
+    margin-top: 0;
+    align-self: stretch;
+    align-content: start;
+  }
+
+  .product__facts--media div {
+    padding: 20px;
+  }
+
+  .product__facts--media div + div {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .product__facts--media dd {
+    font-size: var(--fs-md);
   }
 }
 
@@ -1812,6 +1877,13 @@
 .contact-form__note {
   color: var(--text-muted);
   font-size: var(--fs-xs);
+}
+
+.contact-form__noscript {
+  padding: 12px 14px;
+  border-left: 3px solid var(--navy);
+  background: var(--bg);
+  font-size: var(--fs-sm);
 }
 
 .contact-form__status:empty {

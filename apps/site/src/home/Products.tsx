@@ -167,14 +167,6 @@ export function Products({ t }: { t: Dict }) {
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
-            <dl className="product__facts">
-              {r.facts.map((fact) => (
-                <div key={fact.title}>
-                  <dt>{fact.title}</dt>
-                  <dd>{fact.text}</dd>
-                </div>
-              ))}
-            </dl>
             <div className="product__actions">
               <External className="btn btn--primary" href={config.restaurantsUrl} t={t}>
                 {r.cta}
@@ -208,6 +200,14 @@ export function Products({ t }: { t: Dict }) {
               </div>
               <figcaption>{r.menu.caption}</figcaption>
             </figure>
+            <dl className="product__facts product__facts--media">
+              {r.facts.map((fact) => (
+                <div key={fact.title}>
+                  <dt>{fact.title}</dt>
+                  <dd>{fact.text}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </article>
       </div>
