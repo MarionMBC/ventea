@@ -8,7 +8,7 @@ import {
   SUBSCRIPTION_STATUS,
 } from '../domain/enums.js';
 import { tenantSlugSchema } from '../domain/tenant.js';
-import { hasLinkLike } from '../utils/links.js';
+import { hasUnambiguousLink } from '../utils/links.js';
 import { emailSchema } from './auth.js';
 
 /**
@@ -54,15 +54,21 @@ export const TERMS_VERSION: (typeof TERMS_VERSIONS)[number] =
   TERMS_VERSIONS[TERMS_VERSIONS.length - 1]!;
 
 /**
- * Nombre de marca o de persona del registro. Sin links ni dominios (TASK-021): llega al correo
- * de bienvenida, que sale desde la dirección de Ventea hacia un correo todavía sin verificar.
+ * Nombre de marca o de persona del registro (TASK-021). Llega al correo de bienvenida, que sale
+ * desde la dirección de Ventea hacia un correo todavía sin verificar: se rechaza solo lo que es
+ * inequívocamente un link (`://`, `www.`, `@`, `/`); un punto pegado (`Pollo.Express`,
+ * `Lic.María`) es un nombre válido y el correo lo neutraliza. El largo se corta ANTES de mirar el
+ * contenido (`abort`): un body de 100 KB no llega a la regla.
  */
+export const NAME_LINK_MESSAGE = 'Quita la dirección web, «@» o «/» del nombre';
+
 const personOrBrandName = z
   .string()
+  .max(200, { abort: true })
   .trim()
   .min(2)
-  .max(80)
-  .refine((value) => !hasLinkLike(value), 'Sin links ni direcciones web en el nombre');
+  .max(80, { abort: true })
+  .refine((value) => !hasUnambiguousLink(value), NAME_LINK_MESSAGE);
 
 export const signupSchema = z.object({
   restaurantName: personOrBrandName,

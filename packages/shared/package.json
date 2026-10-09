@@ -13,6 +13,10 @@
     "./tone": {
       "types": "./dist/utils/tone.d.ts",
       "default": "./dist/utils/tone.js"
+    },
+    "./links": {
+      "types": "./dist/utils/links.d.ts",
+      "default": "./dist/utils/links.js"
     }
   },
   "scripts": {
