@@ -16,6 +16,12 @@
 # la plataforma (https://api.ventea.tech, fijo) con VENTEA_PLATFORM_TOKEN, que dura 1 h: se
 # carga FRESCO justo antes de disparar (`gh secret set VENTEA_PLATFORM_TOKEN --env <slug>`) y se
 # borra al terminar (`gh secret delete …`). Nunca como secret permanente.
+#
+# Build number: App Store Connect rechaza un CFBundleVersion repetido, y con `file` el runner no
+# sabe cuál fue el último subido (sale siempre el del archivo de marca). Para cada subida que no
+# sea la primera, pasar `build_number` mayor que el último subido. Se valida (entero positivo, sin
+# ceros a la izquierda) y llega al generador por env, nunca interpolado en `run:`; el generador
+# además rechaza un número menor que el mínimo de la marca (archivo o plataforma).
 name: Brand app (iOS)
 
 on:
@@ -34,6 +40,11 @@ on:
         description: Firmar y exportar el .ipa si el environment tiene los secrets
         type: boolean
         default: true
+      build_number:
+        description: Build number (CFBundleVersion), mayor que el último subido. Vacío = el de la marca
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -50,13 +61,18 @@ jobs:
     environment: ${{ inputs.tenant }}
     env:
       TENANT: ${{ inputs.tenant }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
       WORK: dist-apps/.work/${{ inputs.tenant }}
 
     steps:
-      - name: Validar slug
+      - name: Validar entradas
         run: |
           if ! [[ "$TENANT" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
             echo "::error::Slug inválido: $TENANT"
+            exit 1
+          fi
+          if [ -n "$BUILD_NUMBER" ] && ! [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]; then
+            echo "::error::build_number debe ser un entero positivo sin ceros a la izquierda"
             exit 1
           fi
 
@@ -77,7 +93,10 @@ jobs:
           VENTEA_PLATFORM_TOKEN: ${{ inputs.config_from == 'api' && secrets.VENTEA_PLATFORM_TOKEN || '' }}
           VENTEA_API_URL: https://api.ventea.tech
           CONFIG_FROM: ${{ inputs.config_from }}
-        run: npm run brand:app -- --tenant "$TENANT" --platform ios --config-from "$CONFIG_FROM"
+        run: |
+          ARGS=(--tenant "$TENANT" --platform ios --config-from "$CONFIG_FROM")
+          if [ -n "$BUILD_NUMBER" ]; then ARGS+=(--build-number "$BUILD_NUMBER"); fi
+          npm run brand:app -- "${ARGS[@]}"
 
       - name: ¿Hay firma?
         id: signing
@@ -86,9 +105,13 @@ jobs:
           PROFILE: ${{ secrets.IOS_PROFILE_BASE64 }}
           TEAM: ${{ secrets.IOS_TEAM_ID }}
           SIGN: ${{ inputs.sign }}
+          CONFIG_FROM: ${{ inputs.config_from }}
         run: |
           if [ "$SIGN" = "true" ] && [ -n "$P12" ] && [ -n "$PROFILE" ] && [ -n "$TEAM" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
+            if [ -z "$BUILD_NUMBER" ] && [ "$CONFIG_FROM" = "file" ]; then
+              echo "::warning::Sin build_number: sale el del archivo de marca. Si ya se subió, App Store Connect lo rechaza."
+            fi
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Sin secrets de firma en el environment $TENANT: build sin firmar."
