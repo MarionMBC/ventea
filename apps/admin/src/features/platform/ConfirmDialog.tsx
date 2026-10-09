@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { useScrollLock } from '@/ui/scrollLock';
+
 /**
  * Diálogo modal de confirmación. Lleva el foco al primer campo (o al botón de
  * confirmar), lo atrapa adentro, cierra con Escape y lo devuelve al botón que lo abrió.
@@ -37,6 +39,7 @@ export function ConfirmDialog({
 }) {
   const titleId = useId();
   const ref = useRef<HTMLFormElement>(null);
+  useScrollLock();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;

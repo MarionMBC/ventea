@@ -286,6 +286,13 @@ slug). Cada marca es un _Environment_ de GitHub con su nombre, limitado a la ram
 App Store Connect; sin ella compila sin firmar, para validar. El `.ipa` se sube con Transporter o
 `xcrun altool`.
 
+App Store Connect rechaza un build number (`CFBundleVersion`) repetido, y con `config_from:
+file` el runner no conoce el último subido: sale siempre el `buildNumber` del archivo de marca.
+Desde la segunda subida, pasar el input **`build_number`** mayor que el último subido. El
+workflow lo valida (entero positivo, sin ceros a la izquierda) y lo pasa al generador por env,
+nunca interpolado en el script; el generador además rechaza un número menor que el mínimo de la
+marca. Alternativa: subir `buildNumber` en `brands/` (commit en `main`) antes de cada corrida.
+
 La configuración sale por defecto del archivo de `brands/` (`config_from: file`). Con
 `config_from: api` lee `https://api.ventea.tech` (fijo) con un token de plataforma, que dura 1 h:
 cargarlo fresco justo antes (`gh secret set VENTEA_PLATFORM_TOKEN --env <slug>`) y borrarlo al

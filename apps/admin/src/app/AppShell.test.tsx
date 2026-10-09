@@ -110,8 +110,17 @@ describe('Shell del panel', () => {
     fireEvent.click(open);
     expect(open.getAttribute('aria-expanded')).toBe('true');
     expect(document.querySelector('.app--drawer-open')).toBeTruthy();
+    // El fondo no scrollea con el cajón abierto (regla de layout, TASK-020).
+    expect(document.documentElement.style.overflow).toBe('hidden');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(open.getAttribute('aria-expanded')).toBe('false');
+    expect(document.documentElement.style.overflow).toBe('');
+  });
+
+  it('la barra lateral es un panel de scroll propio, no un segundo scroll de la página', async () => {
+    renderPanel([makeOrder()]);
+    await screen.findByText('Ana Pérez');
+    expect(document.querySelector('#app-sidebar')?.hasAttribute('data-scroll-pane')).toBe(true);
   });
 
   it('la barra lateral se contrae y recuerda la elección', async () => {

@@ -20,6 +20,7 @@ import {
 } from '@/ui/icons';
 import { BrandMark, brandName } from '@/ui/Brand';
 import { LangSwitch } from '@/ui/LangSwitch';
+import { lockScroll } from '@/ui/scrollLock';
 
 import { useServices, useSession } from './services';
 import { brandStyle, useTenant } from './tenant';
@@ -126,11 +127,16 @@ export function AppShell() {
   useEffect(() => {
     if (!drawerOpen) return;
     sidebar.current?.querySelector<HTMLElement>('a, button')?.focus();
+    // Con el cajón abierto el fondo no scrollea (solo el cajón, que tiene scroll propio).
+    const unlock = lockScroll();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeDrawer(true);
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      unlock();
+      document.removeEventListener('keydown', onKey);
+    };
   }, [drawerOpen, closeDrawer]);
 
   const toggleCollapsed = () => {
@@ -182,7 +188,7 @@ export function AppShell() {
 
       <div className="scrim" aria-hidden="true" onClick={() => closeDrawer(true)} />
 
-      <aside id="app-sidebar" ref={sidebar} className="sidebar">
+      <aside id="app-sidebar" ref={sidebar} className="sidebar" data-scroll-pane>
         <div className="sidebar__head">
           <BrandMark tenant={tenant} />
           <div className="sidebar__brand">

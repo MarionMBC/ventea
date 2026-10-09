@@ -209,6 +209,7 @@ export const en = {
   'profile.signIn': 'Sign in to see your points and your orders.',
   'profile.orders': 'Order history',
   'profile.signOut': 'Sign out',
+  'profile.signingOut': 'Signing out',
   'favourites.title': 'Favourites',
   'favourites.emptyTitle': 'Nothing saved yet',
   'favourites.emptyDescription': 'Tap the heart on any item to keep it within reach.',

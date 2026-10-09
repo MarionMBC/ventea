@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getMe, getRewardBalance, getRewardLedger, getTenant } from '../../api/endpoints';
 import type { RewardCatalogEntry, RewardLedgerEntry, RewardLedgerReason } from '../../api/types';
 import { useBrand } from '../../brand/useBrand';
@@ -89,6 +89,8 @@ export const ProfileScreen = ({
 }: ProfileScreenProps) => {
   const brand = useBrand();
   const { customer, isAuthenticated, signOut, updateCustomer } = useAuth();
+  /* Sign-out waits for the API to forget this device (up to ~3 s): show it, and one tap only. */
+  const [signingOut, setSigningOut] = useState(false);
   const me = useResource((signal) => getMe(signal), [], { enabled: isAuthenticated });
   const tenant = useResource((signal) => getTenant(signal), [], { enabled: isAuthenticated });
   const pointsEnabled = tenant.data?.rewardProgram.isEnabled === true;
@@ -226,11 +228,16 @@ export const ProfileScreen = ({
             },
             {
               id: 'logout',
-              label: t('profile.signOut'),
+              label: signingOut ? t('profile.signingOut') : t('profile.signOut'),
               icon: 'logOutOutline',
               danger: true,
+              loading: signingOut,
               onSelect: () => {
-                void signOut().then(() => onSignedOut?.());
+                if (signingOut) return;
+                setSigningOut(true);
+                void signOut()
+                  .then(() => onSignedOut?.())
+                  .finally(() => setSigningOut(false));
               },
             },
           ]}

@@ -197,6 +197,7 @@ export const es: Record<MessageKey, string> = {
   'profile.signIn': 'Inicia sesión para ver tus puntos y tus pedidos.',
   'profile.orders': 'Historial de pedidos',
   'profile.signOut': 'Cerrar sesión',
+  'profile.signingOut': 'Cerrando sesión',
   'favourites.title': 'Favoritos',
   'favourites.emptyTitle': 'Aún no guardas nada',
   'favourites.emptyDescription': 'Toca el corazón de cualquier producto para tenerlo a mano.',

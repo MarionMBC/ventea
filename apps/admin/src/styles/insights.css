@@ -7,6 +7,7 @@
 /* ── Puntos ──────────────────────────────────────────────────────────── */
 .rw__layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -168,6 +169,7 @@
 }
 
 .rw-table-wrap {
+  position: relative;
   margin: 0 -20px;
   overflow-x: auto;
 }
@@ -296,6 +298,7 @@
 /* Panel del cliente */
 .rw-customer {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
@@ -380,6 +383,7 @@ section.rw-section {
 
 .reports__filter-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -460,6 +464,7 @@ section.rw-section {
 
 .reports__grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -608,6 +613,7 @@ section.rw-section {
 }
 
 .barlist__track {
+  position: relative;
   grid-column: 1 / -1;
   height: 8px;
   border-radius: 999px;
@@ -625,6 +631,7 @@ section.rw-section {
 
 /* Tabla alternativa de un gráfico. */
 .report-table-wrap {
+  position: relative;
   margin: 0 -20px;
   overflow-x: auto;
 }

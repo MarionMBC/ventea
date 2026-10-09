@@ -263,6 +263,7 @@ export function BrandPage() {
                     onChange={(url) => set('logoUrl', url)}
                     onBusyChange={busyUpload}
                     shape="square"
+                    disabled={update.isPending}
                   />
                   <ImageUpload
                     label={t('brand.icon')}
@@ -271,6 +272,7 @@ export function BrandPage() {
                     onChange={(url) => set('iconUrl', url)}
                     onBusyChange={busyUpload}
                     shape="square"
+                    disabled={update.isPending}
                   />
                 </div>
               </article>
