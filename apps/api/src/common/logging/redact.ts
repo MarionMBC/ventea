@@ -11,6 +11,8 @@
  * - Push (TASK-016): bloques PEM de clave privada, y el valor de `private_key`/`privateKey`,
  *   `access_token`/`accessToken`, `assertion` (JWT de la service account), `pushToken` y
  *   `pushCredentialsEnc` → `[REDACTED]`.
+ * - Correo (TASK-021): el valor de `smtp_url`/`SMTP_URL`, y la clave de cualquier URL con
+ *   usuario y clave (`smtps://usuario:clave@host`) → `smtps://usuario:[REDACTED]@host`.
  */
 
 // Dígitos separados por espacio, guion, punto o barra (`4111.1111.1111.1111`).
@@ -18,7 +20,7 @@ const PAN_CANDIDATE = /\d(?:[ ./-]?\d){12,18}/g;
 // Clave sensible y su valor, también en JSON escapado una o más veces (`{\"cvv\":\"737\"}`,
 // típico de un body serializado dentro de otro string).
 const SENSITIVE_KEY =
-  /(\\*["']?\b(?:cvv2?|cvc2?|csc|cvn|card_?cvc|card_?cvv|card_?csc|security_?code|card_?number|pan|number|private_?key|access_?token|assertion|push_?token|push_?credentials_?enc)\b\\*["']?\s*[:=]\s*)(\\*"(?:[^"\\]|\\(?!"))*\\*"|'[^']*'|[^\s,}\]&\\]+)/gi;
+  /(\\*["']?\b(?:cvv2?|cvc2?|csc|cvn|card_?cvc|card_?cvv|card_?csc|security_?code|card_?number|pan|number|private_?key|access_?token|assertion|push_?token|push_?credentials_?enc|smtp_?url)\b\\*["']?\s*[:=]\s*)(\\*"(?:[^"\\]|\\(?!"))*\\*"|'[^']*'|[^\s,}\]&\\]+)/gi;
 
 function passesLuhn(digits: string): boolean {
   let sum = 0;
@@ -39,8 +41,12 @@ function passesLuhn(digits: string): boolean {
 const PEM_PRIVATE_KEY =
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g;
 
+// Clave en el userinfo de una URL (`esquema://usuario:clave@host`). El usuario queda.
+const URL_PASSWORD = /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)[^\s/@]+@/gi;
+
 export function redactSensitive(text: string): string {
   return text
+    .replace(URL_PASSWORD, '$1[REDACTED]@')
     .replace(PEM_PRIVATE_KEY, '[REDACTED PRIVATE KEY]')
     .replace(SENSITIVE_KEY, (_match, key: string) => `${key}"[REDACTED]"`)
     .replace(PAN_CANDIDATE, (candidate) => {

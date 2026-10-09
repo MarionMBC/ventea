@@ -13,12 +13,16 @@ const logger = new Logger('PrismaTenantGuard');
  *   `Subscription` y `BillingEvent` NO están exentos: llevan tenantId y se filtran por él;
  *   el panel de plataforma los lee vía `Tenant` (include) o con `tenantId: { in }`.
  * - `FunnelDailyCount`: contadores globales del embudo de la landing, sin marca (TASK-007).
+ * - `EmailMessage`: outbox de correos de la plataforma (TASK-021). `tenantId` opcional (los
+ *   avisos a la plataforma no son de una marca); la despacha un proceso y la lee solo el panel
+ *   de plataforma, nunca una ruta de marca.
  */
 const TENANT_EXEMPT_MODELS = new Set<string>([
   'PlatformAdmin',
   'Tenant',
   'Plan',
   'FunnelDailyCount',
+  'EmailMessage',
   'MenuItemModifierGroup',
 ]);
 

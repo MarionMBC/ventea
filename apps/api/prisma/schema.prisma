@@ -72,6 +72,7 @@ model Tenant {
   menuChanges     MenuChange[]
   appConfig       AppConfig?
   appConfigEvents AppConfigEvent[]
+  emailMessages   EmailMessage[]
 
   @@map("tenants")
 }
@@ -394,6 +395,55 @@ model AppConfigEvent {
 
   @@index([tenantId, createdAt])
   @@map("app_config_events")
+}
+
+// ─── Correos transaccionales (TASK-021) ──────────────────────────────────────
+
+/// Outbox de correos. Cada evento (solicitud de app, bienvenida, prueba por vencer, pago
+/// pendiente…) inserta UNA fila por destinatario con un `dedupeKey` único: el mismo evento
+/// repetido no genera un segundo correo. Un despachador asíncrono la envía con reintentos.
+///
+/// Exenta del guard de tenant: es de la plataforma (`tenantId` opcional; los avisos a la
+/// plataforma no son de una marca) y el panel de plataforma la lee entera. Nunca se expone a
+/// una marca.
+model EmailMessage {
+  id            String      @id @default(uuid())
+  tenantId      String?
+  /// `app_request` | `welcome` | `trial_ending` | … (EMAIL_KIND en @ventea/shared). Texto, no
+  /// enum: una feature nueva agrega su tipo sin migración.
+  kind          String
+  to            String
+  subject       String
+  /// `es` | `en`.
+  language      String      @default("es")
+  /// Datos de la plantilla (nombre de la marca, links, fechas). El cuerpo se arma al enviar.
+  /// Nunca datos de pedidos ni de clientes finales.
+  payload       Json
+  dedupeKey     String      @unique
+  status        EmailStatus @default(pending)
+  attempts      Int         @default(0)
+  /// Próximo intento (reintentos con espera creciente).
+  nextAttemptAt DateTime    @default(now())
+  sentAt        DateTime?
+  /// Último error del transporte, recortado y sin datos sensibles.
+  error         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+  @@index([tenantId])
+  @@map("email_messages")
+}
+
+enum EmailStatus {
+  pending
+  sending
+  sent
+  failed
+  skipped
 }
 
 // ─── Sucursales ──────────────────────────────────────────────────────────────
