@@ -33,6 +33,15 @@ export class MediaStorage {
     return full.startsWith(this.root + path.sep) ? full : null;
   }
 
+  /**
+   * Para servir con `res.sendFile(file, { root })`: Express vuelve a verificar que el archivo
+   * quede dentro de `root` (la carpeta de la marca), además de las validaciones de acá.
+   */
+  servable(tenantId: string, fileName: string): { root: string; file: string } | null {
+    const full = this.filePath(tenantId, fileName);
+    return full ? { root: path.dirname(full), file: path.basename(full) } : null;
+  }
+
   /** Escribe de forma atómica (temporal + rename). Si ya existe (mismo hash), no hace nada. */
   async write(tenantId: string, fileName: string, data: Buffer): Promise<void> {
     const target = this.requirePath(tenantId, fileName);

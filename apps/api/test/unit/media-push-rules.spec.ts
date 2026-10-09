@@ -5,6 +5,7 @@ import { contrastRatio, createMenuItemSchema, reorderSchema, textContrastOn } fr
 import { redactSensitive } from '@/common/logging/redact';
 import { brandWarnings, defaultBundleId, defaultPublisher } from '@/modules/branding/brand-rules';
 import { detectImageFormat } from '@/modules/media/image-signature';
+import { MediaStorage } from '@/modules/media/media-storage';
 import {
   absoluteMediaUrl,
   MEDIA_FILE_PATTERN,
@@ -92,6 +93,28 @@ describe('URLs de medios', () => {
     expect(publicBaseUrl('', 'https', 'carolina.ventea.tech')).toBe('https://carolina.ventea.tech');
     expect(publicBaseUrl(undefined, 'http', 'evil.test/"><script>')).toBe('http://localhost');
     expect(publicBaseUrl(undefined, 'javascript', 'a.test')).toBe('http://a.test');
+  });
+});
+
+describe('MediaStorage: rutas servibles', () => {
+  const storage = new MediaStorage({
+    get: (key: string) => (key === 'MEDIA_DIR' ? '/srv/media' : undefined),
+  } as never);
+
+  it('sirve relativo a la carpeta de la marca', () => {
+    const target = storage.servable(TENANT, `${HASH}.webp`)!;
+    expect(target.file).toBe(`${HASH}.webp`);
+    expect(target.root.endsWith(TENANT)).toBe(true);
+    expect(target.root.startsWith(storage.root)).toBe(true);
+  });
+
+  it.each([
+    [TENANT, '../x.webp'],
+    [TENANT, `..${'/'}${OTHER}/${HASH}.webp`],
+    ['..', `${HASH}.webp`],
+    [`${TENANT}/..`, `${HASH}.webp`],
+  ])('rechaza %s / %s', (tenantId, file) => {
+    expect(storage.servable(tenantId, file)).toBeNull();
   });
 });
 
