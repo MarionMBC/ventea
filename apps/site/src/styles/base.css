@@ -203,6 +203,13 @@ main:focus {
   transform: translateY(1px);
 }
 
+/* Deshabilitado (p. ej. el envío del formulario antes de hidratar). */
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn--sm {
   min-height: 40px;
   padding: 8px 16px;

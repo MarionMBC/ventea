@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { selectProjectType } from '@/home/projectTypeEvent';
@@ -19,6 +20,26 @@ function fillValid() {
 }
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: /preparar correo/i }));
+
+describe('ContactForm sin JS (HTML prerenderizado)', () => {
+  it('method=post, submit deshabilitado hasta hidratar y alternativa mailto en <noscript>', () => {
+    const html = renderToString(<ContactForm t={es} />);
+    const form = /<form[^>]*>/.exec(html)![0];
+    expect(form).toContain('method="post"');
+    // Nada de action a una URL que procese datos: sin action, un POST va a la página estática.
+    expect(form).not.toMatch(/action="[^"]*\?/);
+    const submit = /<button[^>]*type="submit"[^>]*>/.exec(html)![0];
+    expect(submit).toContain('disabled=""');
+    expect(html).toMatch(/<noscript>[\s\S]*mailto:hola@ventea\.tech[\s\S]*<\/noscript>/);
+  });
+
+  it('al hidratar (efectos del cliente) el submit se habilita', () => {
+    render(<ContactForm t={es} openUrl={vi.fn()} />);
+    const button = screen.getByRole('button', { name: /preparar correo/i }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(button.closest('form')!.getAttribute('method')).toBe('post');
+  });
+});
 
 describe('ContactForm', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -79,7 +100,9 @@ describe('ContactForm', () => {
 
     act(() => vi.advanceTimersByTime(1000));
     const status = screen.getByRole('status').textContent ?? '';
-    expect(status).toMatch(/todavía no se envió/);
+    expect(status).toMatch(/Intentamos abrir su aplicación de correo/);
+    expect(status).toMatch(/todavía no se envió nada/);
+    expect(status).not.toMatch(/está listo/);
     expect(document.body.textContent).not.toMatch(/mensaje enviado|enviado con éxito|¡gracias/i);
     expect(
       screen.getByRole('link', { name: /escribir a hola@ventea\.tech/i }).getAttribute('href'),

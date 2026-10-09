@@ -4,6 +4,7 @@ import { config } from '@/config';
 import { format, type Dict } from '@/i18n';
 import type { ProjectTypeId } from '@/i18n/types';
 import { PROJECT_TYPE_EVENT } from '@/home/projectTypeEvent';
+import { useHydrated } from '@/useHydrated';
 
 import {
   buildMailto,
@@ -67,6 +68,10 @@ export function ContactForm({
   const [status, setStatus] = useState<Status>('idle');
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [preview, setPreview] = useState('');
+  // Falso en el HTML prerenderizado y en el primer render del cliente (sin desajuste de
+  // hidratación): el submit queda deshabilitado hasta que React toma el formulario. Sin JS nunca
+  // se envía nada (ni un GET con los datos en la URL, que terminaría en los logs del servidor).
+  const ready = useHydrated();
   const formRef = useRef<HTMLFormElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -136,7 +141,14 @@ export function ContactForm({
   };
 
   return (
-    <form ref={formRef} className="contact-form" noValidate onSubmit={onSubmit}>
+    // method="post" como cinturón: si algo llegara a enviarlo sin JS, el cuerpo no va a la URL ni
+    // a los logs, y nginx (estático) responde 405.
+    <form ref={formRef} className="contact-form" method="post" noValidate onSubmit={onSubmit}>
+      <noscript>
+        <p className="contact-form__noscript">
+          {c.form.noscript} <a href={`mailto:${to}`}>{to}</a>.
+        </p>
+      </noscript>
       <p className="contact-form__summary" role="alert">
         {submitted && hasErrors ? c.form.errorsSummary : ''}
       </p>
@@ -243,7 +255,12 @@ export function ContactForm({
         />
       </div>
       <div className="contact-form__actions">
-        <button type="submit" className="btn btn--primary btn--lg" aria-busy={status === 'opening'}>
+        <button
+          type="submit"
+          className="btn btn--primary btn--lg"
+          disabled={!ready}
+          aria-busy={status === 'opening'}
+        >
           {c.form.submit}
           <span aria-hidden="true">→</span>
         </button>
