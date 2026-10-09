@@ -5,17 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5176",
-    "build": "tsc -b && vite build && node scripts/check-seo.mjs",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx && node scripts/prerender.mjs && node scripts/check-seo.mjs",
     "preview": "vite preview --port 4176",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@resvg/resvg-js": "^2.6.2",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

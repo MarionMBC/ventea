@@ -3,6 +3,7 @@
 # copiar los del host (node_modules de Windows, dist viejos) los pisaría.
 **/node_modules
 **/dist
+**/dist-ssr
 **/build
 **/.turbo
 **/coverage
