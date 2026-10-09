@@ -1,5 +1,6 @@
 import { reportsEn } from '@/features/reports/i18n';
 import { rewardsEn } from '@/features/rewards/i18n';
+import { teamLocationsEn } from './team-locations';
 
 /**
  * English: the panel's primary language. Every other dictionary must have exactly these keys
@@ -17,8 +18,6 @@ export const en = {
   'nav.orders': 'Orders',
   'nav.history': 'History',
   'nav.billing': 'Billing',
-  'nav.comingSoon': 'Coming soon',
-  'nav.soon': 'Soon',
   'nav.menu': 'Menu',
   'nav.locations': 'Locations',
   'nav.rewards': 'Rewards',
@@ -34,9 +33,6 @@ export const en = {
   'role.owner': 'Owner',
   'role.manager': 'Manager',
   'role.staff': 'Staff',
-
-  'placeholder.body': 'This section isn’t available yet. We’re working on it.',
-  'placeholder.back': 'Go to orders',
 
   'login.pageTitle': 'Sign in · {brand}',
   'login.title': 'Restaurant dashboard',
@@ -500,6 +496,7 @@ export const en = {
 
   ...rewardsEn,
   ...reportsEn,
+  ...teamLocationsEn,
 };
 
 /** Shape every dictionary must satisfy: same keys as English, string values. */

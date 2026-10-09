@@ -36,6 +36,23 @@ const DONE_MESSAGE: Record<DialogKind, string> = {
   'resolve-payment': 'Cobro resuelto.',
 };
 
+/**
+ * Topes del plan, solo lectura (los fija una migración; no hay edición de planes): sucursales
+ * activas y usuarios del panel (TASK-022).
+ */
+export function planLimitsLabel(plan: { maxLocations: number | null; maxStaff?: number | null }) {
+  const locations =
+    plan.maxLocations === null
+      ? 'sucursales ilimitadas'
+      : `${plan.maxLocations} ${plan.maxLocations === 1 ? 'sucursal' : 'sucursales'}`;
+  if (plan.maxStaff === undefined) return locations;
+  const staff =
+    plan.maxStaff === null
+      ? 'usuarios ilimitados'
+      : `${plan.maxStaff} ${plan.maxStaff === 1 ? 'usuario' : 'usuarios'}`;
+  return `${locations} · ${staff}`;
+}
+
 /** Precio del plan e intervalo actuales, para precargar un pago manual. */
 function currentPriceCents(
   plans: { code: string; priceMonthlyCents: number; priceYearlyCents: number }[] | undefined,
@@ -402,7 +419,7 @@ function ChangePlanDialog({
         >
           {(plans.data ?? []).map((plan) => (
             <option key={plan.code} value={plan.code}>
-              {plan.name} · {formatUsdCents(plan.priceMonthlyCents)}/mes
+              {plan.name} · {formatUsdCents(plan.priceMonthlyCents)}/mes · {planLimitsLabel(plan)}
             </option>
           ))}
           {!plans.data && <option value={current.planCode}>{PLAN_LABEL[current.planCode]}</option>}

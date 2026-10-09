@@ -42,6 +42,8 @@ export const locationSchema = z.object({
   longitude: z.number(),
   phone: z.string().nullable(),
   openingHours: openingHoursSchema.nullable(),
+  /** Recibe pedidos (TASK-022). Opcional: una API anterior no lo manda (= sí recibe). */
+  acceptsOrders: z.boolean().optional(),
 });
 
 export type PublicTenant = z.infer<typeof publicTenantSchema>;

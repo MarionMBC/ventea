@@ -35,6 +35,7 @@ import {
   placeOrder as sendAttempt,
 } from '../orders/placeOrder';
 import { errorMessage, useResource } from '../useResource';
+import { checkoutLocation } from './checkoutLocation';
 import { ScreenShell } from './ScreenShell';
 import { RetryState, SignInState } from './ScreenStates';
 import './screens.css';
@@ -173,9 +174,8 @@ export const CheckoutScreen = ({
   const subtotalCents = cartSubtotalCents(shownLines);
 
   /* Order at the location the menu (and so the estimate) came from; the
-     first listed location only if the menu has not loaded. */
-  const formLocation =
-    locations.data?.find((item) => item.id === menu?.locationId) ?? locations.data?.[0];
+     first one taking orders only if the menu has not loaded. */
+  const formLocation = checkoutLocation(locations.data, menu?.locationId);
   const location = pending
     ? locations.data?.find((item) => item.id === pending.input.locationId)
     : formLocation;

@@ -34,6 +34,6 @@ import { assertJwtSecret, TokenService } from './token.service';
   ],
   controllers: [AuthController, StaffAuthController],
   providers: [AuthService, TokenService],
-  exports: [TokenService],
+  exports: [TokenService, AuthService],
 })
 export class AuthModule {}

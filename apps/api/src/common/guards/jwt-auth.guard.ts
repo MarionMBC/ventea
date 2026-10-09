@@ -1,5 +1,6 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
   type CanActivate,
@@ -16,6 +17,8 @@ import {
 } from '@/common/auth/auth.context';
 import { TENANT_REQUEST_KEY } from '@/common/tenant.context';
 import { TokenService } from '@/modules/auth/token.service';
+import type { PrismaClientExtended } from '@/prisma/prisma.client';
+import { PRISMA } from '@/prisma/prisma.module';
 
 /**
  * Verifica el access token y lo ata al tenant del request.
@@ -26,6 +29,10 @@ import { TokenService } from '@/modules/auth/token.service';
  * sin `tid`) no pasa `TokenService.verify`: también 401. El mensaje es siempre el mismo:
  * distinguir los casos le diría a un atacante qué parte del token falló.
  *
+ * Staff (TASK-022): el miembro tiene que seguir activo y con la `tokenVersion` del token, y el
+ * rol que cuenta es el de la base, no el del token: desactivar, cambiar el rol o resetear la
+ * contraseña corta la sesión en el acto (sin esperar a que venza el access token).
+ *
  * No se usa suelto: lo aplican `@CustomerAuth()` y `@StaffAuth()`.
  */
 @Injectable()
@@ -33,6 +40,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,
+    @Inject(PRISMA) private readonly prisma: PrismaClientExtended,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -52,12 +60,21 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Sesión inválida o expirada');
     }
 
+    let role = claims.role;
     if (kind === 'staff') {
+      const staff = await this.prisma.staffMember.findFirst({
+        where: { tenantId: claims.tid, id: claims.sub, isActive: true },
+        select: { role: true, tokenVersion: true },
+      });
+      if (!staff || staff.tokenVersion !== (claims.ver ?? 0)) {
+        throw new UnauthorizedException('Sesión inválida o expirada');
+      }
+      role = staff.role;
       const roles = this.reflector.getAllAndOverride<TenantRole[] | undefined>(
         AUTH_ROLES_KEY,
         targets,
       );
-      if (!claims.role || (roles && roles.length > 0 && !roles.includes(claims.role))) {
+      if (roles && roles.length > 0 && !roles.includes(role)) {
         throw new ForbiddenException('Tu rol no permite esta acción');
       }
     }
@@ -66,7 +83,7 @@ export class JwtAuthGuard implements CanActivate {
       id: claims.sub,
       tenantId: claims.tid,
       kind: claims.kind,
-      role: claims.role,
+      role,
     };
     request[AUTH_REQUEST_KEY] = principal;
     return true;

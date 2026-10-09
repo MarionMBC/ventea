@@ -8,7 +8,7 @@ import { useIntlLocale, useT, type Messages } from '@/i18n';
 import { IntervalToggle } from '@/landing/IntervalToggle';
 import { ApiError, signup } from '@/lib/api';
 import { formatDate, formatUsd, MIN_PASSWORD_LENGTH, priceFor, slugify } from '@/lib/format';
-import { locationsLabel, planName } from '@/lib/plans';
+import { locationsLabel, planName, staffLabel } from '@/lib/plans';
 import { trackOnce } from '@/lib/track';
 import { FEATURED_PLAN, usePlans } from '@/lib/usePlans';
 import { PlainHeader } from '@/site/PlainHeader';
@@ -533,6 +533,7 @@ function PlanStep({
             </span>
             <span className="plan-pick__meta">
               {locationsLabel(plan.maxLocations, t)}
+              {staffLabel(plan, t) ? ` · ${staffLabel(plan, t)}` : ''}
               {plan.features.brandedApp ? s.brandedApp : ''}
             </span>
             <span className="plan-pick__price">

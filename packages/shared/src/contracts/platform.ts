@@ -34,6 +34,11 @@ export const planSchema = z.object({
   currency: z.string().length(3),
   /** Sucursales activas permitidas; `null` = ilimitadas. */
   maxLocations: z.number().int().positive().nullable(),
+  /**
+   * Usuarios del panel (miembros activos + invitaciones pendientes, TASK-022); `null` =
+   * ilimitados. Opcional: una API anterior no lo manda (el cliente no muestra el dato).
+   */
+  maxStaff: z.number().int().positive().nullable().optional(),
   features: planFeaturesSchema,
 });
 

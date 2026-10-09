@@ -17,6 +17,9 @@ export const EMAIL_KIND = [
   'trial_ending',
   'past_due',
   'past_due_reminder',
+  // TASK-022: enlaces de un solo uso del equipo (el panel también los muestra para copiar).
+  'staff_invite',
+  'staff_password_reset',
 ] as const;
 export type EmailKind = (typeof EMAIL_KIND)[number];
 

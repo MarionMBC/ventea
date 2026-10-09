@@ -92,6 +92,7 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
         priceYearlyCents: 25000,
         currency: 'USD',
         maxLocations: 1,
+        maxStaff: 3,
         features: {
           brandedApp: false,
           customDomain: false,
@@ -106,6 +107,7 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
         priceYearlyCents: 59000,
         currency: 'USD',
         maxLocations: 3,
+        maxStaff: 10,
         features: { brandedApp: true, customDomain: true, reports: false, prioritySupport: false },
       },
       {
@@ -115,6 +117,7 @@ describe('Plataforma: planes y registro self-service (AC3)', () => {
         priceYearlyCents: 129000,
         currency: 'USD',
         maxLocations: null,
+        maxStaff: null,
         features: { brandedApp: true, customDomain: true, reports: true, prioritySupport: true },
       },
     ]);

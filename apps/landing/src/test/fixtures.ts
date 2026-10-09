@@ -10,6 +10,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 59000,
     currency: 'USD',
     maxLocations: 3,
+    maxStaff: 10,
     features: { brandedApp: true, customDomain: true, reports: false, prioritySupport: false },
   },
   {
@@ -19,6 +20,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 25000,
     currency: 'USD',
     maxLocations: 1,
+    maxStaff: 3,
     features: { brandedApp: false, customDomain: false, reports: false, prioritySupport: false },
   },
   {
@@ -28,6 +30,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 129000,
     currency: 'USD',
     maxLocations: null,
+    maxStaff: null,
     features: { brandedApp: true, customDomain: true, reports: true, prioritySupport: true },
   },
 ];

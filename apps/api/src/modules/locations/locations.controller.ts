@@ -31,6 +31,7 @@ export class LocationsController {
         longitude: location.longitude,
         phone: location.phone,
         openingHours: hours.success ? hours.data : null,
+        acceptsOrders: location.acceptsOrders,
       };
     });
   }

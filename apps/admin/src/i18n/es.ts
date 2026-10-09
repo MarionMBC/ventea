@@ -2,6 +2,7 @@ import { reportsEs } from '@/features/reports/i18n';
 import { rewardsEs } from '@/features/rewards/i18n';
 
 import type { Messages } from './en';
+import { teamLocationsEs } from './team-locations';
 
 /** Español (Honduras / LatAm). Tiene que cumplir `Messages`: mismas claves que el inglés. */
 export const es: Messages = {
@@ -15,8 +16,6 @@ export const es: Messages = {
   'nav.orders': 'Pedidos',
   'nav.history': 'Historial',
   'nav.billing': 'Facturación',
-  'nav.comingSoon': 'Próximamente',
-  'nav.soon': 'Pronto',
   'nav.menu': 'Menú',
   'nav.locations': 'Sucursales',
   'nav.rewards': 'Puntos',
@@ -32,9 +31,6 @@ export const es: Messages = {
   'role.owner': 'Dueño',
   'role.manager': 'Encargado',
   'role.staff': 'Staff',
-
-  'placeholder.body': 'Esta sección todavía no está disponible. Estamos trabajando en ella.',
-  'placeholder.back': 'Ir a pedidos',
 
   'login.pageTitle': 'Iniciar sesión · {brand}',
   'login.title': 'Panel del local',
@@ -497,4 +493,5 @@ export const es: Messages = {
 
   ...rewardsEs,
   ...reportsEs,
+  ...teamLocationsEs,
 };

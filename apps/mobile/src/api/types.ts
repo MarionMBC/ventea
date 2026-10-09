@@ -152,6 +152,8 @@ export interface Location {
   longitude: number;
   phone: string | null;
   openingHours: OpeningHours[] | null;
+  /** Takes orders (TASK-022). Missing from an older API = it does. */
+  acceptsOrders?: boolean;
 }
 
 /* ── Catalog (contracts/catalog.ts) ──────────────────────────────────── */

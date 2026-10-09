@@ -61,21 +61,19 @@ describe('Shell del panel', () => {
       'Orders',
       'History',
       'Menu',
+      'Locations',
       'Reports',
       'Rewards',
       'My brand',
+      'Team',
       'Billing',
     ]);
     expect(within(nav()).getByRole('link', { name: 'Orders' }).getAttribute('aria-current')).toBe(
       'page',
     );
 
-    const soon = within(nav()).getByRole('list', { name: 'Coming soon' });
-    for (const name of ['Locations', 'Team']) {
-      expect(within(soon).getByText(name)).toBeTruthy();
-    }
-    expect(within(soon).queryAllByRole('link')).toHaveLength(0);
-    expect(within(soon).queryAllByRole('button')).toHaveLength(0);
+    // Ya no queda nada «Próximamente» (TASK-022 + TASK-023).
+    expect(within(nav()).queryByRole('list', { name: 'Coming soon' })).toBeNull();
   });
 
   it('muestra usuario, rol y «Powered by Ventea»; el staff no ve Facturación', async () => {
@@ -86,6 +84,9 @@ describe('Shell del panel', () => {
     expect(screen.getByText('Powered by Ventea')).toBeTruthy();
     expect(within(nav()).queryByRole('link', { name: 'Billing' })).toBeNull();
     expect(within(nav()).queryByRole('link', { name: 'My brand' })).toBeNull();
+    expect(within(nav()).queryByRole('link', { name: 'Team' })).toBeNull();
+    // Sucursales las ve todo el equipo (solo lectura para staff, TASK-022).
+    expect(within(nav()).getByRole('link', { name: 'Locations' })).toBeTruthy();
     expect(within(nav()).queryByRole('link', { name: 'Reports' })).toBeNull();
     expect(within(nav()).queryByRole('link', { name: 'Rewards' })).toBeNull();
     // El menú lo ve todo el equipo (solo lectura para staff).
@@ -132,12 +133,9 @@ describe('Shell del panel', () => {
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeTruthy();
   });
 
-  it('una sección sin implementar (ruta vieja) avisa y ofrece volver a pedidos', async () => {
-    renderPanel([], { path: '/admin/locations' });
-    expect(await screen.findByRole('heading', { name: 'Locations' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe(
-      '/admin/orders',
-    );
+  it('la ruta vieja /staff lleva a Equipo (TASK-022)', async () => {
+    renderPanel([], { path: '/admin/staff' });
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/team'));
   });
 });
 
@@ -160,7 +158,7 @@ describe('Idioma', () => {
     const navEs = screen.getByRole('navigation', { name: 'Secciones del panel' });
     expect(within(navEs).getByRole('link', { name: 'Pedidos' })).toBeTruthy();
     expect(within(navEs).getByRole('link', { name: 'Facturación' })).toBeTruthy();
-    expect(within(navEs).getByText('Próximamente')).toBeTruthy();
+    expect(within(navEs).getByRole('link', { name: 'Sucursales' })).toBeTruthy();
     const card = screen.getByTestId('order-CHC-1000');
     expect(within(card).getByRole('button', { name: 'Empezar' })).toBeTruthy();
     expect(within(card).getByText('Para llevar')).toBeTruthy();

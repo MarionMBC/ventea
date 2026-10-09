@@ -19,6 +19,7 @@ const tenantClaimsSchema = z.object({
   typ: z.enum(['access', 'refresh']),
   kind: z.enum(AUTH_KIND),
   role: z.enum(TENANT_ROLE).optional(),
+  ver: z.number().int().nonnegative().optional(),
 });
 
 /** JWT de plataforma: sin `tid` (estricto: un `tid` colado lo invalida) y solo access. */
@@ -109,8 +110,16 @@ export class TokenService {
     tenantId: string;
     kind: AuthKind;
     role?: TenantRole;
+    /** Staff: `StaffMember.tokenVersion` (TASK-022). */
+    tokenVersion?: number;
   }): Promise<AuthTokens> {
-    const base = { sub: input.subject, tid: input.tenantId, kind: input.kind, role: input.role };
+    const base = {
+      sub: input.subject,
+      tid: input.tenantId,
+      kind: input.kind,
+      role: input.role,
+      ver: input.tokenVersion,
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync({ ...base, typ: 'access' }, { expiresIn: this.accessTtl }),
       this.jwt.signAsync({ ...base, typ: 'refresh' }, { expiresIn: this.refreshTtl }),

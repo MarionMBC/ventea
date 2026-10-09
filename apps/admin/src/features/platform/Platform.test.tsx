@@ -9,6 +9,7 @@ import { apiError, json } from '@/test/fixtures';
 
 import { createPlatformClient } from './client';
 import { isPlatformHost, isPlatformPath } from './host';
+import { planLimitsLabel } from './TenantDetail';
 import { formatUsdCents } from './labels';
 import { createPlatformSessionStore, PLATFORM_SESSION_KEY, type PlatformSession } from './session';
 
@@ -31,6 +32,7 @@ const PLANS = [
     priceYearlyCents: 59000,
     currency: 'USD',
     maxLocations: 3,
+    maxStaff: 10,
     features: { brandedApp: true, customDomain: true, reports: false, prioritySupport: false },
   },
 ];
@@ -822,6 +824,16 @@ describe('apps de las marcas', () => {
   });
 });
 
+describe('topes del plan (solo lectura, TASK-022)', () => {
+  it('sucursales y usuarios del panel; sin el dato de la API, solo sucursales', () => {
+    expect(planLimitsLabel({ maxLocations: 1, maxStaff: 3 })).toBe('1 sucursal · 3 usuarios');
+    expect(planLimitsLabel({ maxLocations: null, maxStaff: null })).toBe(
+      'sucursales ilimitadas · usuarios ilimitados',
+    );
+    expect(planLimitsLabel({ maxLocations: 3 })).toBe('3 sucursales');
+  });
+});
+
 describe('correos (TASK-021)', () => {
   const FAILED = {
     id: uuid(900),
@@ -838,7 +850,7 @@ describe('correos (TASK-021)', () => {
   const SENT = {
     ...FAILED,
     id: uuid(901),
-    kind: 'staff_invite',
+    kind: 'future_kind',
     status: 'sent',
     attempts: 1,
     error: null,
@@ -866,7 +878,7 @@ describe('correos (TASK-021)', () => {
     const table = await screen.findByRole('table');
     expect(within(table).getByText('Solicitud de app')).toBeTruthy();
     // Un tipo que el panel no conoce se muestra tal cual.
-    expect(within(table).getByText('staff_invite')).toBeTruthy();
+    expect(within(table).getByText('future_kind')).toBeTruthy();
     expect(within(table).getByText(/connect ETIMEDOUT/)).toBeTruthy();
     expect(within(table).getAllByRole('button', { name: 'Reenviar' })).toHaveLength(1);
 

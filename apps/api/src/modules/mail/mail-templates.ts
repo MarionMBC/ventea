@@ -83,11 +83,97 @@ const TEMPLATE_DATA = {
     daysLeft: z.number().int().min(0).max(30),
     billingUrl: urlSchema,
   }),
+  staff_invite: baseSchema.extend({
+    tenantName: nameSchema,
+    /** Dueño que invita (nombre que eligió: se neutraliza como el de la marca). */
+    inviterName: nameSchema,
+    role: z.enum(['owner', 'manager', 'staff']),
+    /** `https://<slug>.<dominio>/admin/join#<token>`: lleva un secreto (ver `SECRET_LINK_KINDS`). */
+    inviteUrl: urlSchema,
+    expiresAt: z.iso.datetime(),
+  }),
+  staff_password_reset: baseSchema.extend({
+    tenantName: nameSchema,
+    memberName: nameSchema,
+    resetUrl: urlSchema,
+    expiresAt: z.iso.datetime(),
+  }),
 } satisfies Record<EmailKind, z.ZodType>;
+
+/**
+ * Tipos cuyo link es un secreto de un solo uso (TASK-022). Cuando el correo queda `sent` o
+ * `skipped` (ya no se reenvía), el despachador borra el link del `payload` guardado: la outbox no
+ * conserva tokens válidos.
+ */
+export const SECRET_LINK_KINDS: Readonly<Partial<Record<EmailKind, string>>> = {
+  staff_invite: 'inviteUrl',
+  staff_password_reset: 'resetUrl',
+};
+
+const ROLE_LABEL = {
+  es: { owner: 'dueño', manager: 'encargado', staff: 'staff' },
+  en: { owner: 'owner', manager: 'manager', staff: 'staff' },
+} as const;
 
 export type EmailTemplateData = { [K in EmailKind]: z.input<(typeof TEMPLATE_DATA)[K]> };
 
 type Data<K extends EmailKind> = z.output<(typeof TEMPLATE_DATA)[K]>;
+
+// Plantillas del equipo (TASK-022): van al final de TEMPLATES.
+const TEAM_TEMPLATES = {
+  staff_invite: (d: Data<'staff_invite'>, lang: BrandLanguage, fmt: (iso: string) => string) =>
+    lang === 'en'
+      ? {
+          // Asunto sin el nombre de la marca: va a una dirección no verificada (como la bienvenida).
+          subject: "You're invited to a Ventea dashboard",
+          heading: `Join the ${d.tenantName} team`,
+          paragraphs: [
+            `${d.inviterName} invited you to the ${d.tenantName} dashboard on Ventea as ${ROLE_LABEL.en[d.role]}.`,
+            `Open the link to choose your name and password. It works once and expires on ${fmt(d.expiresAt)}.`,
+            "If you weren't expecting this invitation, ignore this email: nothing happens without the link.",
+          ],
+          cta: { label: 'Join the team', url: d.inviteUrl },
+          footer: `You are receiving this email because the owner of ${d.tenantName} invited this address to their Ventea dashboard. Questions: ${d.supportEmail}`,
+        }
+      : {
+          subject: 'Te invitaron a un panel de Ventea',
+          heading: `Únete al equipo de ${d.tenantName}`,
+          paragraphs: [
+            `${d.inviterName} te invitó al panel de ${d.tenantName} en Ventea como ${ROLE_LABEL.es[d.role]}.`,
+            `Abre el enlace para elegir tu nombre y contraseña. Sirve una sola vez y vence el ${fmt(d.expiresAt)}.`,
+            'Si no esperabas esta invitación, ignora este correo: sin el enlace no pasa nada.',
+          ],
+          cta: { label: 'Unirme al equipo', url: d.inviteUrl },
+          footer: `Recibes este correo porque el dueño de ${d.tenantName} invitó esta dirección a su panel de Ventea. Dudas: ${d.supportEmail}`,
+        },
+
+  staff_password_reset: (
+    d: Data<'staff_password_reset'>,
+    lang: BrandLanguage,
+    fmt: (iso: string) => string,
+  ) =>
+    lang === 'en'
+      ? {
+          subject: `New password for the ${d.tenantName} dashboard`,
+          heading: `${d.memberName}, choose a new password`,
+          paragraphs: [
+            `The owner of ${d.tenantName} created a link so you can choose a new password for the dashboard. Your open sessions end when you use it.`,
+            `It works once and expires on ${fmt(d.expiresAt)}. If you didn't ask for it, tell the owner and ignore this email.`,
+          ],
+          cta: { label: 'Choose a new password', url: d.resetUrl },
+          footer: `You are receiving this email because you are a member of the ${d.tenantName} team on Ventea. Questions: ${d.supportEmail}`,
+        }
+      : {
+          subject: `Contraseña nueva para el panel de ${d.tenantName}`,
+          heading: `${d.memberName}, elige una contraseña nueva`,
+          paragraphs: [
+            `El dueño de ${d.tenantName} creó un enlace para que elijas una contraseña nueva del panel. Tus sesiones abiertas se cierran al usarlo.`,
+            `Sirve una sola vez y vence el ${fmt(d.expiresAt)}. Si no lo pediste, avísale al dueño e ignora este correo.`,
+          ],
+          cta: { label: 'Elegir contraseña nueva', url: d.resetUrl },
+          footer: `Recibes este correo porque eres parte del equipo de ${d.tenantName} en Ventea. Dudas: ${d.supportEmail}`,
+        },
+};
 
 const TEMPLATES: {
   [K in EmailKind]: (
@@ -248,6 +334,7 @@ const TEMPLATES: {
           cta: { label: 'Ir a Facturación', url: d.billingUrl },
           footer: `Recibes este correo porque eres dueño de la cuenta de ${d.tenantName} en Ventea. Es un aviso del servicio sobre tu suscripción, no publicidad.`,
         },
+  ...TEAM_TEMPLATES,
 };
 
 export function isEmailKind(kind: string): kind is EmailKind {
@@ -297,7 +384,7 @@ export function renderEmail(
  */
 function sanitizeNames(data: Record<string, unknown>): Record<string, unknown> {
   const out = { ...data };
-  for (const key of ['tenantName', 'ownerName'] as const) {
+  for (const key of ['tenantName', 'ownerName', 'inviterName', 'memberName'] as const) {
     const value = out[key];
     if (typeof value === 'string') {
       out[key] = inlineText(neutralizeLinks(inlineText(value, 200)), MAX_NAME_IN_EMAIL);

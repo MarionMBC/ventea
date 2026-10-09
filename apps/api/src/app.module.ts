@@ -24,6 +24,7 @@ import {
   SubscriptionStateMiddleware,
 } from './modules/subscriptions/subscription.middleware';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { TeamModule } from './modules/team/team.module';
 import { TenantMiddleware } from './modules/tenants/tenant.middleware';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -46,6 +47,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MediaModule,
     PushModule,
     BrandingModule,
+    TeamModule,
     MailModule,
     NotificationsModule,
     ReportsModule,
