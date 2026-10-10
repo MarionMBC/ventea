@@ -11,6 +11,13 @@ import { LifecycleMailer } from './lifecycle-mailer.service';
 /** Primera vuelta un rato después de arrancar (no compite con el arranque ni las migraciones). */
 const FIRST_RUN_DELAY_MS = 2 * 60_000;
 const DEFAULT_INTERVAL_MINUTES = 60;
+/**
+ * Cuánto espera el apagado a la vuelta en curso. Nest corre los `beforeApplicationShutdown` en
+ * serie: cobro (35 s) + correo (30 s) + esto = 70 s, dentro del `stop_grace_period: 75s` de los
+ * compose. Cortar no rompe nada: los correos se encolan en una transacción (se revierte y la
+ * próxima vuelta los encola, `dedupeKey`).
+ */
+export const LIFECYCLE_SHUTDOWN_WAIT_MS = 5_000;
 
 /**
  * Job de correos de ciclo de vida (prueba por vencer, pago pendiente). Idempotente: corre cada
@@ -24,6 +31,7 @@ export class LifecycleScheduler implements OnApplicationBootstrap, BeforeApplica
   private readonly logger = new Logger(LifecycleScheduler.name);
   private timer?: NodeJS.Timeout;
   private current?: Promise<void>;
+  private stopping = false;
 
   constructor(
     private readonly config: ConfigService,
@@ -46,27 +54,40 @@ export class LifecycleScheduler implements OnApplicationBootstrap, BeforeApplica
     this.timer.unref();
   }
 
+  /** Deja de programar y espera, con tope, la vuelta en curso (antes de que se cierre Prisma). */
   async beforeApplicationShutdown(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
-    await this.current;
+    if (!this.current) return;
+    let timeout: NodeJS.Timeout | undefined;
+    await Promise.race([
+      this.current,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, LIFECYCLE_SHUTDOWN_WAIT_MS);
+      }),
+    ]);
+    if (timeout) clearTimeout(timeout);
   }
 
   private tick(): void {
-    if (this.current) return;
-    this.current = this.mailer
-      .runLifecycle()
-      .then((run) => {
-        if (run.locked && run.enqueued > 0) {
-          this.logger.log(`Correos de ciclo de vida encolados: ${run.enqueued}`);
-        }
-      })
-      .catch((error: unknown) => {
-        this.logger.error(
-          `Job de correos de ciclo de vida falló: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      })
-      .finally(() => {
-        this.current = undefined;
-      });
+    if (this.current || this.stopping) return;
+    this.current = this.runOnce().finally(() => {
+      this.current = undefined;
+    });
   }
+
+  private async runOnce(): Promise<void> {
+    try {
+      const run = await this.mailer.runLifecycle();
+      if (run.locked && run.enqueued > 0) {
+        this.logger.log(`Correos de ciclo de vida encolados: ${run.enqueued}`);
+      }
+    } catch (error) {
+      this.logger.error(`Job de correos de ciclo de vida falló: ${errorText(error)}`);
+    }
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

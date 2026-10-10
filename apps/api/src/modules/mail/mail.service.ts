@@ -54,7 +54,7 @@ const STALE_ERROR = 'Envío interrumpido: el proceso se cortó a mitad del enví
 /**
  * Cuánto espera el apagado al envío en curso (un SMTP lento tarda hasta ~40 s: 10+10+20 de
  * timeouts). Nest corre los `beforeApplicationShutdown` en serie: cobro (35 s) + correo (30 s)
- * = 65 s, dentro del `stop_grace_period: 75s` de los compose. Si se corta igual, la fila queda
+ * + ciclo de vida (5 s) = 70 s, dentro del `stop_grace_period: 75s` de los compose. Si se corta igual, la fila queda
  * `sending` y vuelve a la cola como intento interrumpido.
  */
 export const SHUTDOWN_WAIT_MS = 30_000;
