@@ -21,9 +21,15 @@ function guardWith(rules: RateLimitOptions[]): RateLimitGuard {
   return new RateLimitGuard(reflector, config, new RateLimitStore());
 }
 
+const headers: Record<string, string> = {};
+
 function contextFrom(ip: string, tenantId = 'tenant-1'): ExecutionContext {
   const request = { ip, [TENANT_REQUEST_KEY]: { tenantId } };
-  const response = { setHeader: () => undefined };
+  const response = {
+    setHeader: (name: string, value: string) => {
+      headers[name] = value;
+    },
+  };
   return {
     getHandler: () => undefined,
     switchToHttp: () => ({ getRequest: () => request, getResponse: () => response }),
@@ -60,5 +66,16 @@ describe('RateLimitGuard con varias reglas', () => {
     expect(() => guard.canActivate(contextFrom('3.3.3.3', 'a'))).toThrow(HttpException);
     // La IP usó 1 de 2: otra marca desde la misma IP todavía entra.
     expect(guard.canActivate(contextFrom('3.3.3.3', 'b'))).toBe(true);
+  });
+
+  it('Retry-After es la mayor espera entre las reglas que frenan', () => {
+    // Por hora (marca, 1) y por día (IP, 1): el segundo pedido choca con las dos.
+    const guard = guardWith([
+      { bucket: 'by-tenant', envKey: 'TENANT_LIMIT', defaultPerHour: 1, key: 'tenant' },
+      { bucket: 'by-ip', envKey: 'IP_LIMIT', defaultPerHour: 1, windowHours: 24 },
+    ]);
+    expect(guard.canActivate(contextFrom('4.4.4.4'))).toBe(true);
+    expect(() => guard.canActivate(contextFrom('4.4.4.4'))).toThrow(HttpException);
+    expect(Number(headers['Retry-After'])).toBeGreaterThan(23 * 60 * 60);
   });
 });

@@ -96,7 +96,13 @@ export class RateLimitGuard implements CanActivate {
       return { options, key, limiter, retryInMs: limiter.check(key, this.limitFor(options), now) };
     });
 
-    const blocked = checked.find((rule) => rule.retryInMs !== null);
+    // Retry-After: la MAYOR espera entre las reglas que frenan (antes no se libera el pedido).
+    const blocked = checked
+      .filter((rule) => rule.retryInMs !== null)
+      .reduce<(typeof checked)[number] | null>(
+        (worst, rule) => (worst && worst.retryInMs! >= rule.retryInMs! ? worst : rule),
+        null,
+      );
     if (!blocked) {
       for (const rule of checked) rule.limiter.record(rule.key, now);
       return true;
