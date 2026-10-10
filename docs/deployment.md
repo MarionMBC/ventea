@@ -189,6 +189,18 @@ rechazados por la pasarela antes del banco) y `alertsLast7Days` (`billing_alert`
 doble pago, monto aprobado distinto del pedido, card-testing). Los dos tienen que estar en 0;
 si no, revisar el detalle de la marca y EBC.
 
+### Intentos de cobro abiertos duplicados
+
+Una suscripción tiene como mucho un intento de cobro abierto (`pending`, `unknown` o
+`needs_review`): lo garantiza el índice único parcial `payment_attempts_one_open_per_subscription`
+(TASK-025). Si al desplegar la migración `20261010130000_one_open_payment_attempt` falla con
+«hay suscripciones con más de un intento de cobro abierto», la base ya tenía duplicados y la
+migración no los toca: son registros de cobro. Para cada suscripción listada, conciliar con la
+pasarela cuál se cobró y cerrar los demás con `resolve-payment` (uno por vez). Después marcar la
+migración fallida como revertida (`npx prisma migrate resolve --rolled-back
+20261010130000_one_open_payment_attempt`, dentro del contenedor de la API) y volver a
+desplegar. Nunca borrar intentos a mano.
+
 ### Puesta en marcha con CyberSource (no verificada: faltan credenciales)
 
 1. **ms-payments con CyberSource**, en la red interna de la API y sin exponerlo a internet:

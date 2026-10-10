@@ -8,7 +8,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
 }
 
 // Prisma 7: la URL de conexion ya no vive en el schema. Migrate la lee de
@@ -256,6 +257,10 @@ model PaymentAttempt {
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
 
+  /// Invariante: como mucho UN intento abierto (pending/unknown/needs_review = OPEN_ATTEMPT_STATUSES)
+  /// por suscripción. El lock de la app lo cuida; este índice lo garantiza en la base. El predicado
+  /// va escrito como lo normaliza Postgres (`IN` → `= ANY`): si no, `migrate diff` lo ve distinto.
+  @@unique([tenantId, subscriptionId], map: "payment_attempts_one_open_per_subscription", where: raw("(status = ANY (ARRAY['pending'::\"PaymentAttemptStatus\", 'unknown'::\"PaymentAttemptStatus\", 'needs_review'::\"PaymentAttemptStatus\"]))"))
   @@index([tenantId, subscriptionId, periodStart])
   @@index([status])
   @@map("payment_attempts")

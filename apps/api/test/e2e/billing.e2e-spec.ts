@@ -335,6 +335,44 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
     });
   });
 
+  describe('invariante en la base (TASK-025)', () => {
+    it('un solo intento abierto por suscripción: el segundo choca con el índice único parcial', async () => {
+      const target = await brand('un-abierto');
+      const subscription = await subscriptionOf(target);
+      const attempt = (
+        orderId: string,
+        status: 'pending' | 'unknown' | 'needs_review' | 'failed',
+      ) =>
+        prisma.paymentAttempt.create({
+          data: {
+            tenantId: target.tenant.id,
+            subscriptionId: subscription.id,
+            orderId,
+            kind: 'establish',
+            periodStart: subscription.currentPeriodStart,
+            periodEnd: subscription.currentPeriodEnd,
+            planId: subscription.planId,
+            interval: subscription.interval,
+            attempt: 1,
+            amountCents: 100,
+            currency: 'HNL',
+            status,
+          },
+        });
+
+      await attempt(`${target.tenant.id}-a`, 'pending');
+      for (const status of ['pending', 'unknown', 'needs_review'] as const) {
+        await expect(attempt(`${target.tenant.id}-${status}`, status)).rejects.toMatchObject({
+          code: 'P2002',
+        });
+      }
+      // Cerrados no cuentan: un fallido convive con el abierto.
+      await attempt(`${target.tenant.id}-b`, 'failed');
+      // Y por la API, con el abierto, el alta sigue siendo 409 (no 500).
+      await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(409);
+    });
+  });
+
   describe('lo que ve el dueño (TASK-006 review)', () => {
     it('GET /api/billing no expone emails, referencias, notas ni orderIds; la plataforma ve los intentos abiertos', async () => {
       const target = await brand('dueno-privado');

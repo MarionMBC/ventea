@@ -23,6 +23,7 @@ import { PlanLimitsService } from '@/modules/subscriptions/plan-limits.service';
 import { addDays, nextStatus, periodEnd } from '@/modules/subscriptions/subscription-state';
 import type { PrismaClientExtended } from '@/prisma/prisma.client';
 import { PRISMA } from '@/prisma/prisma.module';
+import { isUniqueViolation } from '@/prisma/prisma-errors';
 
 import { BillingLockService, subscriptionLockKey } from './billing-lock.service';
 import { BillingOutcomeService, OPEN_ATTEMPT_STATUSES } from './billing-outcome.service';
@@ -279,22 +280,30 @@ export class BillingService {
     };
 
     // Write-ahead, con lo que se cobra congelado: si la respuesta se pierde, el intento queda,
-    // nadie cobra de nuevo a ciegas y al confirmarlo se aplica exactamente esto.
-    await this.prisma.paymentAttempt.create({
-      data: {
-        tenantId,
-        subscriptionId: subscription.id,
-        orderId,
-        kind: 'establish',
-        periodStart,
-        periodEnd: frozen.periodEnd,
-        planId: plan.id,
-        interval,
-        attempt: 1,
-        amountCents: amount.amountCents,
-        currency: amount.currency,
-      },
-    });
+    // nadie cobra de nuevo a ciegas y al confirmarlo se aplica exactamente esto. El índice único
+    // parcial (un intento abierto por suscripción) frena a quien se colara sin el lock.
+    await this.prisma.paymentAttempt
+      .create({
+        data: {
+          tenantId,
+          subscriptionId: subscription.id,
+          orderId,
+          kind: 'establish',
+          periodStart,
+          periodEnd: frozen.periodEnd,
+          planId: plan.id,
+          interval,
+          attempt: 1,
+          amountCents: amount.amountCents,
+          currency: amount.currency,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException('Hay un cobro en curso para esta marca; espera un momento');
+        }
+        throw error;
+      });
 
     let result: EstablishResult;
     try {
