@@ -41,14 +41,16 @@ describe('diccionarios es/en', () => {
     expect(empty(es).map(([key]) => key)).toEqual(['.products.marketing.languageNote']);
   });
 
-  it('nota de idioma de restaurantes exacta: sitio y panel en español, app de la captura en inglés', () => {
-    expect(en.products.restaurants.languageNote).toMatch(/kitchen board are in Spanish/);
+  it('nota de idioma de restaurantes exacta: panel bilingüe en español en la captura, app en inglés', () => {
     expect(en.products.restaurants.languageNote).toMatch(
-      /customer app in the screenshot is in English/,
+      /dashboard is available in English and Spanish/,
     );
+    expect(en.products.restaurants.languageNote).toMatch(/screenshot shows it in Spanish/);
+    expect(en.products.restaurants.languageNote).toMatch(/screenshot shows it in English/);
     expect(es.products.restaurants.languageNote).toMatch(
-      /app de clientes de la captura está en inglés/,
+      /panel del restaurante está en español e inglés/,
     );
+    expect(es.products.restaurants.languageNote).toMatch(/la captura la muestra en inglés/);
   });
 
   it('sin garantías absolutas ni compromisos contractuales no confirmados', () => {
