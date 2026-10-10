@@ -78,7 +78,8 @@ function normalize(text: string, keepJoiners: boolean): string {
 
 const INVISIBLE = /^[\p{Cf}\p{Default_Ignorable_Code_Point}]$/u;
 /** ZWNJ, ZWJ y selectores de variante de texto/emoji. */
-const JOINER = /^[\u200C\u200D\uFE0E\uFE0F]$/u;
+const JOINERS = new Set(['\u200C', '\u200D', '\uFE0E', '\uFE0F']);
+const JOINER = { test: (char: string): boolean => JOINERS.has(char) };
 const WORDISH = /^[\p{L}\p{M}\p{Extended_Pictographic}]$/u;
 
 function isWordish(char: string | undefined): boolean {
