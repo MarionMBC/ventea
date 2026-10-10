@@ -238,6 +238,8 @@ export const en = {
     'Your payment is pending. Your service stays active until {date}; after that it will be suspended. {left} To register your payment, write to us at {email}.',
   'banner.daysLeft_one': '{count} day left.',
   'banner.daysLeft_other': '{count} days left.',
+  'banner.pastDueGraceOver':
+    'Your grace period ended on {date} and your service is paused: customers can’t see your menu or place orders. To register your payment, write to us at {email}.',
   'banner.pastDuePaused':
     'Your trial ended and your service is paused: customers can’t see your menu or place orders. To activate your plan, write to us at {email}.',
   'banner.suspended':

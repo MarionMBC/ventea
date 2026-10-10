@@ -38,12 +38,27 @@ const contact = <a href={`mailto:${BILLING_CONTACT_EMAIL}`}>{BILLING_CONTACT_EMA
 
 /**
  * Aviso de pago pendiente (TASK-007). En gracia el servicio SIGUE activo hasta `graceEndsAt`
- * (la API atiende menú y pedidos); sin gracia (prueba vencida sin pago) está pausado.
+ * (la API atiende menú y pedidos); sin gracia (prueba vencida sin pago) está pausado. Con la
+ * gracia vencida y el ciclo (cada 15 min) todavía sin pasarla a `suspended`, la API ya bloquea:
+ * se avisa la pausa, no «quedan 0 días» con una fecha pasada.
  */
-export function PastDueBanner({ data }: { data: PanelBillingOverview }) {
+export function PastDueBanner({
+  data,
+  now = Date.now(),
+}: {
+  data: PanelBillingOverview;
+  now?: number;
+}) {
   const { t, rich, day } = useI18n();
+  if (data.graceEndsAt && data.graceEndsAt.getTime() <= now) {
+    return (
+      <p className="banner banner--danger" role="alert">
+        {rich('banner.pastDueGraceOver', { date: day(data.graceEndsAt), email: contact })}
+      </p>
+    );
+  }
   if (data.graceEndsAt) {
-    const left = daysLeft(data.graceEndsAt);
+    const left = daysLeft(data.graceEndsAt, now);
     return (
       <p className="banner banner--warn" role="alert">
         {rich('banner.pastDueGrace', {

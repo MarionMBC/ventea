@@ -235,6 +235,8 @@ export const es: Messages = {
     'Tu pago está pendiente. Tu servicio sigue activo hasta el {date}; luego se suspenderá. {left} Para registrar tu pago escríbenos a {email}.',
   'banner.daysLeft_one': 'Queda {count} día.',
   'banner.daysLeft_other': 'Quedan {count} días.',
+  'banner.pastDueGraceOver':
+    'Tu período de gracia terminó el {date} y tu servicio está pausado: tus clientes no pueden ver el menú ni hacer pedidos. Para registrar tu pago escríbenos a {email}.',
   'banner.pastDuePaused':
     'Tu prueba terminó y tu servicio está pausado: tus clientes no pueden ver el menú ni hacer pedidos. Para activar tu plan escríbenos a {email}.',
   'banner.suspended':

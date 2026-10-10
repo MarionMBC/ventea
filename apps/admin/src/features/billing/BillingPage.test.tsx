@@ -268,6 +268,25 @@ describe('Pago pendiente en gracia (TASK-007)', () => {
     expect(text(banner)).toContain(`stays active until ${formatDay(graceEndsAt)}`);
   });
 
+  it('gracia vencida y todavía sin suspender: avisa la pausa, no «0 days left» con fecha pasada', async () => {
+    const ended = new Date(Date.now() - 5 * 60_000);
+    renderBilling({
+      billing: overview({
+        status: 'past_due',
+        trialEndsAt: null,
+        currentPeriodEnd: new Date(Date.now() - 7 * DAY).toISOString(),
+        graceEndsAt: ended.toISOString(),
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Billing' });
+    expect(document.body.textContent).toContain(
+      `Your grace period ended on ${formatDay(ended)} and your service is paused`,
+    );
+    expect(document.body.textContent).not.toContain('0 days left');
+    expect(document.body.textContent).not.toContain('stays active');
+    expect(document.body.textContent).not.toContain('Your trial ended');
+  });
+
   it('prueba vencida sin pago (past_due sin gracia): avisa que el servicio está pausado', async () => {
     renderBilling({ billing: overview({ status: 'past_due', graceEndsAt: null }) });
     await screen.findByRole('heading', { level: 1, name: 'Billing' });
