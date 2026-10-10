@@ -82,32 +82,36 @@ export class RateLimitGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    for (const options of rules) {
-      const byTenant = options.key === 'tenant';
+    const now = Date.now();
+    // Primero se chequean TODAS las reglas y recién después se registra el intento en cada una:
+    // un pedido que frena la regla por IP no gasta cupo de la regla por marca (ni al revés).
+    const checked = rules.map((options) => {
       const key =
         options.key === 'principal'
           ? principalKey(request)
-          : byTenant
+          : options.key === 'tenant'
             ? tenantKey(request)
             : ipKey(request);
-      const windowMs = (options.windowHours ?? 1) * HOUR_MS;
-      const retryInMs = this.store
-        .limiter(options.bucket, windowMs)
-        .hit(key, this.limitFor(options), Date.now());
-      if (retryInMs === null) continue;
+      const limiter = this.store.limiter(options.bucket, (options.windowHours ?? 1) * HOUR_MS);
+      return { options, key, limiter, retryInMs: limiter.check(key, this.limitFor(options), now) };
+    });
 
-      context
-        .switchToHttp()
-        .getResponse<Response>()
-        .setHeader('Retry-After', String(Math.ceil(retryInMs / 1000)));
-      throw new HttpException(
-        byTenant
-          ? 'Demasiados intentos para esta marca. Intenta de nuevo más tarde.'
-          : 'Demasiados intentos desde esta conexión. Intenta de nuevo más tarde.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+    const blocked = checked.find((rule) => rule.retryInMs !== null);
+    if (!blocked) {
+      for (const rule of checked) rule.limiter.record(rule.key, now);
+      return true;
     }
-    return true;
+
+    context
+      .switchToHttp()
+      .getResponse<Response>()
+      .setHeader('Retry-After', String(Math.ceil(blocked.retryInMs! / 1000)));
+    throw new HttpException(
+      blocked.options.key === 'tenant'
+        ? 'Demasiados intentos para esta marca. Intenta de nuevo más tarde.'
+        : 'Demasiados intentos desde esta conexión. Intenta de nuevo más tarde.',
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   private limitFor(options: RateLimitOptions): number {
