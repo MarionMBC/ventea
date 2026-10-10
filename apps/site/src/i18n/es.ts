@@ -297,12 +297,12 @@ export const es: Dict = {
         },
       ],
       languageNote:
-        'El panel del restaurante está en español e inglés; la captura lo muestra en español. La app de clientes sigue el idioma del teléfono (español o inglés); la captura la muestra en inglés.',
+        'El panel del restaurante está en español e inglés, y la app de clientes sigue el idioma del teléfono (español o inglés); las capturas los muestran en inglés.',
       cta: 'Visitar Ventea para restaurantes',
       kitchen: {
-        alt: 'Panel de Ventea de un restaurante: menú lateral con Pedidos, Historial, Menú, Sucursales, Reportes, Puntos, Mi marca, Equipo y Facturación, y el tablero con las columnas Nuevos, En cocina y Listos; cada pedido muestra su número, si es para llevar o para comer aquí, el cliente, los productos con notas y el total.',
+        alt: 'Panel de Ventea de un restaurante: menú lateral con Orders, History, Menu, Locations, Reports, Rewards, My brand, Team y Billing, y el tablero con las columnas New, In the kitchen y Ready; cada pedido muestra su número, si es para llevar o para comer aquí, el cliente, los productos con notas y el total.',
         caption:
-          'Panel del restaurante: los pedidos pasan de «Nuevos» a «En cocina» y «Listos» (pedidos y clientes de ejemplo).',
+          'Panel del restaurante, en inglés: los pedidos pasan de «New» a «In the kitchen» y «Ready» (pedidos y clientes de ejemplo).',
       },
       menu: {
         alt: 'Menú en la app de un restaurante, con sus colores: buscador, categorías, un combo con descuento y productos con foto, precio y botón para agregar.',
