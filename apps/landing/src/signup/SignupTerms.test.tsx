@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { TERMS_VERSIONS } from '@ventea/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -162,7 +162,10 @@ describe('Dirección lista antes de entrar al panel (bug de certificado, TASK-00
     api(() => json({ ready: false }));
     await signUp();
 
-    await vi.advanceTimersByTimeAsync(READY_SLOW_MS);
+    // `act`: el `setSlow(true)` del timer de 4 min dispara un render que React agenda en una
+    // macrotarea real. Sin `act`, si el polling no llegó a encadenar timers después de ese (runner
+    // lento), el salto de reloj termina antes del commit y el aviso todavía no está en el DOM.
+    await act(() => vi.advanceTimersByTimeAsync(READY_SLOW_MS));
 
     const status = screen.getByRole('status');
     expect(text(status)).toContain('Está tardando más de lo normal');
