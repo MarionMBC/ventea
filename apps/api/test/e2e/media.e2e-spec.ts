@@ -512,6 +512,29 @@ describe('Medios: GC de archivos huérfanos (TASK-025)', () => {
     await request(app.getHttpServer()).get(`/api/media/${tenant.id}/${kept}.webp`).expect(200);
   });
 
+  it('sin huérfanos para borrar no toma el lock: una subida en curso no la hace saltear', async () => {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let locked!: () => void;
+    const lockTaken = new Promise<void>((resolve) => (locked = resolve));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`media:${tenant.id}`}))`;
+        locked();
+        await released;
+      },
+      { timeout: 30_000 },
+    );
+    await lockTaken;
+    try {
+      // Lo de la marca está registrado o es reciente: se lista y se descarta sin el lock.
+      expect((await app.get(MediaGc).run()).skipped).toBe(0);
+    } finally {
+      release();
+      await holder;
+    }
+  });
+
   it('con el lock de medios de la marca tomado (una subida en curso) la saltea', async () => {
     const orphan = await place(`${fakeHash()}.webp`, 2 * HOUR);
     let release!: () => void;

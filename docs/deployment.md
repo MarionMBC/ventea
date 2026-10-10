@@ -393,6 +393,11 @@ listado de directorio.
 **Un respaldo que nunca se restauró no es un respaldo.** Probar la restauración sobre
 una base descartable antes de confiar en él.
 
+**Orden al restaurar: primero la base, después los medios.** El GC horario de medios (TASK-025)
+borra los archivos sin registro con más de 1 h, y un archivo restaurado conserva su fecha vieja:
+si los medios vuelven antes que la base y pasa una vuelta, se borran. Para restaurar en otro
+orden, levantar la API con `MAIL_SCHEDULER_ENABLED=false` (apaga también el GC) hasta terminar.
+
 Los respaldos quedan en el mismo VPS, que es exactamente donde no sirven si el VPS se
 pierde. Copiarlos afuera —almacenamiento del proveedor, otro servidor— es parte de la
 puesta en marcha, no un extra.

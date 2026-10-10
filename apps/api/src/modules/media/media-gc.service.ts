@@ -33,11 +33,13 @@ export interface MediaGcRun {
  * y `<hash>.thumb.webp` sin `MediaAsset` y los temporales de escrituras cortadas, siempre que
  * tengan más de `ORPHAN_MIN_AGE_MS`.
  *
- * Cada marca se revisa con su lock de medios (el mismo que subidas, borrados y referencias)
- * tomado con try: si está ocupado, la marca queda para la próxima vuelta. Con el lock tomado
- * ninguna subida puede estar entre «el archivo ya existe» y su registro, y dos réplicas nunca
- * revisan la misma marca a la vez. Solo mira carpetas con forma de tenantId y archivos con forma
- * de medio: nada más del volumen se borra.
+ * Listar la carpeta, mirar fechas y descartar lo registrado se hace SIN lock. Solo para borrar
+ * se toma el lock de medios de la marca (el mismo que subidas, borrados y referencias) con try,
+ * y adentro se vuelve a mirar el registro y la fecha de cada candidato: el lock dura una consulta
+ * y unos `rm`, así una subida de la marca no espera un barrido entero (su transacción tiene 5 s).
+ * Ocupado → la marca queda para la próxima vuelta. Con el lock tomado ninguna subida puede estar
+ * entre «el archivo ya existe» y su registro. Solo mira carpetas con forma de tenantId y archivos
+ * con forma de medio: nada más del volumen se borra.
  */
 @Injectable()
 export class MediaGc {
@@ -88,27 +90,28 @@ export class MediaGc {
     tenantId: string,
     olderThan: number,
   ): Promise<{ files: number; bytes: number } | null> {
+    // 1 · Sin lock: candidatos por nombre y fecha, menos los que tienen registro.
+    const dir = path.join(this.storage.root, tenantId);
+    let candidates: { file: string; hash: string | null }[] = [];
+    for (const name of await readdir(dir)) {
+      const media = MEDIA_FILE_PATTERN.exec(name);
+      if (!media && !TEMP_FILE_PATTERN.test(name)) continue;
+      const file = path.join(dir, name);
+      if (!(await isOldFile(file, olderThan))) continue;
+      candidates.push({ file, hash: media ? media[1]! : null });
+    }
+    candidates = await this.withoutRecord(this.prisma, tenantId, candidates);
+    if (candidates.length === 0) return { files: 0, bytes: 0 };
+
+    // 2 · Con el lock, corto: se re-chequea registro y fecha de cada uno y se borra.
     return this.prisma.$transaction(
       async (tx) => {
         const [row] = await tx.$queryRaw<{ locked: boolean }[]>`
           SELECT pg_try_advisory_xact_lock(hashtext(${`media:${tenantId}`})) AS locked`;
         if (!row?.locked) return null;
-
-        const dir = path.join(this.storage.root, tenantId);
-        const names = await readdir(dir);
-        const known = new Set(
-          (await tx.mediaAsset.findMany({ where: { tenantId }, select: { hash: true } })).map(
-            (asset) => asset.hash,
-          ),
-        );
-
         let files = 0;
         let bytes = 0;
-        for (const name of names) {
-          const media = MEDIA_FILE_PATTERN.exec(name);
-          const orphan = media ? !known.has(media[1]!) : TEMP_FILE_PATTERN.test(name);
-          if (!orphan) continue;
-          const file = path.join(dir, name);
+        for (const { file } of await this.withoutRecord(tx, tenantId, candidates)) {
           const info = await stat(file).catch(() => null);
           if (!info?.isFile() || info.mtimeMs > olderThan) continue;
           await rm(file, { force: true });
@@ -117,7 +120,31 @@ export class MediaGc {
         }
         return { files, bytes };
       },
-      { timeout: 60_000, maxWait: 10_000 },
+      { timeout: 30_000, maxWait: 10_000 },
     );
   }
+
+  /** Los candidatos cuyo hash no tiene `MediaAsset` (los temporales nunca tienen). */
+  private async withoutRecord<T extends { hash: string | null }>(
+    db: Pick<PrismaClientExtended, 'mediaAsset'>,
+    tenantId: string,
+    candidates: T[],
+  ): Promise<T[]> {
+    const hashes = [...new Set(candidates.flatMap((c) => (c.hash ? [c.hash] : [])))];
+    if (hashes.length === 0) return candidates;
+    const known = new Set(
+      (
+        await db.mediaAsset.findMany({
+          where: { tenantId, hash: { in: hashes } },
+          select: { hash: true },
+        })
+      ).map((asset) => asset.hash),
+    );
+    return candidates.filter((c) => !c.hash || !known.has(c.hash));
+  }
+}
+
+async function isOldFile(file: string, olderThan: number): Promise<boolean> {
+  const info = await stat(file).catch(() => null);
+  return Boolean(info?.isFile() && info.mtimeMs <= olderThan);
 }
