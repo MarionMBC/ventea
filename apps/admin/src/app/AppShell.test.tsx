@@ -1,6 +1,6 @@
 import type { StaffAuthResponse, StaffOrder } from '@ventea/shared';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { urgencyOf } from '@/features/orders/OrderCard';
 import { LANG_STORAGE_KEY } from '@/i18n';
@@ -116,6 +116,29 @@ describe('Shell del panel', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(open.getAttribute('aria-expanded')).toBe('false');
     expect(document.documentElement.style.overflow).toBe('');
+  });
+
+  it('Escape devuelve el foco al botón del menú (no a <body>)', async () => {
+    renderPanel([makeOrder()]);
+    await screen.findByText('Ana Pérez');
+    const open = screen.getByRole('button', { name: 'Open menu' });
+    fireEvent.click(open);
+    // Un elemento dentro de algo `inert` no toma el foco (el navegador lo ignora; jsdom no
+    // implementa inert, así que se registra en qué estado estaba al pedir el foco).
+    const focusedWhileInert: boolean[] = [];
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      focusedWhileInert.push(this.closest('[inert]') !== null);
+    });
+    try {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => expect(focus.mock.contexts).toContain(open));
+      const index = focus.mock.contexts.lastIndexOf(open);
+      expect(focusedWhileInert[index]).toBe(false);
+    } finally {
+      focus.mockRestore();
+    }
   });
 
   it('la barra lateral es un panel de scroll propio, no un segundo scroll de la página', async () => {
