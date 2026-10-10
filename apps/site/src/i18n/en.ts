@@ -289,7 +289,7 @@ export const en: Dict = {
         { title: 'Operations', text: 'Containers, scripted deployments and database backups' },
       ],
       languageNote:
-        'The restaurant dashboard is available in English and Spanish; the screenshot shows it in Spanish. The customer app follows the phone’s language (English or Spanish); the screenshot shows it in English.',
+        'The restaurant dashboard is available in English and Spanish, and the customer app follows the phone’s language (English or Spanish); the screenshots show both in English.',
       cta: 'Visit Ventea for restaurants',
       kitchen: {
         alt: 'A restaurant’s Ventea dashboard: a sidebar with Orders, History, Menu, Locations, Reports, Rewards, My brand, Team and Billing, and the order board with New, In the kitchen and Ready columns; each order shows its number, pickup or dine-in, the customer, items with notes and the total.',
