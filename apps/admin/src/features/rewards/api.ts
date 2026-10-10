@@ -143,20 +143,33 @@ function useCustomerMutation<TVars>(id: string, path: string) {
   });
 }
 
+/** Último envío sin éxito por acción y cliente; vive fuera del cajón (ver `actionKeys`). */
+const pendingKeys = new Map<string, { payload: string; key: string }>();
+
 /**
  * Clave de idempotencia por acción: la misma mientras se reintenta el mismo envío (mismos
  * datos, sin éxito todavía); una nueva al cambiar los datos o después de un éxito.
+ *
+ * Con `scope` (acción + cliente) el envío pendiente vive a nivel de módulo, no en el estado del
+ * cajón: si el dueño lo cierra tras un timeout y lo reabre, el reintento con los mismos datos
+ * lleva la misma clave y la API no duplica el ajuste. Se pierde al recargar la página.
  */
-export function actionKeys() {
-  let last: { payload: string; key: string } | null = null;
+export function actionKeys(scope?: string) {
+  const store =
+    scope === undefined ? new Map<string, { payload: string; key: string }>() : pendingKeys;
+  const slot = scope ?? '';
   return {
     keyFor(payload: unknown): string {
       const text = JSON.stringify(payload);
-      if (last?.payload !== text) last = { payload: text, key: crypto.randomUUID() };
+      let last = store.get(slot);
+      if (last?.payload !== text) {
+        last = { payload: text, key: crypto.randomUUID() };
+        store.set(slot, last);
+      }
       return last.key;
     },
     done() {
-      last = null;
+      store.delete(slot);
     },
   };
 }

@@ -50,8 +50,8 @@ export function CustomerDrawer({
   const current = detail.data?.customer ?? customer;
   const busy = adjust.isPending || redeem.isPending;
   const content = useRef<HTMLDivElement>(null);
-  const [adjustKeys] = useState(actionKeys);
-  const [redeemKeys] = useState(actionKeys);
+  const [adjustKeys] = useState(() => actionKeys(`adjust:${customer.id}`));
+  const [redeemKeys] = useState(() => actionKeys(`redeem:${customer.id}`));
 
   // Mientras guarda, el botón pulsado se deshabilita y el foco cae al <body>: al terminar se
   // devuelve al panel (si no, Escape y el ciclo de Tab dejan de funcionar en el cajón).
