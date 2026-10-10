@@ -103,10 +103,19 @@ export function AppShell() {
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLElement>(null);
 
-  const closeDrawer = useCallback((restoreFocus = false) => {
+  // El foco vuelve al botón DESPUÉS de cerrar: mientras el cajón está abierto el header es
+  // `inert` y `focus()` no hace nada (caería en <body>). Lo hace el efecto de abajo.
+  const restoreFocus = useRef(false);
+  const closeDrawer = useCallback((returnFocus = false) => {
+    restoreFocus.current = returnFocus;
     setDrawerPath(null);
-    if (restoreFocus) menuButton.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (drawerOpen || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    menuButton.current?.focus();
+  }, [drawerOpen]);
 
   // Pasar a escritorio cierra el cajón (ahí la barra lateral está fija).
   useEffect(() => {

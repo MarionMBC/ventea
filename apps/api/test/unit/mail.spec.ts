@@ -326,6 +326,78 @@ describe('nombres con links (anti-phishing)', () => {
     );
   });
 
+  it('el signup acepta «/» entre dígitos y «www.» que no empieza palabra (TASK-025)', () => {
+    for (const name of ['Comida 24/7', 'Pizza 1/2', 'Awww.Pizza', 'Grill 3/4 y 1/2']) {
+      expect(hasUnambiguousLink(name)).toBe(false);
+      expect(
+        signupSchema.safeParse(signupBody({ restaurantName: name, ownerName: name })).success,
+      ).toBe(true);
+    }
+    // Sigue rechazando la barra fuera de dígitos y «www.» al inicio de palabra.
+    for (const bad of [
+      '24/evil',
+      'evil/7',
+      'a /b',
+      '24/ 7',
+      've a www.evil',
+      '(www.evil)',
+      '24/7/login',
+    ]) {
+      expect(hasUnambiguousLink(bad)).toBe(true);
+    }
+  });
+
+  it('neutralizeLinks: invisibles, marcas combinantes e IPv4 sin esquema (TASK-025)', () => {
+    // Invisibles (\p{Cf} / Default_Ignorable) no esconden el dominio.
+    expect(neutralizeLinks('evil.c\u200Bom')).toBe('evil com');
+    expect(neutralizeLinks('evil.c\u00ADom')).toBe('evil com');
+    expect(neutralizeLinks('evil\u2060.com')).toBe('evil com');
+    expect(neutralizeLinks('evil.\uFE0Fcom')).toBe('evil com');
+    // Una marca combinante (sin forma compuesta en NFKC) cuenta como letra.
+    expect(neutralizeLinks('evil.c\u0332om')).not.toMatch(/\./);
+    expect(neutralizeLinks('evil\u0332.com')).not.toMatch(/\./);
+    // IPv4 sin esquema.
+    expect(neutralizeLinks('entra a 192.168.0.1')).toBe('entra a 192 168 0 1');
+    expect(neutralizeLinks('10.0.0.1:8080/login')).not.toMatch(/\d\.\d/);
+    // Lo que no es IP queda.
+    expect(neutralizeLinks('Café 1.5 · v2.0.1')).toBe('Café 1.5 · v2.0.1');
+  });
+
+  it('neutralizeLinks: IPv4 dentro de tramos con grupos inválidos y esquemas repetidos (review TASK-025)', () => {
+    expect(neutralizeLinks('1..8.8.8.8')).not.toMatch(/8\.8/);
+    expect(neutralizeLinks('1234.8.8.8.8')).not.toMatch(/8\.8/);
+    expect(neutralizeLinks('ip 9.9.9.9..1.5')).toBe('ip 9 9 9 9..1.5');
+    expect(neutralizeLinks('https://https://evil.com')).toBe('evil com');
+    expect(neutralizeLinks('hxxp://ftp://www.evil.com/x')).toBe('www evil com/x');
+  });
+
+  it('neutralizeLinks conserva ZWNJ/ZWJ dentro de palabras y emoji, y no lo dejan pasar un dominio', () => {
+    const persian = 'می' + '\u200C' + 'خواهم';
+    expect(neutralizeLinks(persian)).toBe(persian);
+    const family = '👨' + '\u200D' + '👩' + '\u200D' + '👧 Tacos';
+    expect(neutralizeLinks(family)).toBe(family);
+    // Un ZWJ/ZWNJ entre letras no esconde el dominio; junto al punto se quita.
+    expect(neutralizeLinks('evil.c' + '\u200D' + 'om')).not.toMatch(/\./);
+    expect(neutralizeLinks('evil.c' + '\u200C' + 'om')).not.toMatch(/\./);
+    expect(neutralizeLinks('evil' + '\u200D' + '.com')).toBe('evil com');
+    // El signup mira sin ningún invisible.
+    expect(hasUnambiguousLink('w' + '\u200D' + 'ww.evil')).toBe(true);
+  });
+
+  it('DoS: fuzz de 200 KB en neutralizeLinks y hasUnambiguousLink en menos de 50 ms', () => {
+    const pieces = ['.', '/', '\u200B', '\u0332', 'a', '1', 'www.', '://', '@', ' ', 'é', '。'];
+    let seed = 7;
+    let fuzz = '';
+    while (fuzz.length < 200_000) {
+      seed = (seed * 48271) % 2147483647;
+      fuzz += pieces[seed % pieces.length];
+    }
+    const start = performance.now();
+    neutralizeLinks(fuzz);
+    hasUnambiguousLink(fuzz);
+    expect(performance.now() - start).toBeLessThan(50);
+  });
+
   it('DoS: 100 KB en el nombre se rechaza en menos de 50 ms', () => {
     const huge = `${'a.'.repeat(50_000)}1`;
     let start = performance.now();

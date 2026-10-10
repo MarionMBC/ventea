@@ -20,7 +20,9 @@ import { BUILD_BRAND, IS_NATIVE, storageKey } from '../brand/runtime';
  *   notification is obviously useful ("your order is ready") — never on launch.
  * - The token is registered with `POST /api/devices` while signed in, and the
  *   device is deleted on sign-out so the next person on the phone does not
- *   get the previous one's orders.
+ *   get the previous one's orders. If that DELETE answers late and fails
+ *   after the next person registered, and their registration did not take
+ *   the token over (a guest, a failed POST), the token dies on the device.
  * - Tapping a notification with `data.orderId` opens that order's tracking.
  */
 
@@ -123,21 +125,54 @@ export const createPushController = (deps: PushDeps): PushController => {
    * since (the next person signed in), the token is theirs now.
    */
   let generation = 0;
+  /** Whether the API holds this install's token for whoever is here now. */
+  let registered: 'pending' | 'yes' | 'no' = 'no';
+  /**
+   * A late sign-out DELETE failed after someone registered again: the API may
+   * still send the previous customer's notifications to this token. Settled by
+   * the outcome of that registration (`settleOrphan`).
+   */
+  let orphan = false;
   const registerNative = () => {
     generation += 1;
+    registered = 'pending';
     return deps.plugin.register();
   };
 
+  const killLocalToken = async () => {
+    await deps.plugin.unregister().catch(() => undefined);
+    await deps.plugin.removeAllDeliveredNotifications().catch(() => undefined);
+  };
+
+  /**
+   * If the new registration took the token over on the API (POST ok), the old
+   * device is gone with it. If it did not (a guest, a failed POST), the only way
+   * to stop the previous customer's notifications is to kill the token here: the
+   * DELETE cannot be retried without their session. Waits while it is pending.
+   */
+  const settleOrphan = async () => {
+    if (!orphan || registered === 'pending') return;
+    orphan = false;
+    if (registered === 'no') await killLocalToken();
+  };
+
   const registerToken = async (token: string) => {
-    if (!deps.isSignedIn() || !token) return;
+    if (!deps.isSignedIn() || !token) {
+      registered = 'no';
+      await settleOrphan();
+      return;
+    }
     try {
       const device = await deps.register({ platform: deps.platform, pushToken: token });
       if (device && typeof device.id === 'string')
         write(deps.storage, deps.keys.deviceId, device.id);
+      registered = 'yes';
     } catch {
       /* The API may not have /api/devices yet, or be offline: push simply
          stays off until the next sign-in or order. */
+      registered = 'no';
     }
+    await settleOrphan();
   };
 
   const toPermission = (status: PermissionStatus): PushPermission =>
@@ -152,7 +187,10 @@ export const createPushController = (deps: PushDeps): PushController => {
       initialised = true;
       try {
         await deps.plugin.addListener('registration', (token) => void registerToken(token.value));
-        await deps.plugin.addListener('registrationError', () => undefined);
+        await deps.plugin.addListener('registrationError', () => {
+          registered = 'no';
+          void settleOrphan();
+        });
         await deps.plugin.addListener('pushNotificationActionPerformed', (action) => {
           const orderId = orderIdFromNotification(action);
           if (orderId) openOrder(orderId);
@@ -206,13 +244,24 @@ export const createPushController = (deps: PushDeps): PushController => {
       const cleanUp = async () => {
         /* Still signed in here: the DELETE goes with the session (and its
            refresh, if the access token expired) of the person leaving. */
-        if (id) await deps.unregister(id).catch(() => undefined);
-        /* Past the cap and someone registered since: that token is theirs. */
-        if (generation !== signedOutAt) return;
+        const deleted = id
+          ? await deps.unregister(id).then(
+              () => true,
+              () => false,
+            )
+          : true;
+        /* Past the cap and someone registered since: that token is theirs,
+           unless the API still has it for the person who left (see `orphan`). */
+        if (generation !== signedOutAt) {
+          if (!deleted) {
+            orphan = true;
+            await settleOrphan();
+          }
+          return;
+        }
         /* Even if the API was unreachable, the token dies on the device: FCM
            answers UNREGISTERED and the API drops it on the next send. */
-        await deps.plugin.unregister().catch(() => undefined);
-        await deps.plugin.removeAllDeliveredNotifications().catch(() => undefined);
+        await killLocalToken();
       };
       try {
         await Promise.race([cleanUp(), deadline]);

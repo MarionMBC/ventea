@@ -238,6 +238,23 @@ describe('Reportes', () => {
     expect(last.query.get('from')).toBeNull();
   });
 
+  it('«Limpiar filtros» también sin URLSearchParams.size (Safari < 17)', async () => {
+    const size = Object.getOwnPropertyDescriptor(URLSearchParams.prototype, 'size');
+    delete (URLSearchParams.prototype as { size?: number }).size;
+    try {
+      renderReports({
+        path: '/admin/reports?location=nope',
+        respond: (query) =>
+          query.get('locationId')
+            ? json({ statusCode: 400, message: 'locationId inválido', error: 'Bad Request' }, 400)
+            : json(makeReport()),
+      });
+      expect(await screen.findByRole('button', { name: 'Clear filters' })).toBeTruthy();
+    } finally {
+      if (size) Object.defineProperty(URLSearchParams.prototype, 'size', size);
+    }
+  });
+
   it('un año fuera de 2000–2100 se marca y no se pide', async () => {
     const { api } = renderReports();
     const to = (await screen.findByLabelText('To')) as HTMLInputElement;

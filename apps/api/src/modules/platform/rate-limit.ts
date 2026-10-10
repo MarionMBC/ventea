@@ -14,16 +14,28 @@ export class SlidingWindowLimiter {
    * que se libere un lugar si no entra (el intento rechazado no cuenta).
    */
   hit(key: string, limit: number, now: number): number | null {
+    const retryInMs = this.check(key, limit, now);
+    if (retryInMs === null) this.record(key, now);
+    return retryInMs;
+  }
+
+  /**
+   * Como `hit`, pero sin registrar nada: con varias reglas a la vez, primero se chequean todas
+   * y solo si todas dejan pasar se registra el intento en cada una (`record`).
+   */
+  check(key: string, limit: number, now: number): number | null {
     this.sweep(now);
     const since = now - this.windowMs;
     const recent = (this.hits.get(key) ?? []).filter((at) => at > since);
-    if (recent.length >= limit) {
-      this.hits.set(key, recent);
-      return recent[0]! + this.windowMs - now;
-    }
+    this.hits.set(key, recent);
+    return recent.length >= limit ? recent[0]! + this.windowMs - now : null;
+  }
+
+  /** Registra un intento ya chequeado con `check`. */
+  record(key: string, now: number): void {
+    const recent = this.hits.get(key) ?? [];
     recent.push(now);
     this.hits.set(key, recent);
-    return null;
   }
 
   /** Borra las claves sin intentos en la ventana, como mucho una vez por ventana. */

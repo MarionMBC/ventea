@@ -183,6 +183,69 @@ describe('push', () => {
     await expect(controller.beforeSignOut()).resolves.toBeUndefined();
   });
 
+  /**
+   * The late DELETE of the previous customer fails after the next person on the phone registered,
+   * and that registration did not take the token over (a guest, or its POST failed): the API would
+   * keep sending the previous customer's notifications here. The token dies on the device instead.
+   */
+  const lateFailedDelete = async (
+    next: 'guest' | 'post-ok' | 'post-fails',
+    deleteFails: 'after-post' | 'during-post',
+  ) => {
+    let failDelete: () => void = () => undefined;
+    let answerPost: () => void = () => undefined;
+    const register = vi.fn(
+      () =>
+        new Promise<{ id: string }>((resolve, reject) => {
+          answerPost = () =>
+            next === 'post-fails' ? reject(new Error('offline')) : resolve({ id: 'device-2' });
+          if (deleteFails === 'after-post') answerPost();
+        }),
+    );
+    const ctx = setup(
+      {
+        unregister: () =>
+          new Promise<void>((_, reject) => (failDelete = () => reject(new Error('503')))),
+        signOutTimeoutMs: 20,
+        isSignedIn: () => next !== 'guest',
+        register,
+      },
+      'granted',
+    );
+    await ctx.controller.init(() => undefined);
+    ctx.storage.setItem('device', 'device-9');
+    await ctx.controller.beforeSignOut(); // the cap wins: the DELETE is still in flight
+    await ctx.controller.afterOrderPlaced(); // the next person, on the same phone
+    await flush();
+    failDelete();
+    await flush();
+    answerPost();
+    await flush();
+    return { ...ctx, register };
+  };
+
+  for (const deleteFails of ['after-post', 'during-post'] as const) {
+    test(`late DELETE fails, the next one is a guest: the local token dies (${deleteFails})`, async () => {
+      const { plugin, register } = await lateFailedDelete('guest', deleteFails);
+      expect(register).not.toHaveBeenCalled();
+      expect(plugin.unregister).toHaveBeenCalledTimes(1);
+      expect(plugin.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    test(`late DELETE fails, the next POST fails: the local token dies (${deleteFails})`, async () => {
+      const { plugin, register } = await lateFailedDelete('post-fails', deleteFails);
+      expect(register).toHaveBeenCalledTimes(1);
+      expect(plugin.unregister).toHaveBeenCalledTimes(1);
+    });
+
+    test(`late DELETE fails, the next POST takes the token over: it lives (${deleteFails})`, async () => {
+      const { plugin, register, storage } = await lateFailedDelete('post-ok', deleteFails);
+      expect(register).toHaveBeenCalledTimes(1);
+      expect(storage.getItem('device')).toBe('device-2');
+      expect(plugin.unregister).not.toHaveBeenCalled();
+    });
+  }
+
   test('a late sign-out clean-up does not kill the token of the next person who signs in', async () => {
     let finishDelete: () => void = () => undefined;
     const { controller, storage, plugin } = setup(

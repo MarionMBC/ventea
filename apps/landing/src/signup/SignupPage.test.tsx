@@ -320,6 +320,17 @@ describe('Registro: nombres con links (TASK-021)', () => {
     expect(screen.getByLabelText('Tu nombre')).toBeTruthy();
   });
 
+  it('en el cliente: «/» entre dígitos y «www.» dentro de una palabra son nombres válidos', async () => {
+    for (const name of ['Comida 24/7', 'Awww.Pizza']) {
+      api();
+      const { unmount } = render(<SignupPage search="" />);
+      await toRestaurantStep(name);
+      expect(screen.queryByText(es.signup.errors.nameLink)).toBeNull();
+      expect(screen.getByLabelText('Tu nombre')).toBeTruthy();
+      unmount();
+    }
+  });
+
   it('en el cliente: tu nombre con «@» o «/» no se envía', async () => {
     const fetchMock = api();
     render(<SignupPage search="" />);

@@ -139,6 +139,10 @@ directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los 
 - **Proxy:** la subida es `multipart` hasta 5 MB y va directo a la API (Traefik / Caddy no limitan
   el cuerpo por defecto). Si se pone un proxy con límite (nginx: `client_max_body_size`), dejar
   al menos 6 MB en `/api/staff/media`.
+- **Archivos huérfanos:** si la transacción de una subida falla después de escribir, el archivo
+  queda sin registro. Cada hora (con los correos de ciclo de vida, `MAIL_SCHEDULER_ENABLED`) un
+  GC borra, por marca y con su lock de medios, los `<hash>.webp` / `.thumb.webp` sin registro y
+  los `.tmp` de escrituras cortadas con más de 1 h. No toca nada más del volumen.
 - **Verificación tras desplegar:** subir una imagen desde Mi marca o el menú de una marca de
   prueba → asignarla a un ítem → `GET /api/menu` la muestra con URL absoluta → abrirla (200,
   `image/webp`) → `GET /api/tenant` trae `logoUrl`/`iconUrl` absolutos.
@@ -179,7 +183,8 @@ curl -X POST "https://<host-api>/api/platform/tenants/<slug>/record-payment" \
 Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) y deja la marca
 `active`. No toca una cancelación agendada por el dueño. El servicio `api` de los compose
 lleva `stop_grace_period: 75s`: el apagado espera, en serie, la corrida de cobro en curso (hasta 35 s) y el envío de correo
-en curso (hasta 30 s; el despacho deja de tomar correos nuevos al empezar el apagado). Con un cobro con tarjeta sin
+en curso (hasta 30 s; el despacho deja de tomar correos nuevos al empezar el apagado) y la vuelta horaria de
+correos de ciclo de vida y GC de medios (hasta 5 s). Con un cobro con tarjeta sin
 confirmar responde `409`: primero `resolve-payment`.
 
 ### Alertas
@@ -188,6 +193,45 @@ confirmar responde `409`: primero `resolve-payment`.
 rechazados por la pasarela antes del banco) y `alertsLast7Days` (`billing_alert`: posible
 doble pago, monto aprobado distinto del pedido, card-testing). Los dos tienen que estar en 0;
 si no, revisar el detalle de la marca y EBC.
+
+### Intentos de cobro abiertos duplicados
+
+Una suscripción tiene como mucho un intento de cobro abierto (`pending`, `unknown` o
+`needs_review`): lo garantiza el índice único parcial `payment_attempts_one_open_per_subscription`
+(TASK-025, migración `20261010130000_one_open_payment_attempt`). Si la base ya tiene duplicados,
+la migración aborta sin tocar nada (son registros de cobro) y lista marca, suscripción y
+`orderId`.
+
+**Antes de desplegar** (solo lectura; `deploy.sh` lo corre solo antes del respaldo y aborta sin
+cambiar nada):
+
+```bash
+cd /opt/ventea && ./check-open-payment-attempts.sh
+```
+
+Si lista algo, con la versión actual todavía arriba: para cada suscripción, conciliar con la
+pasarela cuál se cobró y cerrar los demás con `resolve-payment` (uno por `orderId`). Recién con el
+chequeo en verde, `./deploy.sh <nueva>`.
+
+**Si igual falló la migración** (Prisma la deja `failed`: todo `migrate deploy`, también el de la
+versión anterior, da `P3009` y la API no levanta). En este orden:
+
+```bash
+cd /opt/ventea
+# 1 · Desbloquear Prisma (el servicio migrate corre como root, que es lo que Prisma necesita)
+docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate \
+  ../../node_modules/.bin/prisma migrate resolve --rolled-back 20261010130000_one_open_payment_attempt
+# 2 · Volver a la versión anterior (su migrate deploy ya corre: la migración quedó revertida)
+./deploy.sh <version-anterior>
+# 3 · Con la API arriba: cerrar los intentos sobrantes, uno por orderId (los lista el error)
+curl -X POST "https://<host-api>/api/platform/tenants/<slug>/resolve-payment" \
+  -H "Authorization: Bearer $PLATFORM_TOKEN" -H "Content-Type: application/json" \
+  -d '{"orderId": "<orderId>", "outcome": "failed", "note": "duplicado, conciliado con la pasarela"}'
+# 4 · Chequeo en verde y redeploy
+./check-open-payment-attempts.sh && ./deploy.sh <nueva>
+```
+
+`outcome` según lo que diga la pasarela de cada intento. Nunca borrar intentos a mano.
 
 ### Puesta en marcha con CyberSource (no verificada: faltan credenciales)
 
@@ -281,7 +325,8 @@ certificado durante varios minutos.
 mkdir -p /opt/ventea && cd /opt/ventea
 
 # 2 · Copiar desde el repo: compose, Caddyfile y los scripts de operación
-#     (deploy/docker-compose.prod.yml, deploy/Caddyfile, deploy/deploy.sh, deploy/backup.sh)
+#     (deploy/docker-compose.prod.yml, deploy/Caddyfile, deploy/deploy.sh, deploy/backup.sh,
+#      deploy/check-open-payment-attempts.sh)
 
 # 3 · Configuración del cliente
 cp .env.production.example .env
@@ -309,8 +354,9 @@ emitido para un cliente valga en la instancia de otro.
 cd /opt/ventea && ./deploy.sh 0.2.0
 ```
 
-[`deploy.sh`](../deploy/deploy.sh) hace, en este orden: respaldo → fijar la versión en
-`.env` → `pull` → migrar → levantar → verificar `/api/health`.
+[`deploy.sh`](../deploy/deploy.sh) hace, en este orden: pre-chequeo de datos de solo lectura
+(`check-open-payment-attempts.sh`: aborta sin tocar nada si una migración va a fallar) →
+respaldo → fijar la versión en `.env` → `pull` → migrar → levantar → verificar `/api/health`.
 
 El orden no es decorativo. Migrar sin respaldo previo deja sin punto de retorno si la
 migración sale mal, y en ese momento la base ya cambió de forma.
@@ -323,6 +369,12 @@ versión sin que nadie lo haya pedido.
 compatible hacia atrás; si una migración borra una columna, volver a la imagen anterior
 no alcanza y hay que restaurar el respaldo. Por eso las migraciones destructivas se
 parten en dos versiones: primero dejar de usar la columna, después borrarla.
+
+**Si una migración falló**, Prisma la deja `failed` y ningún `migrate deploy` corre (`P3009`),
+tampoco el de la versión anterior: el rollback no levanta hasta marcarla revertida con
+`docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate
+../../node_modules/.bin/prisma migrate resolve --rolled-back <migración>` (ejemplo completo en
+«Intentos de cobro abiertos duplicados»).
 
 ## Respaldos
 
@@ -340,6 +392,11 @@ listado de directorio.
 
 **Un respaldo que nunca se restauró no es un respaldo.** Probar la restauración sobre
 una base descartable antes de confiar en él.
+
+**Orden al restaurar: primero la base, después los medios.** El GC horario de medios (TASK-025)
+borra los archivos sin registro con más de 1 h, y un archivo restaurado conserva su fecha vieja:
+si los medios vuelven antes que la base y pasa una vuelta, se borran. Para restaurar en otro
+orden, levantar la API con `MAIL_SCHEDULER_ENABLED=false` (apaga también el GC) hasta terminar.
 
 Los respaldos quedan en el mismo VPS, que es exactamente donde no sirven si el VPS se
 pierde. Copiarlos afuera —almacenamiento del proveedor, otro servidor— es parte de la

@@ -135,7 +135,11 @@ function useCustomerMutation<TVars>(id: string, path: string) {
           headers: { [IDEMPOTENCY_KEY_HEADER]: key },
         },
       ),
-    onSuccess: (detail) => {
+    // En el hook y no en el `mutate()` del cajón: corre aunque el cajón ya se haya desmontado
+    // (atrás del navegador con el envío en vuelo). Sin esto la clave quedaba guardada y una acción
+    // nueva idéntica (un canje es `{rewardId}`) la reusaba: la API devolvía el movimiento viejo.
+    onSuccess: (detail, { key }) => {
+      releaseActionKey(key);
       queryClient.setQueryData(customerKey(id), detail);
       // Sin esperar: el panel del cliente ya tiene su saldo nuevo y no queda «guardando».
       void queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
@@ -143,22 +147,43 @@ function useCustomerMutation<TVars>(id: string, path: string) {
   });
 }
 
+/** Último envío sin éxito por acción y cliente; vive fuera del cajón (ver `actionKeys`). */
+const pendingKeys = new Map<string, { payload: string; key: string }>();
+
 /**
  * Clave de idempotencia por acción: la misma mientras se reintenta el mismo envío (mismos
  * datos, sin éxito todavía); una nueva al cambiar los datos o después de un éxito.
+ *
+ * Con `scope` (acción + cliente) el envío pendiente vive a nivel de módulo, no en el estado del
+ * cajón: si el dueño lo cierra tras un timeout y lo reabre, el reintento con los mismos datos
+ * lleva la misma clave y la API no duplica el ajuste. Se pierde al recargar la página. El éxito
+ * la libera desde la mutación (`releaseActionKey`), no desde el cajón.
  */
-export function actionKeys() {
-  let last: { payload: string; key: string } | null = null;
+export function actionKeys(scope?: string) {
+  const store =
+    scope === undefined ? new Map<string, { payload: string; key: string }>() : pendingKeys;
+  const slot = scope ?? '';
   return {
     keyFor(payload: unknown): string {
       const text = JSON.stringify(payload);
-      if (last?.payload !== text) last = { payload: text, key: crypto.randomUUID() };
+      let last = store.get(slot);
+      if (last?.payload !== text) {
+        last = { payload: text, key: crypto.randomUUID() };
+        store.set(slot, last);
+      }
       return last.key;
     },
     done() {
-      last = null;
+      store.delete(slot);
     },
   };
+}
+
+/** El envío con esta clave salió bien: la próxima acción, aunque sea idéntica, lleva otra. */
+export function releaseActionKey(key: string): void {
+  for (const [slot, pending] of pendingKeys) {
+    if (pending.key === key) pendingKeys.delete(slot);
+  }
 }
 
 export const useAdjustPoints = (id: string) =>

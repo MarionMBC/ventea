@@ -57,6 +57,19 @@ describe('regla de layout', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('las reglas sobre los hijos del área principal solo valen en el tablero (scope con :has)', () => {
+    const offenders = sheets.flatMap(({ file, css }) =>
+      rules(css)
+        .filter(({ selector }) =>
+          selector
+            .split(',')
+            .some((part) => /\.app__main\s*>/.test(part) && !part.includes(':has(.orders--board)')),
+        )
+        .map(({ selector }) => `${file}: ${selector}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it('el área principal del tablero contiene a sus hijos absolutos (position: relative)', () => {
     const board = sheets
       .flatMap(({ css }) => rules(css))

@@ -26,18 +26,24 @@ export const REPORT_TOP_PRODUCTS = 10;
 export const REPORT_MIN_YEAR = 2000;
 export const REPORT_MAX_YEAR = 2100;
 
-/** Fecha local `AAAA-MM-DD` que existe en el calendario, entre 2000 y 2100. */
-export const isoDateSchema = z
+/**
+ * Fecha `AAAA-MM-DD` que existe en el calendario, sin acotar el año. Es la de la RESPUESTA: el
+ * primer período de una semana de enero del 2000 empieza en 1999 (`1999-12-27`), y el panel no
+ * puede rechazar lo que la API devuelve bien.
+ */
+export const calendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD')
-  .refine((value) => {
-    const year = Number(value.slice(0, 4));
-    return year >= REPORT_MIN_YEAR && year <= REPORT_MAX_YEAR;
-  }, `Año entre ${REPORT_MIN_YEAR} y ${REPORT_MAX_YEAR}`)
   .refine((value) => {
     const date = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
   }, 'Fecha inválida');
+
+/** Fecha local `AAAA-MM-DD` de la ENTRADA: existe en el calendario y está entre 2000 y 2100. */
+export const isoDateSchema = calendarDateSchema.refine((value) => {
+  const year = Number(value.slice(0, 4));
+  return year >= REPORT_MIN_YEAR && year <= REPORT_MAX_YEAR;
+}, `Año entre ${REPORT_MIN_YEAR} y ${REPORT_MAX_YEAR}`);
 
 export const salesReportQuerySchema = z.object({
   from: isoDateSchema.optional(),
@@ -52,8 +58,8 @@ const cents = z.number().int();
 export const salesReportSchema = z.object({
   timezone: z.string(),
   currency: z.string().length(3),
-  from: isoDateSchema,
-  to: isoDateSchema,
+  from: calendarDateSchema,
+  to: calendarDateSchema,
   granularity: z.enum(REPORT_GRANULARITY),
   locationId: z.string().uuid().nullable(),
   /** Sucursales de la marca para el filtro (también las inactivas: tienen historia). */
@@ -66,7 +72,7 @@ export const salesReportSchema = z.object({
     cancelledOrders: count,
   }),
   /** Un punto por período del rango (también los vacíos). `period` = primer día del período. */
-  series: z.array(z.object({ period: isoDateSchema, orders: count, salesCents: cents })),
+  series: z.array(z.object({ period: calendarDateSchema, orders: count, salesCents: cents })),
   /** Todos los pedidos colocados del rango por estado (incluye cancelados). */
   byStatus: z.array(z.object({ status: z.enum(ORDER_STATUS), orders: count })),
   topProducts: z.array(

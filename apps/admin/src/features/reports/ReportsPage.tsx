@@ -137,8 +137,9 @@ export function ReportsPage() {
         </span>
         <h1>{t('reports.errorTitle')}</h1>
         <p>{describeError(error, i18n)}</p>
-        {/* Filtros inválidos en la URL (400): reintentar repetiría lo mismo; se limpian. */}
-        {error instanceof ApiError && error.status === 400 && params.size > 0 ? (
+        {/* Filtros inválidos en la URL (400): reintentar repetiría lo mismo; se limpian. Sin
+            `params.size`: Safari < 17 no lo tiene. */}
+        {error instanceof ApiError && error.status === 400 && params.toString() !== '' ? (
           <button
             type="button"
             className="btn btn--primary"

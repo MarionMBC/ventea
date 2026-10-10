@@ -23,11 +23,11 @@
     overflow-y: auto;
   }
 
-  .app__main > * {
+  .app:has(.orders--board) > .app__main > * {
     flex: none;
   }
 
-  .app__main > .orders--board {
+  .app:has(.orders--board) > .app__main > .orders--board {
     flex: 1 1 auto;
     min-height: 480px;
   }

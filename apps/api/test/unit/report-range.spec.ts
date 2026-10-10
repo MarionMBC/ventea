@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { isoDateSchema, REPORT_MAX_DAYS } from '@ventea/shared';
+import { isoDateSchema, REPORT_MAX_DAYS, salesReportSchema } from '@ventea/shared';
 
 import { shiftDay } from '@/modules/platform/funnel-report';
 
@@ -102,6 +102,38 @@ describe('fechas extremas (review TASK-023: DoS)', () => {
     }
     expect(isoDateSchema.safeParse('2000-01-01').success).toBe(true);
     expect(isoDateSchema.safeParse('2100-12-31').success).toBe(true);
+  });
+});
+
+describe('salesReportSchema (respuesta)', () => {
+  it('acepta un período que empieza antes del 2000 (semana de enero del 2000)', () => {
+    const period = periodStart('2000-01-01', 'week');
+    expect(period < '2000-01-01').toBe(true);
+    const report = {
+      timezone: 'America/Tegucigalpa',
+      currency: 'HNL',
+      from: '2000-01-01',
+      to: '2000-01-31',
+      granularity: 'week',
+      locationId: null,
+      locations: [],
+      totals: {
+        orders: 0,
+        salesCents: 0,
+        averageTicketCents: 0,
+        discountCents: 0,
+        cancelledOrders: 0,
+      },
+      series: fillSeries('2000-01-01', '2000-01-31', 'week', []),
+      byStatus: [],
+      topProducts: [],
+      peakHours: [],
+    };
+    expect(report.series[0]?.period).toBe(period);
+    expect(salesReportSchema.safeParse(report).success).toBe(true);
+    // Sigue exigiendo fechas de calendario válidas.
+    const broken = { ...report, series: [{ period: '2000-02-30', orders: 0, salesCents: 0 }] };
+    expect(salesReportSchema.safeParse(broken).success).toBe(false);
   });
 });
 

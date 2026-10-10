@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type {
   RewardCatalogItem,
   RewardCustomerDetail,
@@ -54,7 +54,16 @@ const customer = {
   lastActivityAt: new Date('2026-10-01T15:00:00Z'),
 };
 
-function renderRewards({ role = 'owner' }: { role?: 'owner' | 'manager' | 'staff' } = {}) {
+function renderRewards({
+  role = 'owner',
+  failAdjustments = 0,
+  adjustmentGate,
+}: {
+  role?: 'owner' | 'manager' | 'staff';
+  failAdjustments?: number;
+  /** El POST del ajuste responde recién cuando se resuelve (envío en vuelo). */
+  adjustmentGate?: Promise<void>;
+} = {}) {
   const state = {
     rewards: makeRewards(),
     menu: makeMenu(),
@@ -103,6 +112,10 @@ function renderRewards({ role = 'owner' }: { role?: 'owner' | 'manager' | 'staff
     }
     if (req.path === `/api/staff/rewards/customers/${CUSTOMER_ID}`) return json(state.detail);
     if (req.path === `/api/staff/rewards/customers/${CUSTOMER_ID}/adjustments`) {
+      if (adjustmentGate) await adjustmentGate;
+      if (failAdjustments-- > 0) {
+        return json({ statusCode: 503, message: 'No disponible', error: 'Unavailable' }, 503);
+      }
       const body = req.body as { points: number; reason: string };
       state.detail = {
         customer: {
@@ -286,6 +299,84 @@ describe('Puntos', () => {
     // El canje del catálogo (500) no alcanza con 100 puntos: la opción queda deshabilitada.
     const option = within(dialog).getByRole('option', { name: /\$5 off/ }) as HTMLOptionElement;
     expect(option.disabled).toBe(true);
+  });
+
+  it('la clave de un ajuste fallido sobrevive a cerrar y reabrir el cajón (mismos datos)', async () => {
+    const { api } = renderRewards({ failAdjustments: 1 });
+    const adjustOnce = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Manage points of Ana Pérez' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Ana Pérez' });
+      fireEvent.change(within(dialog).getByLabelText('Points'), { target: { value: '15' } });
+      fireEvent.change(within(dialog).getByLabelText('Reason'), {
+        target: { value: 'Compensación' },
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save adjustment' }));
+      return dialog;
+    };
+    const keys = () =>
+      api.calls
+        .filter((c) => c.path.endsWith('/adjustments'))
+        .map((c) => c.headers['idempotency-key']);
+
+    // Primer intento: falla (pudo haber llegado). El dueño cierra el cajón.
+    const first = await adjustOnce();
+    await waitFor(() => expect(keys()).toHaveLength(1));
+    await waitFor(() =>
+      expect(
+        (within(first).getByRole('button', { name: 'Save adjustment' }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    fireEvent.keyDown(first, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ana Pérez' })).toBeNull());
+
+    // Reabre y reintenta lo mismo: la misma clave (la API no lo duplica).
+    const second = await adjustOnce();
+    expect(await within(second).findByText('Adjustment saved.')).toBeTruthy();
+    expect(keys()).toHaveLength(2);
+    expect(keys()[1]).toBe(keys()[0]);
+  });
+
+  it('un ajuste que termina con el cajón desmontado libera su clave: el mismo ajuste otra vez lleva otra', async () => {
+    let answer!: () => void;
+    const gate = new Promise<void>((resolve) => (answer = resolve));
+    const { api } = renderRewards({ adjustmentGate: gate });
+    const adjust = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Manage points of Ana Pérez' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Ana Pérez' });
+      fireEvent.change(within(dialog).getByLabelText('Points'), { target: { value: '7' } });
+      fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Regalo' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save adjustment' }));
+      return dialog;
+    };
+    const go = (path: string) =>
+      act(() => {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+    const keys = () =>
+      api.calls
+        .filter((c) => c.path.endsWith('/adjustments'))
+        .map((c) => c.headers['idempotency-key']);
+
+    await adjust();
+    await waitFor(() => expect(keys()).toHaveLength(1));
+    // Atrás del navegador con el envío en vuelo: el cajón se desmonta.
+    go('/admin/orders');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ana Pérez' })).toBeNull());
+    answer(); // el ajuste sale bien sin nadie mirando
+    await waitFor(() =>
+      expect(api.calls.filter((c) => c.path.endsWith('/adjustments'))).toHaveLength(1),
+    );
+    await act(async () => {
+      await gate;
+    });
+
+    go('/admin/rewards');
+    const second = await adjust();
+    expect(await within(second).findByText('Adjustment saved.')).toBeTruthy();
+    expect(keys()).toHaveLength(2);
+    expect(keys()[1]).not.toBe(keys()[0]);
   });
 
   it('búsqueda sin resultados', async () => {
