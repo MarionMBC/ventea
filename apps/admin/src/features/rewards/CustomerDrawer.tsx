@@ -82,7 +82,6 @@ export function CustomerDrawer({
       { body, key: adjustKeys.keyFor([customer.id, body]) },
       {
         onSuccess: () => {
-          adjustKeys.done();
           setPoints('');
           setReason('');
           setFlash(t('rewards.adjusted'));
@@ -101,7 +100,6 @@ export function CustomerDrawer({
       { body, key: redeemKeys.keyFor([customer.id, body]) },
       {
         onSuccess: () => {
-          redeemKeys.done();
           setRewardId('');
           setFlash(t('rewards.redeemed', { name: selected.name }));
         },

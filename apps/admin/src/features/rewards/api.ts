@@ -135,7 +135,11 @@ function useCustomerMutation<TVars>(id: string, path: string) {
           headers: { [IDEMPOTENCY_KEY_HEADER]: key },
         },
       ),
-    onSuccess: (detail) => {
+    // En el hook y no en el `mutate()` del cajón: corre aunque el cajón ya se haya desmontado
+    // (atrás del navegador con el envío en vuelo). Sin esto la clave quedaba guardada y una acción
+    // nueva idéntica (un canje es `{rewardId}`) la reusaba: la API devolvía el movimiento viejo.
+    onSuccess: (detail, { key }) => {
+      releaseActionKey(key);
       queryClient.setQueryData(customerKey(id), detail);
       // Sin esperar: el panel del cliente ya tiene su saldo nuevo y no queda «guardando».
       void queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
@@ -152,7 +156,8 @@ const pendingKeys = new Map<string, { payload: string; key: string }>();
  *
  * Con `scope` (acción + cliente) el envío pendiente vive a nivel de módulo, no en el estado del
  * cajón: si el dueño lo cierra tras un timeout y lo reabre, el reintento con los mismos datos
- * lleva la misma clave y la API no duplica el ajuste. Se pierde al recargar la página.
+ * lleva la misma clave y la API no duplica el ajuste. Se pierde al recargar la página. El éxito
+ * la libera desde la mutación (`releaseActionKey`), no desde el cajón.
  */
 export function actionKeys(scope?: string) {
   const store =
@@ -172,6 +177,13 @@ export function actionKeys(scope?: string) {
       store.delete(slot);
     },
   };
+}
+
+/** El envío con esta clave salió bien: la próxima acción, aunque sea idéntica, lleva otra. */
+export function releaseActionKey(key: string): void {
+  for (const [slot, pending] of pendingKeys) {
+    if (pending.key === key) pendingKeys.delete(slot);
+  }
 }
 
 export const useAdjustPoints = (id: string) =>
