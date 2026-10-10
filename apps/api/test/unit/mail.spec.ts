@@ -363,6 +363,27 @@ describe('nombres con links (anti-phishing)', () => {
     expect(neutralizeLinks('Café 1.5 · v2.0.1')).toBe('Café 1.5 · v2.0.1');
   });
 
+  it('neutralizeLinks: IPv4 dentro de tramos con grupos inválidos y esquemas repetidos (review TASK-025)', () => {
+    expect(neutralizeLinks('1..8.8.8.8')).not.toMatch(/8\.8/);
+    expect(neutralizeLinks('1234.8.8.8.8')).not.toMatch(/8\.8/);
+    expect(neutralizeLinks('ip 9.9.9.9..1.5')).toBe('ip 9 9 9 9..1.5');
+    expect(neutralizeLinks('https://https://evil.com')).toBe('evil com');
+    expect(neutralizeLinks('hxxp://ftp://www.evil.com/x')).toBe('www evil com/x');
+  });
+
+  it('neutralizeLinks conserva ZWNJ/ZWJ dentro de palabras y emoji, y no lo dejan pasar un dominio', () => {
+    const persian = 'می' + '\u200C' + 'خواهم';
+    expect(neutralizeLinks(persian)).toBe(persian);
+    const family = '👨' + '\u200D' + '👩' + '\u200D' + '👧 Tacos';
+    expect(neutralizeLinks(family)).toBe(family);
+    // Un ZWJ/ZWNJ entre letras no esconde el dominio; junto al punto se quita.
+    expect(neutralizeLinks('evil.c' + '\u200D' + 'om')).not.toMatch(/\./);
+    expect(neutralizeLinks('evil.c' + '\u200C' + 'om')).not.toMatch(/\./);
+    expect(neutralizeLinks('evil' + '\u200D' + '.com')).toBe('evil com');
+    // El signup mira sin ningún invisible.
+    expect(hasUnambiguousLink('w' + '\u200D' + 'ww.evil')).toBe(true);
+  });
+
   it('DoS: fuzz de 200 KB en neutralizeLinks y hasUnambiguousLink en menos de 50 ms', () => {
     const pieces = ['.', '/', '\u200B', '\u0332', 'a', '1', 'www.', '://', '@', ' ', 'é', '。'];
     let seed = 7;

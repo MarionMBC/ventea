@@ -16,7 +16,7 @@
  *
  * Las dos normalizan antes: quitan los invisibles (`\p{Cf}` y Default_Ignorable: U+200B, U+00AD,
  * U+2060, selectores de variante…, que esconden `evil.c\u200Bom`), NFKC y los puntos ideográficos
- * `。` `．` `｡`.
+ * `。` `．` `｡`. `neutralizeLinks` conserva ZWNJ/ZWJ/selectores entre letras o emoji (ver `normalize`).
  */
 
 /** Más que esto no es un nombre: se corta antes de procesar (el schema ya limita a 80). */
@@ -24,7 +24,7 @@ export const LINK_CHECK_MAX = 200;
 
 /** `true` si el nombre trae algo que solo puede ser un link o una dirección. */
 export function hasUnambiguousLink(text: string): boolean {
-  const value = normalize(text.slice(0, LINK_CHECK_MAX)).toLowerCase();
+  const value = normalize(text.slice(0, LINK_CHECK_MAX), false).toLowerCase();
   if (value.includes('://') || value.includes('@')) return true;
   const chars = Array.from(value);
   for (let i = 0; i < chars.length; i++) {
@@ -46,7 +46,7 @@ export function hasUnambiguousLink(text: string): boolean {
 
 /** Sin esquemas ni dominios: lo que queda no lo convierte en link ningún cliente de correo. */
 export function neutralizeLinks(text: string): string {
-  const value = normalize(text.slice(0, LINK_CHECK_MAX));
+  const value = normalize(text.slice(0, LINK_CHECK_MAX), true);
   return value
     .split(/(\s+)/)
     .map((token) => (/\s/.test(token) ? token : neutralizeToken(token)))
@@ -55,13 +55,34 @@ export function neutralizeLinks(text: string): string {
 
 /**
  * Sin invisibles (`\p{Cf}`, Default_Ignorable), NFKC (`．` → `.`, `｡` → `。`) y el punto ideográfico
- * `。` como punto. Clases de un carácter con `g`: lineal.
+ * `。` como punto. Con `keepJoiners` (el texto que sale en el correo) se conservan ZWNJ, ZWJ y los
+ * selectores de variante ENTRE dos letras/marcas/emoji: los usan el persa (`می‌خواهم`) y los emoji
+ * compuestos (👨‍👩‍👧). Junto a un punto, un dígito o un espacio se quitan igual, y `neutralizeToken`
+ * los salta al contar letras: no esconden un dominio. Un recorrido; regex de un carácter.
  */
-function normalize(text: string): string {
-  return text
-    .replace(/[\p{Cf}\p{Default_Ignorable_Code_Point}]/gu, '')
-    .normalize('NFKC')
-    .replace(/。/g, '.');
+function normalize(text: string, keepJoiners: boolean): string {
+  const chars = Array.from(text);
+  let out = '';
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i]!;
+    if (!INVISIBLE.test(char)) {
+      out += char;
+      continue;
+    }
+    if (keepJoiners && JOINER.test(char) && isWordish(chars[i - 1]) && isWordish(chars[i + 1])) {
+      out += char;
+    }
+  }
+  return out.normalize('NFKC').replace(/。/g, '.');
+}
+
+const INVISIBLE = /^[\p{Cf}\p{Default_Ignorable_Code_Point}]$/u;
+/** ZWNJ, ZWJ y selectores de variante de texto/emoji. */
+const JOINER = /^[\u200C\u200D\uFE0E\uFE0F]$/u;
+const WORDISH = /^[\p{L}\p{M}\p{Extended_Pictographic}]$/u;
+
+function isWordish(char: string | undefined): boolean {
+  return char !== undefined && WORDISH.test(char);
 }
 
 /** Letra o marca combinante (`c\u0332` es una letra para quien linkifica). */
@@ -73,8 +94,9 @@ function isDigit(char: string | undefined): boolean {
 }
 
 function neutralizeToken(token: string): string {
-  // Esquema: lo que va antes de `://` se descarta (`https://evil.com` → `evil.com`).
-  const scheme = token.indexOf('://');
+  // Esquemas: todo lo que va antes del ÚLTIMO `://` se descarta (`https://evil.com` →
+  // `evil.com`; `https://https://evil.com` también).
+  const scheme = token.lastIndexOf('://');
   const rest = scheme >= 0 ? token.slice(scheme + 3) : token;
   const chars = Array.from(rest);
   for (let i = 0; i < chars.length; i++) {
@@ -82,8 +104,12 @@ function neutralizeToken(token: string): string {
     const before = chars[i - 1];
     if (!before || !LETTER_OR_DIGIT.test(before)) continue;
     // ¿Siguen 2+ letras? (`S.A.` y `1.5` quedan: no parecen dominio).
+    // Los unidores que conservó `normalize` (entre letras) no cortan la cuenta.
     let letters = 0;
-    for (let j = i + 1; j < chars.length && letters < 2 && LETTER.test(chars[j] ?? ''); j++) {
+    for (let j = i + 1; j < chars.length && letters < 2; j++) {
+      const next = chars[j] ?? '';
+      if (JOINER.test(next)) continue;
+      if (!LETTER.test(next)) break;
       letters++;
     }
     if (letters >= 2) chars[i] = ' ';
@@ -93,34 +119,31 @@ function neutralizeToken(token: string): string {
 }
 
 /**
- * IPv4 sin esquema (`192.168.0.1`): en cada tramo de dígitos y puntos con 4+ grupos de 1 a 3
- * dígitos, los puntos pasan a espacio. Un recorrido, sin regex. `1.5` y `2.0.1` quedan.
+ * IPv4 sin esquema (`192.168.0.1`): en cada tramo de dígitos y puntos, toda cadena de 4+ grupos
+ * de dígitos separados por UN punto pasa a espacios. Un `..` corta la cadena sin descartar el
+ * resto (`1..8.8.8.8` → `1..8 8 8 8`); un grupo largo cuenta (`1234.8.8.8.8`: un linkificador
+ * puede tomar su cola). `1.5` y `2.0.1` quedan. Un recorrido, sin regex.
  */
 function neutralizeIpv4(chars: string[]): void {
-  let start = 0;
-  while (start < chars.length) {
-    if (!isDigit(chars[start])) {
-      start++;
+  let i = 0;
+  while (i < chars.length) {
+    if (!isDigit(chars[i])) {
+      i++;
       continue;
     }
-    let end = start;
-    let groups = 1;
-    let groupLength = 0;
-    let valid = true;
-    for (; end < chars.length && (isDigit(chars[end]) || chars[end] === '.'); end++) {
-      if (chars[end] === '.') {
-        if (groupLength === 0) valid = false;
-        groups++;
-        groupLength = 0;
-      } else if (++groupLength > 3) {
-        valid = false;
-      }
+    // Cadena desde `i`: grupo, punto, grupo, … hasta algo que no sea dígito ni un punto simple.
+    const start = i;
+    let groups = 0;
+    let end = i;
+    while (end < chars.length && isDigit(chars[end])) {
+      while (end < chars.length && isDigit(chars[end])) end++;
+      groups++;
+      if (chars[end] === '.' && isDigit(chars[end + 1])) end++;
+      else break;
     }
-    // Un punto final (`1.2.3.4.`) no es un grupo.
-    if (chars[end - 1] === '.') groups--;
-    if (valid && groups >= 4) {
+    if (groups >= 4) {
       for (let k = start; k < end; k++) if (chars[k] === '.') chars[k] = ' ';
     }
-    start = end;
+    i = end;
   }
 }
