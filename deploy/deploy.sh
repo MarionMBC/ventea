@@ -15,7 +15,7 @@ cd "$DIR"
 # Una migración fallida deja a Prisma bloqueado (P3009) y la API no levanta, ni la versión
 # anterior. Si aborta, seguir docs/deployment.md «Intentos de cobro abiertos duplicados».
 echo "→ Pre-chequeo de datos"
-COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env ./check-open-payment-attempts.sh
+COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env bash ./check-open-payment-attempts.sh
 
 echo "→ Respaldo previo"
 ./backup.sh
