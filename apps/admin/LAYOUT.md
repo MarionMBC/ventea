@@ -10,6 +10,9 @@ Regla para toda pantalla de `apps/admin` (TASK-020). La verifican `src/styles/la
   eso es la doble barra.
 - **Única excepción: el tablero de pedidos** (`.orders--board`). Desde 768 px el área principal
   llena la pantalla (`.app:has(.orders--board) > .app__main`) y cada columna scrollea sola.
+  Toda regla sobre `.app__main` o sus hijos que sirva al tablero va con ese mismo scope
+  (`.app:has(.orders--board) > .app__main > …`): global, cambiaría las demás pantallas. El test
+  de estilos lo exige.
 - Un **panel de scroll propio** que convive con el documento (columnas del tablero, barra
   lateral) lleva el atributo `data-scroll-pane` y no puede estar dentro de otro contenedor que
   también scrollee.
