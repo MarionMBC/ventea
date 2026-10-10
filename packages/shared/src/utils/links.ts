@@ -56,8 +56,8 @@ export function neutralizeLinks(text: string): string {
 /**
  * Sin invisibles (`\p{Cf}`, Default_Ignorable), NFKC (`．` → `.`, `｡` → `。`) y el punto ideográfico
  * `。` como punto. Con `keepJoiners` (el texto que sale en el correo) se conservan ZWNJ, ZWJ y los
- * selectores de variante ENTRE dos letras/marcas/emoji: los usan el persa (`می‌خواهم`) y los emoji
- * compuestos (👨‍👩‍👧). Junto a un punto, un dígito o un espacio se quitan igual, y `neutralizeToken`
+ * selectores de variante ENTRE dos letras/marcas/emoji: los usan el persa (`می\u200Cخواهم`) y los emoji
+ * compuestos (👨\u200D👩\u200D👧). Junto a un punto, un dígito o un espacio se quitan igual, y `neutralizeToken`
  * los salta al contar letras: no esconden un dominio. Un recorrido; regex de un carácter.
  */
 function normalize(text: string, keepJoiners: boolean): string {
