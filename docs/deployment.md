@@ -198,13 +198,40 @@ si no, revisar el detalle de la marca y EBC.
 
 Una suscripción tiene como mucho un intento de cobro abierto (`pending`, `unknown` o
 `needs_review`): lo garantiza el índice único parcial `payment_attempts_one_open_per_subscription`
-(TASK-025). Si al desplegar la migración `20261010130000_one_open_payment_attempt` falla con
-«hay suscripciones con más de un intento de cobro abierto», la base ya tenía duplicados y la
-migración no los toca: son registros de cobro. Para cada suscripción listada, conciliar con la
-pasarela cuál se cobró y cerrar los demás con `resolve-payment` (uno por vez). Después marcar la
-migración fallida como revertida (`npx prisma migrate resolve --rolled-back
-20261010130000_one_open_payment_attempt`, dentro del contenedor de la API) y volver a
-desplegar. Nunca borrar intentos a mano.
+(TASK-025, migración `20261010130000_one_open_payment_attempt`). Si la base ya tiene duplicados,
+la migración aborta sin tocar nada (son registros de cobro) y lista marca, suscripción y
+`orderId`.
+
+**Antes de desplegar** (solo lectura; `deploy.sh` lo corre solo antes del respaldo y aborta sin
+cambiar nada):
+
+```bash
+cd /opt/ventea && ./check-open-payment-attempts.sh
+```
+
+Si lista algo, con la versión actual todavía arriba: para cada suscripción, conciliar con la
+pasarela cuál se cobró y cerrar los demás con `resolve-payment` (uno por `orderId`). Recién con el
+chequeo en verde, `./deploy.sh <nueva>`.
+
+**Si igual falló la migración** (Prisma la deja `failed`: todo `migrate deploy`, también el de la
+versión anterior, da `P3009` y la API no levanta). En este orden:
+
+```bash
+cd /opt/ventea
+# 1 · Desbloquear Prisma (el servicio migrate corre como root, que es lo que Prisma necesita)
+docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate \
+  ../../node_modules/.bin/prisma migrate resolve --rolled-back 20261010130000_one_open_payment_attempt
+# 2 · Volver a la versión anterior (su migrate deploy ya corre: la migración quedó revertida)
+./deploy.sh <version-anterior>
+# 3 · Con la API arriba: cerrar los intentos sobrantes, uno por orderId (los lista el error)
+curl -X POST "https://<host-api>/api/platform/tenants/<slug>/resolve-payment" \
+  -H "Authorization: Bearer $PLATFORM_TOKEN" -H "Content-Type: application/json" \
+  -d '{"orderId": "<orderId>", "outcome": "failed", "note": "duplicado, conciliado con la pasarela"}'
+# 4 · Chequeo en verde y redeploy
+./check-open-payment-attempts.sh && ./deploy.sh <nueva>
+```
+
+`outcome` según lo que diga la pasarela de cada intento. Nunca borrar intentos a mano.
 
 ### Puesta en marcha con CyberSource (no verificada: faltan credenciales)
 
@@ -298,7 +325,8 @@ certificado durante varios minutos.
 mkdir -p /opt/ventea && cd /opt/ventea
 
 # 2 · Copiar desde el repo: compose, Caddyfile y los scripts de operación
-#     (deploy/docker-compose.prod.yml, deploy/Caddyfile, deploy/deploy.sh, deploy/backup.sh)
+#     (deploy/docker-compose.prod.yml, deploy/Caddyfile, deploy/deploy.sh, deploy/backup.sh,
+#      deploy/check-open-payment-attempts.sh)
 
 # 3 · Configuración del cliente
 cp .env.production.example .env
@@ -326,8 +354,9 @@ emitido para un cliente valga en la instancia de otro.
 cd /opt/ventea && ./deploy.sh 0.2.0
 ```
 
-[`deploy.sh`](../deploy/deploy.sh) hace, en este orden: respaldo → fijar la versión en
-`.env` → `pull` → migrar → levantar → verificar `/api/health`.
+[`deploy.sh`](../deploy/deploy.sh) hace, en este orden: pre-chequeo de datos de solo lectura
+(`check-open-payment-attempts.sh`: aborta sin tocar nada si una migración va a fallar) →
+respaldo → fijar la versión en `.env` → `pull` → migrar → levantar → verificar `/api/health`.
 
 El orden no es decorativo. Migrar sin respaldo previo deja sin punto de retorno si la
 migración sale mal, y en ese momento la base ya cambió de forma.
@@ -340,6 +369,12 @@ versión sin que nadie lo haya pedido.
 compatible hacia atrás; si una migración borra una columna, volver a la imagen anterior
 no alcanza y hay que restaurar el respaldo. Por eso las migraciones destructivas se
 parten en dos versiones: primero dejar de usar la columna, después borrarla.
+
+**Si una migración falló**, Prisma la deja `failed` y ningún `migrate deploy` corre (`P3009`),
+tampoco el de la versión anterior: el rollback no levanta hasta marcarla revertida con
+`docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate
+../../node_modules/.bin/prisma migrate resolve --rolled-back <migración>` (ejemplo completo en
+«Intentos de cobro abiertos duplicados»).
 
 ## Respaldos
 

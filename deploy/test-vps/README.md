@@ -144,7 +144,7 @@ estén publicados en producción).
 
 ## Desplegar otra versión
 
-Orden obligatorio: **backup → build de las imágenes → `IMAGE_API`/`IMAGE_WEB=<tag>` en `.env` →
+Orden obligatorio: **pre-chequeo de datos (solo lectura) → backup → build de las imágenes → `IMAGE_API`/`IMAGE_WEB=<tag>` en `.env` →
 `docker compose up -d` (el servicio `migrate` corre `prisma migrate deploy` antes de levantar la
 API; las migraciones siembran los planes y dejan a los tenants existentes en Cadena anual `active`)
 → `./sync-routes.sh`**. El compose exige `IMAGE_WEB` (`${IMAGE_WEB:?…}`): sin ella o vacía,
@@ -162,7 +162,12 @@ docker build -f src/deploy/Dockerfile.web -t ventea-web:0.1.0-<commit> src
 sed -i 's/^IMAGE_API=.*/IMAGE_API=ventea-api:0.1.0-<commit>/' .env
 grep -q '^IMAGE_WEB=' .env   && sed -i 's/^IMAGE_WEB=.*/IMAGE_WEB=ventea-web:0.1.0-<commit>/' .env   || echo 'IMAGE_WEB=ventea-web:0.1.0-<commit>' >> .env
 cp src/deploy/test-vps/docker-compose.yml src/deploy/test-vps/*.sh .   # si cambiaron
+cp src/deploy/check-open-payment-attempts.sh .
 chmod +x *.sh
+# Solo lectura, ANTES de tocar nada: si lista suscripciones con más de un intento de cobro abierto,
+# NO seguir (la migración 20261010130000 fallaría y la API no levantaría, ni la versión anterior).
+# Cerrar los sobrantes con resolve-payment (orderId) y volver a correrlo. Ver docs/deployment.md.
+COMPOSE_FILE=docker-compose.yml ./check-open-payment-attempts.sh
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > backup-$(date +%F-%H%M).sql.gz
 # Medios de las marcas (TASK-016, volumen `media`). La primera vez el volumen no existe: se salta.
 docker compose exec -T api tar -C /data/media -czf - . > media-$(date +%F-%H%M).tar.gz 2>/dev/null || true
@@ -170,6 +175,8 @@ docker compose exec -T api tar -C /data/media -czf - . > media-$(date +%F-%H%M).
 grep -q '^PUSH_CREDENTIALS_KEY=' .env || echo "PUSH_CREDENTIALS_KEY=$(openssl rand -base64 32)" >> .env
 docker compose up -d && ./sync-routes.sh   # sync-routes INMEDIATAMENTE después (ver abajo)
 docker compose logs migrate | tail -5     # "All migrations have been successfully applied"
+# Si una migración falló (P3018/P3009): docker compose run --rm migrate ../../node_modules/.bin/prisma
+#   migrate resolve --rolled-back <migración> → IMAGE_API anterior + up -d → resolve-payment → redeploy
 curl -fsS https://api.ventea.tech/api/health   # REGIONS mal escrito = la API no arranca (todas las marcas)
 ./install-cron.sh                          # una vez (idempotente)
 curl https://api.ventea.tech/api/health

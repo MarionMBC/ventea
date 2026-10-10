@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { Logger, type INestApplication } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import {
@@ -370,6 +373,74 @@ describe('Cobro recurrente con FakeGateway (TASK-005)', () => {
       await attempt(`${target.tenant.id}-b`, 'failed');
       // Y por la API, con el abierto, el alta sigue siendo 409 (no 500).
       await asOwner(http().post('/api/billing/payment-method'), target).send(CARD_BODY).expect(409);
+    });
+
+    it('el pre-chequeo de deploy (check-open-payment-attempts.sh) lista los duplicados con orderId', async () => {
+      // La SQL vive en el script de deploy; se ejecuta tal cual sobre una base con duplicados
+      // (índice quitado DENTRO de la transacción, que se revierte al final).
+      // Los e2e corren con cwd = apps/api (npm -w); el script está en deploy/ de la raíz.
+      const script = readFileSync(
+        join(process.cwd(), '..', '..', 'deploy', 'check-open-payment-attempts.sh'),
+        'utf8',
+      );
+      const sql = /<<'SQL' \|\| true\r?\n([\s\S]*?)\r?\nSQL\r?\n/.exec(script)?.[1];
+      expect(sql).toBeTruthy();
+
+      const dup = await brand('precheck-dup');
+      const single = await brand('precheck-uno');
+      const ROLLBACK = new Error('rollback');
+      let rows: { slug: string; orderId: string; status: string }[] = [];
+      let clean: unknown[] = [];
+      await prisma
+        .$transaction(async (tx) => {
+          clean = await tx.$queryRawUnsafe(sql!);
+          await tx.$executeRawUnsafe('DROP INDEX "payment_attempts_one_open_per_subscription"');
+          const open = async (
+            target: Brand,
+            orderId: string,
+            status: 'pending' | 'unknown' | 'failed',
+          ) => {
+            const subscription = await tx.subscription.findUniqueOrThrow({
+              where: { tenantId: target.tenant.id },
+            });
+            await tx.paymentAttempt.create({
+              data: {
+                tenantId: target.tenant.id,
+                subscriptionId: subscription.id,
+                orderId,
+                kind: 'establish',
+                periodStart: subscription.currentPeriodStart,
+                periodEnd: subscription.currentPeriodEnd,
+                planId: subscription.planId,
+                interval: subscription.interval,
+                attempt: 1,
+                amountCents: 100,
+                currency: 'HNL',
+                status,
+              },
+            });
+          };
+          await open(dup, 'pre-dup-1', 'pending');
+          await open(dup, 'pre-dup-2', 'unknown');
+          await open(dup, 'pre-dup-3', 'failed');
+          await open(single, 'pre-uno-1', 'pending');
+          rows = await tx.$queryRawUnsafe(sql!);
+          throw ROLLBACK;
+        })
+        .catch((error: unknown) => {
+          if (error !== ROLLBACK) throw error;
+        });
+
+      expect(clean).toEqual([]);
+      expect(rows.map(({ slug, orderId, status }) => ({ slug, orderId, status }))).toEqual([
+        { slug: dup.tenant.slug, orderId: 'pre-dup-1', status: 'pending' },
+        { slug: dup.tenant.slug, orderId: 'pre-dup-2', status: 'unknown' },
+      ]);
+      // El rollback dejó el índice.
+      const index = await prisma.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM pg_indexes
+         WHERE indexname = 'payment_attempts_one_open_per_subscription'`;
+      expect(Number(index[0]!.n)).toBe(1);
     });
   });
 
