@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { MediaGc } from '@/modules/media/media-gc.service';
+
 import { LifecycleMailer } from './lifecycle-mailer.service';
 
 /** Primera vuelta un rato después de arrancar (no compite con el arranque ni las migraciones). */
@@ -15,7 +17,7 @@ const DEFAULT_INTERVAL_MINUTES = 60;
  * Cuánto espera el apagado a la vuelta en curso. Nest corre los `beforeApplicationShutdown` en
  * serie: cobro (35 s) + correo (30 s) + esto = 70 s, dentro del `stop_grace_period: 75s` de los
  * compose. Cortar no rompe nada: los correos se encolan en una transacción (se revierte y la
- * próxima vuelta los encola, `dedupeKey`).
+ * próxima vuelta los encola, `dedupeKey`) y el GC de medios para entre marcas.
  */
 export const LIFECYCLE_SHUTDOWN_WAIT_MS = 5_000;
 
@@ -25,6 +27,9 @@ export const LIFECYCLE_SHUTDOWN_WAIT_MS = 5_000;
  * correrlo seguido solo hace que el aviso de `past_due` llegue cerca de la hora en que entró.
  * Todas las réplicas lo programan; el advisory lock deja correr a una. Se apaga con
  * `MAIL_SCHEDULER_ENABLED=false` (tests).
+ *
+ * En la misma vuelta, después de los correos, corre el GC de medios huérfanos (`MediaGc`, con el
+ * lock de medios de cada marca). Un fallo de uno no frena al otro.
  */
 @Injectable()
 export class LifecycleScheduler implements OnApplicationBootstrap, BeforeApplicationShutdown {
@@ -36,6 +41,7 @@ export class LifecycleScheduler implements OnApplicationBootstrap, BeforeApplica
   constructor(
     private readonly config: ConfigService,
     private readonly mailer: LifecycleMailer,
+    private readonly mediaGc: MediaGc,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -84,6 +90,12 @@ export class LifecycleScheduler implements OnApplicationBootstrap, BeforeApplica
       }
     } catch (error) {
       this.logger.error(`Job de correos de ciclo de vida falló: ${errorText(error)}`);
+    }
+    if (this.stopping) return;
+    try {
+      await this.mediaGc.run(new Date(), () => this.stopping);
+    } catch (error) {
+      this.logger.error(`GC de medios huérfanos falló: ${errorText(error)}`);
     }
   }
 }

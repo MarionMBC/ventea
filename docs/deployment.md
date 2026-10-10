@@ -139,6 +139,10 @@ directorio con dueño `node`, así que un volumen nuevo ya nace escribible. Los 
 - **Proxy:** la subida es `multipart` hasta 5 MB y va directo a la API (Traefik / Caddy no limitan
   el cuerpo por defecto). Si se pone un proxy con límite (nginx: `client_max_body_size`), dejar
   al menos 6 MB en `/api/staff/media`.
+- **Archivos huérfanos:** si la transacción de una subida falla después de escribir, el archivo
+  queda sin registro. Cada hora (con los correos de ciclo de vida, `MAIL_SCHEDULER_ENABLED`) un
+  GC borra, por marca y con su lock de medios, los `<hash>.webp` / `.thumb.webp` sin registro y
+  los `.tmp` de escrituras cortadas con más de 1 h. No toca nada más del volumen.
 - **Verificación tras desplegar:** subir una imagen desde Mi marca o el menú de una marca de
   prueba → asignarla a un ítem → `GET /api/menu` la muestra con URL absoluta → abrirla (200,
   `image/webp`) → `GET /api/tenant` trae `logoUrl`/`iconUrl` absolutos.
@@ -180,7 +184,7 @@ Abre un período desde hoy (o desde el fin del vigente, si paga por adelantado) 
 `active`. No toca una cancelación agendada por el dueño. El servicio `api` de los compose
 lleva `stop_grace_period: 75s`: el apagado espera, en serie, la corrida de cobro en curso (hasta 35 s) y el envío de correo
 en curso (hasta 30 s; el despacho deja de tomar correos nuevos al empezar el apagado) y la vuelta horaria de
-correos de ciclo de vida (hasta 5 s). Con un cobro con tarjeta sin
+correos de ciclo de vida y GC de medios (hasta 5 s). Con un cobro con tarjeta sin
 confirmar responde `409`: primero `resolve-payment`.
 
 ### Alertas

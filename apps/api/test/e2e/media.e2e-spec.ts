@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { mkdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { INestApplication } from '@nestjs/common';
@@ -7,6 +7,8 @@ import type { PrismaClient } from '@prisma/client';
 import type { MediaList, MediaUploadResponse } from '@ventea/shared';
 import sharp from 'sharp';
 import request from 'supertest';
+
+import { MediaGc } from '@/modules/media/media-gc.service';
 
 import {
   createApp,
@@ -435,5 +437,105 @@ describe('Medios: cuota y rate limit (TASK-016)', () => {
     await upload(await pngWithExif(11, 11)).expect(201);
     const response = await upload(await pngWithExif(12, 12)).expect(429);
     expect(Number(response.headers['retry-after'])).toBeGreaterThan(0);
+  });
+});
+
+describe('Medios: GC de archivos huérfanos (TASK-025)', () => {
+  let app: INestApplication;
+  let prisma: PrismaClient;
+  let tenant: TestTenant;
+  let owner: string;
+  let dir: string;
+
+  const HOUR = 60 * 60_000;
+  const fakeHash = () => randomBytes(32).toString('hex');
+
+  /** Archivo en la carpeta de la marca con `mtime` de hace `ageMs`. */
+  async function place(name: string, ageMs: number): Promise<string> {
+    const file = join(dir, name);
+    await writeFile(file, randomBytes(64));
+    const at = new Date(Date.now() - ageMs);
+    await utimes(file, at, at);
+    return file;
+  }
+
+  beforeAll(async () => {
+    app = await createApp();
+    prisma = createRawPrisma();
+    tenant = await seedTenant(prisma, 'media-gc');
+    owner = (await loginStaff(app, tenant)).accessToken;
+    dir = join(process.env.MEDIA_DIR!, tenant.id);
+    await mkdir(dir, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  it('borra solo huérfanos de más de 1 h: los registrados, los recientes y lo ajeno quedan', async () => {
+    const uploaded = await request(app.getHttpServer())
+      .post('/api/staff/media')
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${owner}`)
+      .attach('file', await pngWithExif(41, 41), { filename: 'a.png', contentType: 'image/png' })
+      .expect(201);
+    const kept = /([0-9a-f]{64})\.webp$/.exec((uploaded.body as MediaUploadResponse).url)![1]!;
+    // Registrado y viejo: queda.
+    for (const name of [`${kept}.webp`, `${kept}.thumb.webp`]) {
+      const at = new Date(Date.now() - 3 * HOUR);
+      await utimes(join(dir, name), at, at);
+    }
+
+    const orphan = fakeHash();
+    const recent = fakeHash();
+    const gone = [
+      await place(`${orphan}.webp`, 2 * HOUR),
+      await place(`${orphan}.thumb.webp`, 2 * HOUR),
+      await place(`${fakeHash()}.webp.${randomUUID()}.tmp`, 2 * HOUR),
+    ];
+    const stay = [
+      join(dir, `${kept}.webp`),
+      join(dir, `${kept}.thumb.webp`),
+      // Una subida en curso: el registro todavía no está commiteado.
+      await place(`${recent}.webp`, 10 * 60_000),
+      // Lo que no tiene forma de medio no se toca.
+      await place('notas.txt', 5 * HOUR),
+    ];
+
+    const run = await app.get(MediaGc).run();
+    expect(run.removedFiles).toBeGreaterThanOrEqual(3);
+    for (const file of gone) await expect(stat(file)).rejects.toMatchObject({ code: 'ENOENT' });
+    for (const file of stay) await expect(stat(file)).resolves.toBeTruthy();
+
+    // La imagen registrada se sigue sirviendo.
+    await request(app.getHttpServer()).get(`/api/media/${tenant.id}/${kept}.webp`).expect(200);
+  });
+
+  it('con el lock de medios de la marca tomado (una subida en curso) la saltea', async () => {
+    const orphan = await place(`${fakeHash()}.webp`, 2 * HOUR);
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let locked!: () => void;
+    const lockTaken = new Promise<void>((resolve) => (locked = resolve));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`media:${tenant.id}`}))`;
+        locked();
+        await released;
+      },
+      { timeout: 30_000 },
+    );
+    await lockTaken;
+    try {
+      const run = await app.get(MediaGc).run();
+      expect(run.skipped).toBeGreaterThanOrEqual(1);
+      await expect(stat(orphan)).resolves.toBeTruthy();
+    } finally {
+      release();
+      await holder;
+    }
+    await app.get(MediaGc).run();
+    await expect(stat(orphan)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
