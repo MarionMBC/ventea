@@ -1,0 +1,29 @@
+# Ruta de Traefik de Carolina (instalación dedicada). Se publica a mano en
+# /etc/traefik/dynamic/carolina-prod.yml (644, root: via `docker run -v /etc/traefik/dynamic:/d alpine`).
+# Prioridades 200/150: ganan sobre la ruta vieja de ventea-test (100/10) mientras convivan,
+# así el cambio de stack no deja el host sin ruta. Mismo patrón /api → API, resto → web.
+http:
+  routers:
+    carolina-prod-api:
+      rule: 'Host(`carolina-hot-chicken.ventea.tech`) && (PathPrefix(`/api/`) || Path(`/api`))'
+      entryPoints: [websecure]
+      service: carolina-prod-api
+      priority: 200
+      tls:
+        certResolver: letsencrypt
+    carolina-prod-web:
+      rule: 'Host(`carolina-hot-chicken.ventea.tech`)'
+      entryPoints: [websecure]
+      service: carolina-prod-web
+      priority: 150
+      tls:
+        certResolver: letsencrypt
+  services:
+    carolina-prod-api:
+      loadBalancer:
+        servers:
+          - url: 'http://carolina-prod-api-1:3000'
+    carolina-prod-web:
+      loadBalancer:
+        servers:
+          - url: 'http://carolina-prod-web-1:80'

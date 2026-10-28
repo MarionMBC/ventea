@@ -72,6 +72,11 @@ SSLIP_HOST=ventea-test.37-60-228-46.sslip.io
 
 slugs=$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc \
   "select slug from tenants where \"isActive\" order by slug")
+# EXCLUDE_SLUGS (.env, separados por espacio): marcas que ya corren en su propia instalación
+# dedicada (p. ej. carolina-hot-chicken, TASK-027). Su ruta la publica deploy/carolina-prod, no esta.
+for ex in ${EXCLUDE_SLUGS:-}; do
+  slugs=$(printf '%s\n' "$slugs" | grep -vx -- "$ex" || true)
+done
 
 api_hosts="$SSLIP_HOST api.$TENANT_BASE_DOMAIN"
 app_host="app.$TENANT_BASE_DOMAIN"

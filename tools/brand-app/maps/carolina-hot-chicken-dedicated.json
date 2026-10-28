@@ -1,0 +1,13 @@
+{
+  "$comment": "Instalación dedicada de Carolina (TASK-027): fotos reales de los 4 platos. --dir = carpeta con products/ (carolina-4, classic-slider, wings, fire-mozz .png) y brand/logo-carolina-mark.png (logo de la app de Carolina). Uso: --map tools/brand-app/maps/carolina-hot-chicken-dedicated.json",
+  "items": {
+    "Carolina 4": "products/carolina-4.png",
+    "Carolina Classic Slider": "products/classic-slider.png",
+    "Wings": "products/wings.png",
+    "Carolina Fire Mozz": "products/fire-mozz.png"
+  },
+  "brand": {
+    "logo": "brand/logo-carolina-mark.png",
+    "icon": "brand/logo-carolina-mark.png"
+  }
+}
