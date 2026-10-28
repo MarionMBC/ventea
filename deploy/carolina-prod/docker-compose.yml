@@ -1,0 +1,62 @@
+# Carolina Hot Chicken - instalación DEDICADA (TASK-027, ADR 0006): TENANT_MODE=single,
+# base y JWT propios, sin conexión con la instancia multi-tenant (~/ventea-test).
+# Vive en la VPS compartida de VIAJU, así que no trae Caddy: el Traefik de la VPS termina TLS
+# (ruta en /etc/traefik/dynamic/carolina-prod.yml, ver README.md). Postgres sin puerto al host.
+name: carolina-prod
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  migrate:
+    image: ${IMAGE_API}
+    restart: 'no'
+    user: '0' # prisma migrate escribe en node_modules/@prisma/engines
+    working_dir: /app/apps/api
+    command: ['../../node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment: { DATABASE_URL: '${DATABASE_URL}' }
+    networks: [internal]
+    depends_on: { postgres: { condition: service_healthy } }
+  api:
+    image: ${IMAGE_API}
+    restart: unless-stopped
+    stop_grace_period: 75s
+    mem_limit: 768m # sharp pide RAM fuera del heap; en la VPS compartida, un abuso reinicia la API y no la VPS
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      TENANT_MODE: single
+      TENANT_SLUG: ${TENANT_SLUG}
+      PUBLIC_ORIGIN: https://${HOST}
+      BILLING_MODE: manual # dedicada: no hay cobro del SaaS
+      MEDIA_DIR: /data/media
+      PUSH_CREDENTIALS_KEY: ${PUSH_CREDENTIALS_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    volumes: [media:/data/media]
+    networks: [internal, dokploy-network]
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+  web:
+    image: ${IMAGE_WEB:?falta IMAGE_WEB en .env}
+    restart: unless-stopped
+    networks: [dokploy-network]
+networks:
+  internal:
+  dokploy-network: { external: true }
+volumes:
+  pgdata:
+  media: # fotos y logo de la marca: respaldarlo junto con la base

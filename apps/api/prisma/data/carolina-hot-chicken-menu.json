@@ -1,0 +1,199 @@
+{
+  "currency": "USD",
+  "rewardProgram": {
+    "isEnabled": true,
+    "pointsPerCurrencyUnit": 1,
+    "redemptionValueCents": 1,
+    "minPointsToRedeem": 100,
+    "signupBonusPoints": 50
+  },
+  "modifierGroups": [
+    {
+      "key": "heat-medium",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "heat-hot",
+      "name": "Heat level",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "Hot",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Mild",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Medium",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Reaper",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "wing-size",
+      "name": "Size",
+      "minSelect": 1,
+      "maxSelect": 1,
+      "options": [
+        {
+          "name": "6 wings",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "12 wings",
+          "priceDeltaCents": 800,
+          "isAvailable": true
+        },
+        {
+          "name": "24 wings",
+          "priceDeltaCents": 2000,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "wing-flavor",
+      "name": "Flavor",
+      "minSelect": 1,
+      "maxSelect": 3,
+      "options": [
+        {
+          "name": "Buffalo",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Garlic parmesan",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Korean BBQ",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        }
+      ]
+    },
+    {
+      "key": "extras",
+      "name": "Extras",
+      "minSelect": 0,
+      "maxSelect": 3,
+      "options": [
+        {
+          "name": "Extra pickles",
+          "priceDeltaCents": 0,
+          "isAvailable": true
+        },
+        {
+          "name": "Extra comeback sauce",
+          "priceDeltaCents": 75,
+          "isAvailable": true
+        },
+        {
+          "name": "Ranch dip",
+          "priceDeltaCents": 75,
+          "isAvailable": true
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "name": "Combos",
+      "isActive": true,
+      "items": [
+        {
+          "name": "Carolina 4",
+          "description": "Two Nashville hot chicken sliders on toasted buns with creamy slaw and pickles, a cone of crinkle-cut fries and house comeback sauce.",
+          "basePriceCents": 1490,
+          "compareAtPriceCents": null,
+          "tags": ["popular", "combo"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-medium", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Sandwiches",
+      "isActive": true,
+      "items": [
+        {
+          "name": "Carolina Classic Slider",
+          "description": "Hand-breaded Nashville hot chicken tender on a toasted bun with creamy slaw, pickles and comeback sauce.",
+          "basePriceCents": 790,
+          "compareAtPriceCents": null,
+          "tags": ["popular", "hot"],
+          "isAvailable": true,
+          "modifierGroups": ["heat-hot", "extras"]
+        }
+      ]
+    },
+    {
+      "name": "Wings",
+      "isActive": true,
+      "items": [
+        {
+          "name": "Wings",
+          "description": "Crispy fried wings tossed in your choice of flavors, served with a side of ranch.",
+          "basePriceCents": 990,
+          "compareAtPriceCents": null,
+          "tags": ["new"],
+          "isAvailable": true,
+          "modifierGroups": ["wing-size", "wing-flavor"]
+        }
+      ]
+    },
+    {
+      "name": "Starters",
+      "isActive": true,
+      "items": [
+        {
+          "name": "Carolina Fire Mozz",
+          "description": "Mozzarella sticks in a fiery Nashville-spiced crust, fried until golden and stretchy, with pickles on the side.",
+          "basePriceCents": 690,
+          "compareAtPriceCents": null,
+          "tags": ["hot"],
+          "isAvailable": true,
+          "modifierGroups": ["extras"]
+        }
+      ]
+    }
+  ]
+}
