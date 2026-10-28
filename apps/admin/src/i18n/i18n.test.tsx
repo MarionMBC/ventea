@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { en } from './en';
 import { es } from './es';
@@ -112,6 +112,18 @@ describe('language selection', () => {
     // A saved choice wins over the browser.
     window.localStorage.setItem(LANG_STORAGE_KEY, 'en');
     expect(initialLang('', ['es-HN'])).toBe('en');
+  });
+
+  it('a build with VITE_ADMIN_IGNORE_BROWSER_LANG starts in English whatever the browser says', () => {
+    vi.stubEnv('VITE_ADMIN_IGNORE_BROWSER_LANG', '1');
+    try {
+      expect(initialLang('', ['es-419'])).toBe('en');
+      // Picking Spanish (stored) still wins afterwards.
+      window.localStorage.setItem(LANG_STORAGE_KEY, 'es');
+      expect(initialLang('', ['en-US'])).toBe('es');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('defaults to English; ?lang=es wins and is remembered', () => {

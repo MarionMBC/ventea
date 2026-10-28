@@ -41,6 +41,20 @@ La base de pruebas (con el tenant y sus datos viejos) no se borra. Para volver: 
 borrar `/etc/traefik/dynamic/carolina-prod.yml` (Traefik recarga solo; el cron republica la ruta vieja en ≤ 1 min)
 y `docker compose -p carolina-prod stop`. No usar `down -v` hasta decidir descartar la base nueva.
 
+## Idioma: inglés fijo
+
+La imagen web de Carolina se construye con su archivo de marca (`lockLanguage: true`: la web y la app
+nativa ignoran el idioma del dispositivo) y con el panel ignorando el idioma del navegador (arranca en
+inglés; quien elige ES en el selector lo conserva):
+
+```bash
+docker build -f deploy/Dockerfile.web --build-arg BRAND_FILE=brands/brand.carolina.json   --build-arg ADMIN_IGNORE_BROWSER_LANG=1 -t ventea-web:0.1.0-<sha>-carolina .
+docker save ventea-web:0.1.0-<sha>-carolina | gzip | ssh <vps> 'gunzip | docker load'   # y IMAGE_WEB en .env
+```
+
+La app nativa sale de `npm run brand:app -- --tenant carolina-hot-chicken --config-from file --release`
+(`apps/mobile/brands/brand.carolina.json`: `apiUrl` = este host, firmada con el keystore de producción de Carolina).
+
 ## Actualizar
 
 `IMAGE_API` / `IMAGE_WEB` a la etiqueta nueva en `.env` → `docker compose up -d` (migra solo: el servicio

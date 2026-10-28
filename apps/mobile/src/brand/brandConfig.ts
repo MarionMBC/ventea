@@ -33,6 +33,8 @@ export interface BrandConfig {
   iconUrl: string | null;
   /** Used when the device language is not one the app speaks. */
   defaultLanguage: Language;
+  /** Ignore the device language: the app always speaks `defaultLanguage` (a brand sold in one language). */
+  lockLanguage?: boolean;
   /** ISO 4217 until `/api/tenant` answers. */
   currency: string;
   push: {
@@ -126,6 +128,7 @@ export const parseBrandConfig = (input: unknown): BrandConfig => {
     logoUrl: optionalUrl(input, 'logoUrl'),
     iconUrl: optionalUrl(input, 'iconUrl'),
     defaultLanguage: language as Language,
+    ...(input.lockLanguage === true ? { lockLanguage: true } : {}),
     currency: input.currency === undefined ? 'USD' : requireString(input, 'currency', CURRENCY),
     push: { enabled: push.enabled === true },
     ...(input.legacyStoragePrefix === undefined || input.legacyStoragePrefix === null

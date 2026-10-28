@@ -16,6 +16,20 @@ describe('language', () => {
     expect(resolveLanguage({ deviceLanguages: [], brandDefault: 'en' })).toBe('en');
   });
 
+  test('lockLanguage ignores the device language', () => {
+    expect(resolveLanguage({ deviceLanguages: ['es-HN'], brandDefault: 'en', lock: true })).toBe(
+      'en',
+    );
+    expect(
+      resolveLanguage({
+        override: 'es',
+        deviceLanguages: ['en-US'],
+        brandDefault: 'en',
+        lock: true,
+      }),
+    ).toBe('es');
+  });
+
   test('a valid ?lang= override wins, an invalid one is ignored', () => {
     expect(
       resolveLanguage({ override: 'ES', deviceLanguages: ['en-US'], brandDefault: 'en' }),
