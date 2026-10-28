@@ -13,6 +13,7 @@ setLanguage(
     override: import.meta.env.DEV ? new URLSearchParams(window.location.search).get('lang') : null,
     deviceLanguages: navigator.languages?.length ? navigator.languages : [navigator.language],
     brandDefault: BUILD_BRAND.defaultLanguage,
+    lock: BUILD_BRAND.lockLanguage,
   }),
 );
 

@@ -7,9 +7,10 @@
   "logoUrl": null,
   "iconUrl": null,
   "defaultLanguage": "en",
+  "lockLanguage": true,
   "currency": "USD",
   "push": { "enabled": false },
   "legacyStoragePrefix": "chc.",
   "version": "1.2.0",
-  "buildNumber": 5
+  "buildNumber": 6
 }

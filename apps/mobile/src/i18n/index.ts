@@ -12,7 +12,8 @@ export type { MessageKey } from './en';
  * library: the app speaks two languages and never switches mid-session.
  *
  * Language: `?lang=` (web preview only) → the first device language the app
- * speaks → the brand's default (`brand.config.json`).
+ * speaks → the brand's default (`brand.config.json`). A brand with `lockLanguage`
+ * skips the device step: it is sold in one language.
  */
 
 const dictionaries: Record<Language, Record<MessageKey, string>> = { en, es };
@@ -29,13 +30,16 @@ export const resolveLanguage = ({
   override,
   deviceLanguages,
   brandDefault,
+  lock = false,
 }: {
   override?: string | null;
   deviceLanguages: readonly string[];
   brandDefault: Language;
+  lock?: boolean;
 }): Language => {
   const requested = override?.trim().toLowerCase();
   if (isLanguage(requested)) return requested;
+  if (lock) return brandDefault;
   for (const tag of deviceLanguages) {
     const base = tag.toLowerCase().split('-')[0];
     if (isLanguage(base)) return base;

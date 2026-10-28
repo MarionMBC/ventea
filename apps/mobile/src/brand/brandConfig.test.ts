@@ -40,6 +40,13 @@ describe('brand config', () => {
     expect(carolina.bundleId).not.toBe(demo.bundleId);
   });
 
+  test('lockLanguage is off unless the brand sets it to true', () => {
+    expect(parseBrandConfig(valid).lockLanguage).toBeUndefined();
+    expect(parseBrandConfig({ ...valid, lockLanguage: 'yes' }).lockLanguage).toBeUndefined();
+    expect(parseBrandConfig({ ...valid, lockLanguage: true }).lockLanguage).toBe(true);
+    expect(parseBrandConfig(readJson('brands/brand.carolina.json')).lockLanguage).toBe(true);
+  });
+
   test('fills defaults and normalises the API origin', () => {
     const brand = parseBrandConfig(valid);
     expect(brand.apiUrl).toBe('https://api.ventea.tech');

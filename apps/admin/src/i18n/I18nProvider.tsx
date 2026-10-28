@@ -78,7 +78,8 @@ export function browserLang(
 
 /**
  * `?lang=es` wins (and is remembered), then the saved choice, then the browser's language
- * (first visit), then English.
+ * (first visit), then English. A dedicated install built with
+ * `VITE_ADMIN_IGNORE_BROWSER_LANG=1` skips the browser step: English until someone picks.
  */
 export function initialLang(
   search = typeof window === 'undefined' ? '' : window.location.search,
@@ -89,7 +90,10 @@ export function initialLang(
     storeLang(fromUrl);
     return fromUrl;
   }
-  return readStoredLang() ?? browserLang(languages) ?? DEFAULT_LANG;
+  const fromBrowser = import.meta.env.VITE_ADMIN_IGNORE_BROWSER_LANG
+    ? null
+    : browserLang(languages);
+  return readStoredLang() ?? fromBrowser ?? DEFAULT_LANG;
 }
 
 export function createI18n(lang: Lang, setLang: (lang: Lang) => void = () => {}): I18n {
