@@ -9,8 +9,8 @@
   "defaultLanguage": "en",
   "lockLanguage": true,
   "currency": "USD",
-  "push": { "enabled": false },
+  "push": { "enabled": true },
   "legacyStoragePrefix": "chc.",
   "version": "1.2.0",
-  "buildNumber": 7
+  "buildNumber": 8
 }
