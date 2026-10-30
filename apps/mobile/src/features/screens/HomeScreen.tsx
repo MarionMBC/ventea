@@ -78,7 +78,7 @@ export const HomeScreen = ({ onOpenCart, onOpenMenu, onSelectProduct }: HomeScre
         header={t('home.chooseLocation')}
         buttons={[
           ...choice.locations.map((item) => ({
-            text: item.name,
+            text: item.address ? `${item.name} · ${item.address}` : item.name,
             role: item.id === choice.current?.id ? 'selected' : undefined,
             handler: () => pickLocation(item.id),
           })),
