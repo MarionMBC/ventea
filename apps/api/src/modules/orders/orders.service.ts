@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -54,6 +55,8 @@ const ORDER_STATE_SELECT = {
   customerId: true,
   totalCents: true,
   pointsRedeemed: true,
+  placedAt: true,
+  createdAt: true,
 } as const;
 
 @Injectable()
@@ -250,6 +253,20 @@ export class OrdersService {
     if (!order) throw new NotFoundException('Pedido no encontrado');
     if (order.status !== 'confirmed') {
       throw new ConflictException('El pedido ya no se puede cancelar');
+    }
+    const settings = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { customerCanCancel: true, cancelWindowMinutes: true },
+    });
+    if (!settings?.customerCanCancel) {
+      throw new ForbiddenException('Esta marca no permite cancelar pedidos desde la app');
+    }
+    if (
+      settings.cancelWindowMinutes !== null &&
+      Date.now() - (order.placedAt ?? order.createdAt).getTime() >
+        settings.cancelWindowMinutes * 60_000
+    ) {
+      throw new ConflictException('Pasó el tiempo para cancelar este pedido');
     }
     await this.transition(tenantId, order, 'cancelled');
     return this.getOrThrow(tenantId, { id: order.id });

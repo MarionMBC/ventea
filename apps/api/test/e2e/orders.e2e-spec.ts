@@ -403,5 +403,50 @@ describe('Pedidos de cliente (AC4, AC5, AC7)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(409);
     });
+
+    it('cancelar respeta el interruptor de la marca y el tiempo de gracia', async () => {
+      const { accessToken } = await registerCustomer(app, tenant.slug);
+      const cancel = (id: string) =>
+        http()
+          .post(`/api/orders/${id}/cancel`)
+          .set('X-Tenant-Slug', tenant.slug)
+          .set('Authorization', `Bearer ${accessToken}`);
+      const setPolicy = (data: {
+        customerCanCancel?: boolean;
+        cancelWindowMinutes?: number | null;
+      }) => prisma.tenant.update({ where: { id: tenant.id }, data });
+
+      try {
+        // Apagado: 403 y el pedido sigue en pie.
+        const blocked = (await placeOrder(accessToken, { lines: [sandwichLine()] }).expect(201))
+          .body as { id: string };
+        await setPolicy({ customerCanCancel: false });
+        await cancel(blocked.id).expect(403);
+
+        // Encendido pero con el tiempo vencido: 409.
+        await setPolicy({ customerCanCancel: true, cancelWindowMinutes: 1 });
+        await prisma.order.update({
+          where: { id: blocked.id },
+          data: { placedAt: new Date(Date.now() - 5 * 60_000) },
+        });
+        await cancel(blocked.id).expect(409);
+
+        // Dentro del tiempo, o sin límite de tiempo: se cancela.
+        await setPolicy({ cancelWindowMinutes: 10 });
+        await prisma.order.update({ where: { id: blocked.id }, data: { placedAt: new Date() } });
+        await cancel(blocked.id).expect(200);
+
+        const open = (await placeOrder(accessToken, { lines: [sandwichLine()] }).expect(201))
+          .body as { id: string };
+        await setPolicy({ cancelWindowMinutes: null });
+        await prisma.order.update({
+          where: { id: open.id },
+          data: { placedAt: new Date(Date.now() - 600 * 60_000) },
+        });
+        await cancel(open.id).expect(200);
+      } finally {
+        await setPolicy({ customerCanCancel: true, cancelWindowMinutes: 5 });
+      }
+    });
   });
 });

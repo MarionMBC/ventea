@@ -15,6 +15,7 @@ export * from './contracts/push.js';
 export * from './contracts/reports.js';
 export * from './contracts/rewards.js';
 export * from './contracts/team.js';
+export * from './contracts/order-settings.js';
 export * from './contracts/rewards-admin.js';
 export * from './contracts/tenant.js';
 export * from './utils/contrast.js';

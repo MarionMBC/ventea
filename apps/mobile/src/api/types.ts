@@ -133,6 +133,8 @@ export interface Tenant {
     appDisplayName: string | null;
   };
   rewardProgram: RewardProgram;
+  /** Whether the customer can cancel an order from the app, and for how long. Older APIs omit it. */
+  orderCancellation?: { enabled: boolean; windowMinutes: number | null };
   /** Active catalog rewards (TASK-023); missing on older APIs, empty with the programme off. */
   rewards?: RewardCatalogEntry[];
 }

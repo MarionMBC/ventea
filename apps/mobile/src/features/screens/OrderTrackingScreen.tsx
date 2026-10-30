@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
+import { IonAlert, useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
 import { cancelOrder, getOrder } from '../../api/endpoints';
 import { CartItemCard } from '../../components/cards/CartItemCard';
 import { InlineAlert } from '../../components/feedback/InlineAlert';
@@ -14,6 +14,7 @@ import { StickyActionArea } from '../../components/navigation/StickyActionArea';
 import { useToast } from '../../components/feedback/toastContext';
 import { t } from '../../i18n';
 import { useAuth } from '../auth/authContext';
+import { canCancelNow, useCancellationPolicy, useClock } from '../orders/cancellation';
 import { isTerminalOrder, mapOrder } from '../orders/mapOrder';
 import { useMenu } from '../menu/useMenu';
 import { errorMessage, useResource } from '../useResource';
@@ -47,6 +48,8 @@ export const OrderTrackingScreen = ({
   const { showToast } = useToast();
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | undefined>();
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const cancellation = useCancellationPolicy();
   const [finished, setFinished] = useState(false);
   /* Ionic keeps this page mounted under other tabs: polling stops while it is
      out of view and catches up as soon as it is shown again. */
@@ -76,6 +79,8 @@ export const OrderTrackingScreen = ({
 
   const { findProduct } = useMenu();
   const order = resource.data ? mapOrder(resource.data, findProduct) : undefined;
+  /* Ticks only while a time limit can still run out, so the button disappears by itself. */
+  const clock = useClock(Boolean(order?.cancellable && cancellation?.windowMinutes != null));
   const header = (
     <BackHeader
       title={order ? t('order.reference', { code: order.reference }) : t('order.yourOrder')}
@@ -127,6 +132,8 @@ export const OrderTrackingScreen = ({
     );
   }
 
+  const canCancel = canCancelNow(order, cancellation, clock);
+
   const cancel = async () => {
     setCancelling(true);
     setCancelError(undefined);
@@ -136,6 +143,8 @@ export const OrderTrackingScreen = ({
       resource.reload();
     } catch (error) {
       setCancelError(errorMessage(error));
+      /* The API said no (time over, already in the kitchen): show the state as it is now. */
+      resource.reload();
     } finally {
       setCancelling(false);
     }
@@ -146,7 +155,7 @@ export const OrderTrackingScreen = ({
       header={header}
       onRefresh={resource.reload}
       footer={
-        order.cancellable ? (
+        canCancel ? (
           <StickyActionArea>
             <Button
               variant="danger"
@@ -154,7 +163,7 @@ export const OrderTrackingScreen = ({
               block
               loading={cancelling}
               loadingLabel={t('order.cancelling')}
-              onClick={cancel}
+              onClick={() => setConfirmingCancel(true)}
             >
               {t('order.cancel')}
             </Button>
@@ -162,6 +171,20 @@ export const OrderTrackingScreen = ({
         ) : undefined
       }
     >
+      <IonAlert
+        isOpen={confirmingCancel}
+        header={t('order.cancelConfirmTitle', { code: order.reference })}
+        message={
+          order.pointsRedeemed
+            ? t('order.cancelConfirmPoints', { count: order.pointsRedeemed })
+            : t('order.cancelConfirmMessage')
+        }
+        buttons={[
+          { text: t('order.cancelConfirmNo'), role: 'cancel' },
+          { text: t('order.cancelConfirmYes'), role: 'destructive', handler: () => void cancel() },
+        ]}
+        onDidDismiss={() => setConfirmingCancel(false)}
+      />
       <div className="vt-screen__inner">
         <div className="vt-row-between">
           <div className="vt-stack-1">

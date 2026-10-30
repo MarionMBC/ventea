@@ -47,6 +47,11 @@ model Tenant {
   /// Región donde vive la marca. La asigna la plataforma al registrarla (RegionService).
   region          String           @default("hn-1")
   createdVia      TenantCreatedVia @default(script)
+  /// Cancelación del pedido por el propio cliente desde la app. `customerCanCancel = false`
+  /// la apaga; `cancelWindowMinutes` es el tiempo de gracia desde que se hizo el pedido
+  /// (null = sin límite de tiempo, solo mientras el pedido siga «nuevo»).
+  customerCanCancel   Boolean @default(true)
+  cancelWindowMinutes Int?    @default(5)
   /// Versión de términos y privacidad que aceptó el dueño al registrarse (TASK-007,
   /// `TERMS_VERSIONS` de @ventea/shared) y cuándo. Null en marcas creadas por script.
   termsVersion    String?

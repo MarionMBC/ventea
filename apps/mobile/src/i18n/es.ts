@@ -150,6 +150,12 @@ export const es: Record<MessageKey, string> = {
   'order.cancel': 'Cancelar pedido',
   'order.cancelling': 'Cancelando',
   'order.cancelError': 'No pudimos cancelar el pedido',
+  'order.cancelConfirmTitle': '¿Cancelar el pedido {code}?',
+  'order.cancelConfirmMessage': 'Esta acción no se puede deshacer.',
+  'order.cancelConfirmPoints':
+    'Esta acción no se puede deshacer. Se te devuelven {count} puntos que usaste.',
+  'order.cancelConfirmNo': 'No, volver',
+  'order.cancelConfirmYes': 'Sí, cancelar',
   'order.pickupOrder': 'Pedido para retiro',
   'order.staleStatus': 'Mostrando el último estado conocido',
   'order.readyTitle': 'Tu pedido está listo',

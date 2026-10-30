@@ -33,6 +33,17 @@ export const teamLocationsEn = {
   'locations.usageLabel': 'Active locations',
   'locations.add': 'New location',
   'locations.readOnly': 'Only the owner and managers can change locations.',
+  'orderSettings.title': 'Order cancellation',
+  'orderSettings.enabledAria': 'Let customers cancel their order from the app',
+  'orderSettings.hint':
+    'Customers can cancel from the app while the order is still new, within the time below. Your team can always cancel from the panel.',
+  'orderSettings.offHint': 'Off: the Cancel button does not show in the app.',
+  'orderSettings.window': 'Time to cancel (minutes)',
+  'orderSettings.windowHint':
+    'Counted from when the order is placed. After that the Cancel button disappears. Leave empty for no time limit.',
+  'orderSettings.windowError':
+    'Enter a whole number of minutes from 1 to {max}, or leave it empty.',
+  'orderSettings.saved': 'Order cancellation saved.',
   'locations.loading': 'Loading locations…',
   'locations.errorTitle': 'We couldn’t load your locations',
   'locations.emptyTitle': 'No locations yet',
@@ -195,6 +206,16 @@ export const teamLocationsEs: TeamLocationsMessages = {
   'locations.usageLabel': 'Sucursales activas',
   'locations.add': 'Nueva sucursal',
   'locations.readOnly': 'Solo el dueño y los gerentes pueden cambiar las sucursales.',
+  'orderSettings.title': 'Cancelación de pedidos',
+  'orderSettings.enabledAria': 'Permitir que el cliente cancele su pedido desde la app',
+  'orderSettings.hint':
+    'El cliente puede cancelar desde la app mientras el pedido siga nuevo y dentro del tiempo de abajo. Su equipo siempre puede cancelar desde el panel.',
+  'orderSettings.offHint': 'Apagado: el botón Cancelar no aparece en la app.',
+  'orderSettings.window': 'Tiempo para cancelar (minutos)',
+  'orderSettings.windowHint':
+    'Se cuenta desde que se hace el pedido. Pasado ese tiempo el botón Cancelar desaparece. Déjelo vacío para no poner límite.',
+  'orderSettings.windowError': 'Escriba un número entero de minutos de 1 a {max}, o déjelo vacío.',
+  'orderSettings.saved': 'Cancelación de pedidos guardada.',
   'locations.loading': 'Cargando sucursales…',
   'locations.errorTitle': 'No pudimos cargar tus sucursales',
   'locations.emptyTitle': 'Todavía no hay sucursales',

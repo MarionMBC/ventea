@@ -162,6 +162,12 @@ export const en = {
   'order.cancel': 'Cancel order',
   'order.cancelling': 'Cancelling',
   'order.cancelError': 'We could not cancel the order',
+  'order.cancelConfirmTitle': 'Cancel order {code}?',
+  'order.cancelConfirmMessage': 'This cannot be undone.',
+  'order.cancelConfirmPoints':
+    'This cannot be undone. {count} points you used will be returned to your account.',
+  'order.cancelConfirmNo': 'No, go back',
+  'order.cancelConfirmYes': 'Yes, cancel',
   'order.pickupOrder': 'Pickup order',
   'order.staleStatus': 'Showing the last known status',
   'order.readyTitle': 'Your order is ready',

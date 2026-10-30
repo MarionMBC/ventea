@@ -18,6 +18,7 @@ import { PlanUsage, usageFull } from '@/ui/PlanUsage';
 
 import { useStaffLocations } from './api';
 import { hoursGroups } from './hours';
+import { OrderSettingsCard } from './OrderSettingsCard';
 import { LocationDrawer } from './LocationDrawer';
 
 function hoursText(location: StaffLocation, t: I18n['t']): string {
@@ -131,6 +132,7 @@ export function LocationsPage() {
           </p>
         )}
       {!canEdit && <p className="muted">{t('locations.readOnly')}</p>}
+      {session?.staff.role === 'owner' && <OrderSettingsCard />}
 
       {locations.length === 0 ? (
         <div className="state state--empty">

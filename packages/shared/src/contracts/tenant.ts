@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { orderCancellationSchema } from './order-settings.js';
 import { rewardProgramSchema } from './rewards.js';
 import { publicRewardSchema } from './rewards-admin.js';
 
@@ -19,6 +20,11 @@ export const publicTenantSchema = z.object({
     appDisplayName: z.string().nullable(),
   }),
   rewardProgram: rewardProgramSchema,
+  /**
+   * Si el cliente puede cancelar su pedido desde la app y en cuánto tiempo. Opcional: una API
+   * anterior no lo manda (la app no ofrece cancelar).
+   */
+  orderCancellation: orderCancellationSchema.optional(),
   /**
    * Recompensas activas del catálogo (TASK-023), en orden. Opcional: una API anterior no lo
    * manda, y con el programa apagado viene vacío.

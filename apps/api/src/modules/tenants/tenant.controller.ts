@@ -46,6 +46,10 @@ export class TenantController {
         appDisplayName: branding?.appDisplayName ?? tenant.name,
       },
       rewardProgram: program,
+      orderCancellation: {
+        enabled: tenant.customerCanCancel,
+        windowMinutes: tenant.cancelWindowMinutes,
+      },
       // Catálogo de recompensas (TASK-023): lo que la app muestra para canjear en el local.
       rewards: await this.rewards.publicCatalog(tenant.id, program.isEnabled),
     };
