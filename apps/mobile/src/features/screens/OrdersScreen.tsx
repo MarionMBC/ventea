@@ -10,10 +10,14 @@ import { BackHeader } from '../../components/navigation/AppHeader';
 import { t } from '../../i18n';
 import { useAuth } from '../auth/authContext';
 import { isActiveOrder, mapOrder } from '../orders/mapOrder';
+import { useMenu } from '../menu/useMenu';
 import { useResource } from '../useResource';
 import { ScreenShell } from './ScreenShell';
 import { RetryState, SignInState } from './ScreenStates';
 import './screens.css';
+
+/** Panel changes (the kitchen moves an order) reach this list without the guest doing anything. */
+export const ORDERS_POLL_MS = 15_000;
 
 type OrdersFilter = 'active' | 'history';
 
@@ -40,15 +44,23 @@ export const OrdersScreen = ({
 }: OrdersScreenProps) => {
   const { isAuthenticated } = useAuth();
   const [filter, setFilter] = useState<OrdersFilter>('active');
-  const orders = useResource((signal) => listOrders(signal), [], { enabled: isAuthenticated });
+  const orders = useResource((signal) => listOrders(signal), [], {
+    enabled: isAuthenticated,
+    pollMs: ORDERS_POLL_MS,
+    refreshOnShow: true,
+  });
   useIonViewWillEnter(() => orders.reload());
+  const { findProduct } = useMenu();
 
   const visible = (orders.data ?? [])
     .filter((order) => (filter === 'active' ? isActiveOrder(order) : !isActiveOrder(order)))
-    .map(mapOrder);
+    .map((order) => mapOrder(order, findProduct));
 
   return (
-    <ScreenShell header={<BackHeader title={t('orders.title')} onBack={onBack} flush={embedded} />}>
+    <ScreenShell
+      header={<BackHeader title={t('orders.title')} onBack={onBack} flush={embedded} />}
+      onRefresh={isAuthenticated ? orders.reload : undefined}
+    >
       <div className="vt-screen__inner">
         {!isAuthenticated ? (
           <SignInState description={t('orders.signIn')} onSignIn={onSignIn} />

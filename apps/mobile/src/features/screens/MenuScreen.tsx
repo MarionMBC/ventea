@@ -9,7 +9,7 @@ import { CategoryTabs } from '../../components/navigation/CategoryTabs';
 import { SearchHeader } from '../../components/navigation/AppHeader';
 import { t } from '../../i18n';
 import { useAppState } from '../appStateContext';
-import { useMenu } from '../menu/useMenu';
+import { refreshMenu, useMenu } from '../menu/useMenu';
 import { ScreenShell } from './ScreenShell';
 import { RetryState } from './ScreenStates';
 import './screens.css';
@@ -58,6 +58,7 @@ export const MenuScreen = ({
 
   return (
     <ScreenShell
+      onRefresh={refreshMenu}
       header={
         <SearchHeader
           flush={embedded}

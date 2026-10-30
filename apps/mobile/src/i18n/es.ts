@@ -16,6 +16,8 @@ export const es: Record<MessageKey, string> = {
   'common.close': 'Cerrar',
   'common.edit': 'Editar',
   'common.loading': 'Cargando',
+  'common.pullToRefresh': 'Desliza hacia abajo para actualizar',
+  'common.refreshing': 'Actualizando',
   'common.seeAll': 'Ver todo',
   'common.seeMenu': 'Ver el menú',
   'common.tryAgain': 'Reintentar',

@@ -161,3 +161,35 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* Pull-down-to-reload indicator (ScreenShell onRefresh). */
+.vt-pull {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vt-pull__spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid var(--vt-border-subtle, rgba(0, 0, 0, 0.15));
+  border-top-color: var(--vt-brand-primary, currentColor);
+}
+
+.vt-pull__spinner.is-spinning {
+  animation: vt-pull-spin 0.8s linear infinite;
+}
+
+@keyframes vt-pull-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vt-pull__spinner.is-spinning {
+    animation-duration: 2s;
+  }
+}

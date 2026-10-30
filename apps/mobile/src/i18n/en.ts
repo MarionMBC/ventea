@@ -20,6 +20,8 @@ export const en = {
   'common.close': 'Close',
   'common.edit': 'Edit',
   'common.loading': 'Loading',
+  'common.pullToRefresh': 'Pull down to refresh',
+  'common.refreshing': 'Refreshing',
   'common.seeAll': 'See all',
   'common.seeMenu': 'See the menu',
   'common.tryAgain': 'Try again',

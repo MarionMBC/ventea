@@ -29,7 +29,8 @@ interface Result<T> {
  * menu, which has its own. `enabled: false` skips the request (a screen shown
  * signed out), and `pollMs` reloads in the background — the tracking screen
  * uses it, and turns it off once the order is final or the page is not in
- * view. Ticks are skipped while the document is hidden.
+ * view. Ticks are skipped while the document is hidden. `refreshOnShow` also reloads
+ * the moment the app comes back to the foreground, so news does not wait for the next tick.
  *
  * State only changes in callbacks (a response, a retry, a tick), never
  * synchronously inside an effect; `loading` is derived. `deps` must be
@@ -38,7 +39,11 @@ interface Result<T> {
 export const useResource = <T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: readonly unknown[],
-  { enabled = true, pollMs }: { enabled?: boolean; pollMs?: number } = {},
+  {
+    enabled = true,
+    pollMs,
+    refreshOnShow = false,
+  }: { enabled?: boolean; pollMs?: number; refreshOnShow?: boolean } = {},
 ): Resource<T> => {
   const depsKey = JSON.stringify(deps);
   const [result, setResult] = useState<Result<T>>({ key: depsKey });
@@ -79,6 +84,15 @@ export const useResource = <T>(
     }, pollMs);
     return () => window.clearInterval(timer);
   }, [enabled, pollMs]);
+
+  useEffect(() => {
+    if (!enabled || !refreshOnShow) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setAttempt((count) => count + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [enabled, refreshOnShow]);
 
   const reload = useCallback(() => {
     setResult((current) => ({ ...current, error: undefined }));

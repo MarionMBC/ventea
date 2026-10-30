@@ -32,6 +32,10 @@ const fetchMenu = (): Promise<MenuViewModel> => {
   return inflight;
 };
 
+/** The menu once, without subscribing a screen: the cached one, or the next fetch. */
+export const loadMenu = (): Promise<MenuViewModel> =>
+  cached ? Promise.resolve(cached) : fetchMenu();
+
 /** Test hook: forget the cached menu. */
 export const resetMenuCache = () => {
   cached = undefined;
@@ -47,6 +51,36 @@ export const invalidateMenu = () => {
   inflight = undefined;
   fetchMenu().catch(() => undefined);
 };
+
+/** Pull-to-refresh: fetch the menu again for every screen; resolves when it arrives (or fails). */
+export const refreshMenu = (): Promise<void> => {
+  inflight = undefined;
+  return fetchMenu().then(
+    () => undefined,
+    () => undefined,
+  );
+};
+
+/** How often a mounted menu checks the API for panel changes (prices, hidden dishes). */
+export const MENU_POLL_MS = 60_000;
+let pollTimer: number | undefined;
+
+const startMenuPolling = () => {
+  const tick = () => {
+    if (document.visibilityState !== 'hidden') invalidateMenu();
+  };
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') invalidateMenu();
+  };
+  pollTimer = window.setInterval(tick, MENU_POLL_MS);
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    window.clearInterval(pollTimer);
+    pollTimer = undefined;
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+};
+let stopMenuPolling: (() => void) | undefined;
 
 export interface MenuState {
   menu: MenuViewModel | undefined;
@@ -64,6 +98,7 @@ export const useMenu = (): MenuState => {
   useEffect(() => {
     const listener = () => setMenu(cached);
     listeners.add(listener);
+    if (listeners.size === 1) stopMenuPolling = startMenuPolling();
     if (!cached) {
       fetchMenu().then(
         (result) => setMenu(result),
@@ -72,6 +107,10 @@ export const useMenu = (): MenuState => {
     }
     return () => {
       listeners.delete(listener);
+      if (listeners.size === 0) {
+        stopMenuPolling?.();
+        stopMenuPolling = undefined;
+      }
     };
   }, [attempt]);
 

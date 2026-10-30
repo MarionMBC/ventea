@@ -426,3 +426,15 @@
 .vt-card__badge-slot {
   align-self: flex-start;
 }
+
+.vt-order__thumbs {
+  display: flex;
+  gap: var(--vt-space-2, 8px);
+}
+
+.vt-order__thumb {
+  width: 56px;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--vt-radius-md, 12px);
+}

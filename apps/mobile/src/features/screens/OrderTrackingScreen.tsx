@@ -15,6 +15,7 @@ import { useToast } from '../../components/feedback/toastContext';
 import { t } from '../../i18n';
 import { useAuth } from '../auth/authContext';
 import { isTerminalOrder, mapOrder } from '../orders/mapOrder';
+import { useMenu } from '../menu/useMenu';
 import { errorMessage, useResource } from '../useResource';
 import { ScreenShell } from './ScreenShell';
 import { RetryState, SignInState } from './ScreenStates';
@@ -62,6 +63,7 @@ export const OrderTrackingScreen = ({
     {
       enabled: isAuthenticated && Boolean(orderId),
       pollMs: finished || !inView ? undefined : TRACKING_POLL_MS,
+      refreshOnShow: !finished,
     },
   );
 
@@ -72,7 +74,8 @@ export const OrderTrackingScreen = ({
     entered.current = true;
   });
 
-  const order = resource.data ? mapOrder(resource.data) : undefined;
+  const { findProduct } = useMenu();
+  const order = resource.data ? mapOrder(resource.data, findProduct) : undefined;
   const header = (
     <BackHeader
       title={order ? t('order.reference', { code: order.reference }) : t('order.yourOrder')}
@@ -141,6 +144,7 @@ export const OrderTrackingScreen = ({
   return (
     <ScreenShell
       header={header}
+      onRefresh={resource.reload}
       footer={
         order.cancellable ? (
           <StickyActionArea>

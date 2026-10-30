@@ -2,6 +2,7 @@ import type { Order } from '../../types/order';
 import { OrderStatusBadge } from '../feedback/OrderStatusBadge';
 import { Button } from '../ui/Button';
 import { Price } from '../ui/Price';
+import { ProductImage } from '../ui/ProductImage';
 import { formatDate, t } from '../../i18n';
 import './cards.css';
 
@@ -30,6 +31,15 @@ export const OrderCard = ({ order, onDetails, onReorder }: OrderCardProps) => (
       </div>
       <OrderStatusBadge status={order.status} />
     </div>
+    {order.lines.length > 0 && (
+      <div className="vt-order__thumbs" aria-hidden="true">
+        {order.lines.slice(0, 4).map((line) => (
+          <div key={line.id} className="vt-order__thumb">
+            <ProductImage src={line.product.imageUrl} alt="" ratio="1/1" />
+          </div>
+        ))}
+      </div>
+    )}
     <p className="vt-order__summary">{order.summary}</p>
     <hr className="vt-divider" />
     <div className="vt-row-between">

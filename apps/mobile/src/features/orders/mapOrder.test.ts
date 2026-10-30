@@ -111,4 +111,13 @@ describe('mapOrder', () => {
     expect(mapOrder(order()).cancellable).toBe(true);
     expect(mapOrder(order({ status: 'preparing' })).cancellable).toBe(false);
   });
+
+  test('lines take their photo from the current menu; a dish that left it keeps none', () => {
+    const find = (id?: string) =>
+      id === 'item-1' ? ({ id, imageUrl: 'https://img/burger.webp' } as never) : undefined;
+    const [burger, lemonade] = mapOrder(order(), find).lines;
+    expect(burger?.product.imageUrl).toBe('https://img/burger.webp');
+    expect(lemonade?.product.imageUrl).toBeUndefined();
+    expect(mapOrder(order()).lines[0]?.product.imageUrl).toBeUndefined();
+  });
 });

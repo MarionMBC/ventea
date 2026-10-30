@@ -9,7 +9,7 @@ import { CartButton } from '../../components/navigation/CartButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { t } from '../../i18n';
 import { useAppState } from '../appStateContext';
-import { useMenu } from '../menu/useMenu';
+import { refreshMenu, useMenu } from '../menu/useMenu';
 import { useResource } from '../useResource';
 import { ScreenShell } from './ScreenShell';
 import { RetryState } from './ScreenStates';
@@ -52,6 +52,7 @@ export const HomeScreen = ({ onOpenCart, onOpenMenu, onSelectProduct }: HomeScre
 
   return (
     <ScreenShell
+      onRefresh={refreshMenu}
       header={
         <AppHeader
           placeValue={locations.data?.[0]?.name ?? brand.appName}
