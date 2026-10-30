@@ -34,6 +34,10 @@ export const es: Record<MessageKey, string> = {
   'state.errorDescription': 'No pudimos cargar esta sección. Inténtalo de nuevo.',
 
   'home.pickupAt': 'Retiro en',
+  'home.chooseLocation': 'Elige una sucursal',
+  'home.changeLocationTitle': '¿Cambiar de sucursal?',
+  'home.changeLocationMessage': 'Se vaciará tu carrito: cada sucursal tiene su propio menú.',
+  'home.changeLocationConfirm': 'Cambiar',
   'home.categories': 'Categorías',
   'home.popular': 'Lo más pedido',
   'home.deals': 'Ofertas',

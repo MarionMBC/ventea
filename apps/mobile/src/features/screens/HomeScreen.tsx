@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getLocations } from '../../api/endpoints';
+import { IonActionSheet, IonAlert } from '@ionic/react';
 import { useBrand } from '../../brand/useBrand';
 import { CategoryCard } from '../../components/cards/CategoryCard';
 import { ProductCard, ProductCardSkeleton } from '../../components/cards/ProductCard';
@@ -11,7 +11,7 @@ import { t } from '../../i18n';
 import { useAppState } from '../appStateContext';
 import { useAddToCart } from '../useAddToCart';
 import { refreshMenu, useMenu } from '../menu/useMenu';
-import { useResource } from '../useResource';
+import { useLocationChoice } from '../locationChoice';
 import { ScreenShell } from './ScreenShell';
 import { RetryState } from './ScreenStates';
 import './screens.css';
@@ -31,10 +31,19 @@ export interface HomeScreenProps {
  */
 export const HomeScreen = ({ onOpenCart, onOpenMenu, onSelectProduct }: HomeScreenProps) => {
   const brand = useBrand();
-  const { cartCount, favourites, toggleFavourite } = useAppState();
+  const { cartCount, favourites, toggleFavourite, clearCart } = useAppState();
   const addLine = useAddToCart();
   const { menu, loading, error, retry } = useMenu();
-  const locations = useResource((signal) => getLocations(signal), []);
+  const choice = useLocationChoice();
+  const [picking, setPicking] = useState(false);
+  const [switchTo, setSwitchTo] = useState<string | undefined>(undefined);
+  const canChoose = choice.locations.length > 1;
+  /* Each branch has its own menu: with items in the cart, ask before emptying it. */
+  const pickLocation = (id: string) => {
+    if (id === choice.current?.id) return;
+    if (cartCount > 0) setSwitchTo(id);
+    else choice.select(id);
+  };
   const [query, setQuery] = useState('');
 
   const products = useMemo(() => {
@@ -57,11 +66,42 @@ export const HomeScreen = ({ onOpenCart, onOpenMenu, onSelectProduct }: HomeScre
       onRefresh={refreshMenu}
       header={
         <AppHeader
-          placeValue={locations.data?.[0]?.name ?? brand.appName}
+          placeValue={choice.current?.name ?? brand.appName}
+          onPlaceClick={canChoose ? () => setPicking(true) : undefined}
+          placeActionLabel={t('home.chooseLocation')}
           actions={<CartButton count={cartCount} onClick={onOpenCart} />}
         />
       }
     >
+      <IonActionSheet
+        isOpen={picking}
+        header={t('home.chooseLocation')}
+        buttons={[
+          ...choice.locations.map((item) => ({
+            text: item.name,
+            role: item.id === choice.current?.id ? 'selected' : undefined,
+            handler: () => pickLocation(item.id),
+          })),
+          { text: t('common.cancel'), role: 'cancel' },
+        ]}
+        onDidDismiss={() => setPicking(false)}
+      />
+      <IonAlert
+        isOpen={switchTo !== undefined}
+        header={t('home.changeLocationTitle')}
+        message={t('home.changeLocationMessage')}
+        buttons={[
+          { text: t('common.cancel'), role: 'cancel' },
+          {
+            text: t('home.changeLocationConfirm'),
+            handler: () => {
+              clearCart();
+              if (switchTo) choice.select(switchTo);
+            },
+          },
+        ]}
+        onDidDismiss={() => setSwitchTo(undefined)}
+      />
       <div className="vt-screen__inner">
         <SearchField
           value={query}

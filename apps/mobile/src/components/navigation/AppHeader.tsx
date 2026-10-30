@@ -1,5 +1,7 @@
 import { t } from '../../i18n';
 import type { ReactNode } from 'react';
+import { IonIcon } from '@ionic/react';
+import { icons } from '../ui/icons';
 import { BrandLogo } from '../ui/BrandLogo';
 import { IconButton } from '../ui/IconButton';
 import './navigation.css';
@@ -9,6 +11,10 @@ export interface AppHeaderProps {
   placeLabel?: string;
   /** Where the order is picked up; the brand name until locations load. */
   placeValue: string;
+  /** When set the place is a button (several branches to pick from). */
+  onPlaceClick?: () => void;
+  /** Accessible name of that button. */
+  placeActionLabel?: string;
   /** Right slot; normally the CartButton. */
   actions?: ReactNode;
   /** Drop the safe-area top padding when rendered inside a device frame. */
@@ -23,6 +29,8 @@ export interface AppHeaderProps {
 export const AppHeader = ({
   placeLabel = t('home.pickupAt'),
   placeValue,
+  onPlaceClick,
+  placeActionLabel,
   actions,
   flush = false,
 }: AppHeaderProps) => (
@@ -30,9 +38,21 @@ export const AppHeader = ({
     <BrandLogo size={36} />
     <div className="vt-header__place">
       <span className="vt-header__place-label">{placeLabel}</span>
-      <span className="vt-header__place-value">
-        <span>{placeValue}</span>
-      </span>
+      {onPlaceClick ? (
+        <button
+          type="button"
+          className="vt-header__place-value"
+          aria-label={`${placeLabel} ${placeValue}. ${placeActionLabel ?? ''}`.trim()}
+          onClick={onPlaceClick}
+        >
+          <span>{placeValue}</span>
+          <IonIcon aria-hidden="true" icon={icons.chevronDown} />
+        </button>
+      ) : (
+        <span className="vt-header__place-value">
+          <span>{placeValue}</span>
+        </span>
+      )}
     </div>
     <div className="vt-spacer" />
     {actions}

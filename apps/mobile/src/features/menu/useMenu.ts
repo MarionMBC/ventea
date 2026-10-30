@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getMenu } from '../../api/endpoints';
+import { ApiError } from '../../api/client';
+import { getSelectedLocationId, selectLocation, subscribeLocation } from '../locationChoice';
 import type { Product } from '../../types/product';
 import { errorMessage } from '../useResource';
 import type { MenuViewModel } from './mapMenu';
@@ -19,7 +21,21 @@ const listeners = new Set<() => void>();
 
 const fetchMenu = (): Promise<MenuViewModel> => {
   if (!inflight) {
-    inflight = getMenu()
+    const locationId = getSelectedLocationId();
+    inflight = getMenu(locationId)
+      .catch((reason: unknown) => {
+        /* The picked branch is gone or closed: forget it and use the default one. */
+        if (
+          locationId &&
+          reason instanceof ApiError &&
+          reason.status >= 400 &&
+          reason.status < 500
+        ) {
+          selectLocation(undefined);
+          return getMenu();
+        }
+        throw reason;
+      })
       .then((menu) => {
         cached = mapMenu(menu);
         listeners.forEach((listener) => listener());
@@ -31,6 +47,14 @@ const fetchMenu = (): Promise<MenuViewModel> => {
   }
   return inflight;
 };
+
+/* Another branch has its own menu: drop the cached one and load the new one. */
+subscribeLocation(() => {
+  cached = undefined;
+  inflight = undefined;
+  listeners.forEach((listener) => listener());
+  fetchMenu().catch(() => undefined);
+});
 
 /** The menu once, without subscribing a screen: the cached one, or the next fetch. */
 export const loadMenu = (): Promise<MenuViewModel> =>
@@ -96,7 +120,10 @@ export const useMenu = (): MenuState => {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    const listener = () => setMenu(cached);
+    const listener = () => {
+      setMenu(cached);
+      setError(undefined);
+    };
     listeners.add(listener);
     if (listeners.size === 1) stopMenuPolling = startMenuPolling();
     if (!cached) {

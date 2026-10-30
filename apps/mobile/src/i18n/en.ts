@@ -40,6 +40,10 @@ export const en = {
 
   // Home and menu
   'home.pickupAt': 'Pickup at',
+  'home.chooseLocation': 'Choose a branch',
+  'home.changeLocationTitle': 'Change branch?',
+  'home.changeLocationMessage': 'Your cart will be emptied: each branch has its own menu.',
+  'home.changeLocationConfirm': 'Change',
   'home.categories': 'Categories',
   'home.popular': 'Most ordered',
   'home.deals': 'Deals',

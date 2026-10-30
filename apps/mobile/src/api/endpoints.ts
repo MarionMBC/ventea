@@ -39,8 +39,11 @@ export const getTenant = (signal?: AbortSignal) =>
   api.get<Tenant>('/api/tenant', { ...PUBLIC, signal });
 export const getLocations = (signal?: AbortSignal) =>
   api.get<Location[]>('/api/locations', { ...PUBLIC, signal });
-export const getMenu = (signal?: AbortSignal) =>
-  api.get<PublicMenu>('/api/menu', { ...PUBLIC, signal });
+export const getMenu = (locationId?: string, signal?: AbortSignal) =>
+  api.get<PublicMenu>(
+    locationId ? `/api/menu?locationId=${encodeURIComponent(locationId)}` : '/api/menu',
+    { ...PUBLIC, signal },
+  );
 
 /* Orders */
 /**
