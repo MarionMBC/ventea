@@ -653,6 +653,26 @@
 }
 
 /* ── Historial ───────────────────────────────────────────────────────── */
+.history-page {
+  display: grid;
+  gap: 12px;
+}
+
+.history-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-day__label {
+  font-weight: 600;
+}
+
+.history-day__input {
+  width: auto;
+}
+
 .history {
   display: grid;
   gap: 12px;

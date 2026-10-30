@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { describeError, useI18n } from '@/i18n';
 import { IconAlert, IconHistory } from '@/ui/icons';
 
@@ -23,16 +25,69 @@ function HistorySkeleton({ label }: { label: string }) {
   );
 }
 
-/** Entregados y cancelados de hoy (día del dispositivo). Solo lectura. */
+const pad = (n: number) => String(n).padStart(2, '0');
+/** `YYYY-MM-DD` en hora local: el valor de un `<input type="date">`. */
+const toDayValue = (date: Date) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const fromDayValue = (value: string) => {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y!, m! - 1, d!);
+};
+
+/**
+ * Entregados y cancelados de un día (hoy por defecto, día del dispositivo). Solo lectura.
+ * «Hoy» sigue al reloj: pasada la medianoche carga el día nuevo sola. Elegido otro día, se
+ * queda en él hasta tocar «Hoy».
+ */
 export function OrdersHistory() {
+  const { t } = useI18n();
+  const now = useNow(60_000);
+  const today = startOfLocalDay(new Date(now));
+  const [picked, setPicked] = useState<string | null>(null);
+  const since = picked ? fromDayValue(picked) : today;
+  const isToday = since.getTime() === today.getTime();
+  const until = new Date(since.getFullYear(), since.getMonth(), since.getDate() + 1);
+
+  return (
+    <div className="history-page">
+      <div className="history-day">
+        <label className="history-day__label" htmlFor="history-day">
+          {t('history.day')}
+        </label>
+        <input
+          id="history-day"
+          className="field__input history-day__input"
+          type="date"
+          value={toDayValue(since)}
+          max={toDayValue(today)}
+          onChange={(event) => {
+            const value = event.target.value;
+            // Vacío (campo borrado) o hoy: vuelve a seguir al reloj.
+            setPicked(!value || value === toDayValue(today) ? null : value);
+          }}
+        />
+        {!isToday && (
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => setPicked(null)}
+          >
+            {t('history.today')}
+          </button>
+        )}
+      </div>
+      <HistoryDay since={since} until={until} isToday={isToday} />
+    </div>
+  );
+}
+
+function HistoryDay({ since, until, isToday }: { since: Date; until: Date; isToday: boolean }) {
   const { currency } = useOrdersContext();
   const i18n = useI18n();
   const { t, money, clock, customerName } = i18n;
-  // «Hoy» se recalcula con el reloj: pasada la medianoche cambia la clave de la
-  // consulta y la vista carga el día nuevo sola.
-  const now = useNow(60_000);
-  const since = startOfLocalDay(new Date(now));
-  const { data: orders, error, isPending, refetch } = useOrderHistory(since);
+  const { data: fetched, error, isPending, refetch } = useOrderHistory(since);
+  // La API solo filtra «desde»: el tope del día se aplica acá.
+  const orders = fetched?.filter((order) => order.placedAt.getTime() < until.getTime());
 
   if (isPending) return <HistorySkeleton label={t('history.loading')} />;
 
@@ -57,7 +112,7 @@ export function OrdersHistory() {
         <span className="state__icon">
           <IconHistory size={30} />
         </span>
-        <h2>{t('history.emptyTitle')}</h2>
+        <h2>{isToday ? t('history.emptyTitle') : t('history.emptyDay')}</h2>
         <p>{t('history.emptyBody')}</p>
       </div>
     );
@@ -67,7 +122,7 @@ export function OrdersHistory() {
   const sales = delivered.reduce((sum, order) => sum + order.totalCents, 0);
 
   return (
-    <section className="history" aria-label={t('history.label')}>
+    <section className="history" aria-label={isToday ? t('history.label') : t('history.labelDay')}>
       <dl className="stats" aria-label={t('history.summary')}>
         <div className="stat">
           <dt>{t('history.delivered')}</dt>
