@@ -200,3 +200,20 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ── App toast (IonToast): one surface for every tone, the tone shows as the
+   accent stripe + icon, the same language as InlineAlert and .vt-toast. ───── */
+ion-toast.vt-app-toast {
+  --border-left-accent: var(--vt-success);
+}
+ion-toast.vt-app-toast--danger { --border-left-accent: var(--vt-danger); }
+ion-toast.vt-app-toast--warning { --border-left-accent: var(--vt-warning); }
+ion-toast.vt-app-toast--info { --border-left-accent: var(--vt-info); }
+
+ion-toast.vt-app-toast::part(container) {
+  border-inline-start: 4px solid var(--border-left-accent);
+}
+
+ion-toast.vt-app-toast::part(icon) {
+  color: var(--border-left-accent);
+}

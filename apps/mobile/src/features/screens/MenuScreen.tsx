@@ -9,6 +9,7 @@ import { CategoryTabs } from '../../components/navigation/CategoryTabs';
 import { SearchHeader } from '../../components/navigation/AppHeader';
 import { t } from '../../i18n';
 import { useAppState } from '../appStateContext';
+import { useAddToCart } from '../useAddToCart';
 import { refreshMenu, useMenu } from '../menu/useMenu';
 import { ScreenShell } from './ScreenShell';
 import { RetryState } from './ScreenStates';
@@ -34,7 +35,8 @@ export const MenuScreen = ({
   onOpenCart,
   onSelectProduct,
 }: MenuScreenProps) => {
-  const { cartCount, addLine, favourites, toggleFavourite } = useAppState();
+  const { cartCount, favourites, toggleFavourite } = useAppState();
+  const addLine = useAddToCart();
   const { menu, loading: menuLoading, error, retry } = useMenu();
   const loading = forcedLoading || menuLoading;
   const categories = menu?.categories ?? [];

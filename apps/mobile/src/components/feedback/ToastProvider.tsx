@@ -41,6 +41,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         icon={toneIcon[request?.tone ?? 'success']}
         color={toneColor[request?.tone ?? 'success']}
         position="bottom"
+        cssClass={`vt-app-toast vt-app-toast--${request?.tone ?? 'success'}`}
         onDidDismiss={() => setRequest(null)}
         buttons={[{ text: t('common.close'), role: 'cancel' }]}
       />

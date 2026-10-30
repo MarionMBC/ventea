@@ -9,6 +9,7 @@ import { CartButton } from '../../components/navigation/CartButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { t } from '../../i18n';
 import { useAppState } from '../appStateContext';
+import { useAddToCart } from '../useAddToCart';
 import { refreshMenu, useMenu } from '../menu/useMenu';
 import { useResource } from '../useResource';
 import { ScreenShell } from './ScreenShell';
@@ -30,7 +31,8 @@ export interface HomeScreenProps {
  */
 export const HomeScreen = ({ onOpenCart, onOpenMenu, onSelectProduct }: HomeScreenProps) => {
   const brand = useBrand();
-  const { cartCount, addLine, favourites, toggleFavourite } = useAppState();
+  const { cartCount, favourites, toggleFavourite } = useAppState();
+  const addLine = useAddToCart();
   const { menu, loading, error, retry } = useMenu();
   const locations = useResource((signal) => getLocations(signal), []);
   const [query, setQuery] = useState('');

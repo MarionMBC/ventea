@@ -3,6 +3,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { Button } from '../../components/ui/Button';
 import { BackHeader } from '../../components/navigation/AppHeader';
 import { useAppState } from '../appStateContext';
+import { useAddToCart } from '../useAddToCart';
 import { t } from '../../i18n';
 import { useMenu } from '../menu/useMenu';
 import { ScreenShell } from './ScreenShell';
@@ -25,7 +26,8 @@ export const FavouritesScreen = ({
   onBack,
   onOpenMenu,
 }: FavouritesScreenProps) => {
-  const { favourites, toggleFavourite, addLine } = useAppState();
+  const { favourites, toggleFavourite } = useAppState();
+  const addLine = useAddToCart();
   const { menu, loading, error, retry } = useMenu();
   const saved = (menu?.products ?? []).filter((product) => favourites.includes(product.id));
 
