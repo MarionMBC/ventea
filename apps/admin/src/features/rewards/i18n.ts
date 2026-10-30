@@ -5,6 +5,12 @@
 export const rewardsEn = {
   'rewards.pageTitle': 'Rewards · Ventea',
   'rewards.title': 'Rewards',
+  'rewards.summary': 'Program summary',
+  'rewards.statProgram': 'Program',
+  'rewards.statRewards': 'Active rewards',
+  'rewards.statRewardsValue': '{active} of {total}',
+  'rewards.statPointValue': 'Value per point',
+  'rewards.statCustomers': 'Customers',
   'rewards.subtitle':
     'Set up your loyalty program, the rewards customers can redeem and everyone’s points.',
   'rewards.loading': 'Loading the loyalty program…',
@@ -120,6 +126,12 @@ export const rewardsEn = {
 export const rewardsEs: Record<keyof typeof rewardsEn, string> = {
   'rewards.pageTitle': 'Puntos · Ventea',
   'rewards.title': 'Puntos',
+  'rewards.summary': 'Resumen del programa',
+  'rewards.statProgram': 'Programa',
+  'rewards.statRewards': 'Recompensas activas',
+  'rewards.statRewardsValue': '{active} de {total}',
+  'rewards.statPointValue': 'Valor por punto',
+  'rewards.statCustomers': 'Clientes',
   'rewards.subtitle':
     'Configura tu programa de lealtad, las recompensas que tus clientes pueden canjear y sus puntos.',
   'rewards.loading': 'Cargando el programa de puntos…',

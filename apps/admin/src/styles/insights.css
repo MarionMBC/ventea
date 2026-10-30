@@ -202,9 +202,39 @@
   font-variant-numeric: tabular-nums;
 }
 
+.rw-summary {
+  margin: 0 0 16px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .rw-table__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rw-table__text {
   display: grid;
   min-width: 0;
+}
+
+.rw-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.rw-table tbody tr:hover td {
+  background: var(--surface-2);
 }
 
 .rw-table__name {
@@ -219,6 +249,7 @@
 }
 
 .rw-table__balance {
+  font-size: var(--fs-md, 1rem);
   font-weight: 800;
 }
 

@@ -82,6 +82,8 @@ export function RewardsPage() {
         </div>
       </header>
 
+      <Summary data={rewards.data} />
+
       <div className="rw__layout">
         {/* `key`: tras guardar, el formulario arranca de lo que quedó en el servidor. */}
         <ProgramCard
@@ -96,6 +98,37 @@ export function RewardsPage() {
   );
 }
 
+/** Lo esencial del programa de un vistazo, antes de entrar a los detalles. */
+function Summary({ data }: { data: StaffRewards }) {
+  const { t, money } = useI18n();
+  const customers = useRewardCustomers('', 1);
+  const active = data.catalog.filter((reward) => reward.isActive).length;
+  return (
+    <dl className="stats rw-summary" aria-label={t('rewards.summary')}>
+      <div className="stat">
+        <dt>{t('rewards.statProgram')}</dt>
+        <dd>
+          <span className={`tag ${data.program.isEnabled ? 'tag--ok' : 'tag--muted'}`}>
+            {data.program.isEnabled ? t('rewards.on') : t('rewards.off')}
+          </span>
+        </dd>
+      </div>
+      <div className="stat">
+        <dt>{t('rewards.statRewards')}</dt>
+        <dd>{t('rewards.statRewardsValue', { active, total: data.catalog.length })}</dd>
+      </div>
+      <div className="stat">
+        <dt>{t('rewards.statPointValue')}</dt>
+        <dd>{money(data.program.redemptionValueCents, data.currency)}</dd>
+      </div>
+      <div className="stat">
+        <dt>{t('rewards.statCustomers')}</dt>
+        <dd>{customers.data ? customers.data.total : '–'}</dd>
+      </div>
+    </dl>
+  );
+}
+
 function CatalogCard({ data }: { data: StaffRewards }) {
   const i18n = useI18n();
   const { t, money } = i18n;
@@ -105,6 +138,11 @@ function CatalogCard({ data }: { data: StaffRewards }) {
   const [editing, setEditing] = useState<RewardCatalogItem | 'new' | null>(null);
   const [deleting, setDeleting] = useState<RewardCatalogItem | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+
+  // Visibles primero y de menor a mayor costo: así se lee como una escalera de premios.
+  const sorted = [...data.catalog].sort(
+    (a, b) => Number(b.isActive) - Number(a.isActive) || a.pointsCost - b.pointsCost,
+  );
 
   const describe = (reward: RewardCatalogItem) =>
     reward.kind === 'discount'
@@ -141,7 +179,7 @@ function CatalogCard({ data }: { data: StaffRewards }) {
         <p className="rw-empty">{t('rewards.catalogEmpty')}</p>
       ) : (
         <ul className="rw-catalog">
-          {data.catalog.map((reward) => (
+          {sorted.map((reward) => (
             <li key={reward.id} className={`rw-catalog__row${reward.isActive ? '' : ' is-hidden'}`}>
               <span className="rw-catalog__cost">
                 {t('rewards.points', { count: reward.pointsCost })}
@@ -225,6 +263,13 @@ function CatalogCard({ data }: { data: StaffRewards }) {
       )}
     </article>
   );
+}
+
+/** Iniciales para el avatar: dos letras si el nombre tiene dos palabras, si no las dos primeras del texto. */
+function initialsOf(label: string): string {
+  const words = label.split(/[\s@._-]+/).filter(Boolean);
+  const letters = words.length > 1 ? words[0]![0]! + words[1]![0]! : (words[0] ?? '?').slice(0, 2);
+  return letters.toUpperCase();
 }
 
 /** Espera `ms` sin cambios antes de devolver el valor (búsqueda mientras se escribe). */
@@ -323,10 +368,15 @@ function CustomersCard({ data }: { data: StaffRewards }) {
                   return (
                     <tr key={customer.id}>
                       <td className="rw-table__who">
-                        <span className="rw-table__name">{label}</span>
-                        {label !== customer.email && (
-                          <span className="rw-table__email">{customer.email}</span>
-                        )}
+                        <span className="rw-avatar" aria-hidden="true">
+                          {initialsOf(label)}
+                        </span>
+                        <span className="rw-table__text">
+                          <span className="rw-table__name">{label}</span>
+                          {label !== customer.email && (
+                            <span className="rw-table__email">{customer.email}</span>
+                          )}
+                        </span>
                       </td>
                       <td className="num rw-table__balance">
                         <span className="rw-table__cell-label" aria-hidden="true">
