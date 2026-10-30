@@ -76,7 +76,9 @@ describe('Tablero de pedidos', () => {
     expect(c.getByText('Dine-in')).toBeTruthy();
     expect(c.getByText('3 min')).toBeTruthy();
     expect(c.getByText('2×')).toBeTruthy();
-    expect(c.getByText('Hot, Extra salsa')).toBeTruthy();
+    expect(c.getByText(/^Hot, Extra salsa \(\+/)).toBeTruthy();
+    expect(c.getByText('Payment')).toBeTruthy();
+    expect(c.getByText('Subtotal')).toBeTruthy();
     expect(c.getByText('Note: sin pepinillos')).toBeTruthy();
     expect(c.getByText(/paso en 10 min/)).toBeTruthy();
     expect(c.getByText('120 pts (−$1.20)')).toBeTruthy();
@@ -106,6 +108,7 @@ describe('Tablero de pedidos', () => {
     });
 
     fireEvent.click(within(card('CHC-2000')).getByRole('button', { name: 'Start' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, confirm' }));
 
     await waitFor(() =>
       expect(within(column('In the kitchen')).queryByText('CHC-2000')).toBeTruthy(),
@@ -136,6 +139,7 @@ describe('Tablero de pedidos', () => {
     api.setOverride((req) => (req.method === 'PATCH' ? apiError(500, 'Error interno') : undefined));
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, confirm' }));
 
     // En inglés, el mensaje de la API (en español) se reemplaza por uno propio, traducido.
     expect(
@@ -160,6 +164,7 @@ describe('Tablero de pedidos', () => {
       return apiError(409, 'El pedido cambió de estado; recarga e intenta de nuevo');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, confirm' }));
 
     expect(
       await screen.findByText(

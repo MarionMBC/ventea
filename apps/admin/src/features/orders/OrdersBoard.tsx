@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { describeError, useI18n } from '@/i18n';
 import { IconAlert, IconInbox, IconRefresh, IconVolume, IconVolumeOff } from '@/ui/icons';
 
+import { useStaffLocations } from '@/features/locations/api';
+
 import { useNow, usePendingOrderIds } from './hooks';
 import { OrderCard } from './OrderCard';
 import { useOrdersContext } from './OrdersSection';
@@ -67,6 +69,13 @@ export function OrdersBoard() {
   const { t, clock, ago } = i18n;
   const pendingIds = usePendingOrderIds();
   const now = useNow(15_000);
+  // Con una sola sucursal el nombre es ruido: solo se muestra si hay más de una.
+  const { data: locations } = useStaffLocations();
+  const locationNames = new Map(
+    locations && locations.locations.length > 1
+      ? locations.locations.map((l) => [l.id, l.name])
+      : [],
+  );
   const [mobileColumn, setMobileColumn] = useState<BoardStatus>('confirmed');
   const { data: orders, error, isPending, isFetching, refetch, dataUpdatedAt } = activeOrders;
 
@@ -209,6 +218,7 @@ export function OrdersBoard() {
                             now={now}
                             isFresh={fresh.has(order.id)}
                             isPending={pendingIds.has(order.id)}
+                            locationName={locationNames.get(order.locationId) ?? null}
                             onChangeStatus={changeStatus}
                             onSeen={acknowledge}
                           />

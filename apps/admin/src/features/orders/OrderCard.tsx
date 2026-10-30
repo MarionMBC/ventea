@@ -14,7 +14,7 @@ import {
   IconUtensils,
 } from '@/ui/icons';
 
-import { canCancel, primaryAction, type StatusAction } from './transitions';
+import { canCancel, primaryAction, statusLabel, type StatusAction } from './transitions';
 
 /**
  * Minutos desde que entró el pedido a partir de los que el reloj de la tarjeta se pone en
@@ -48,6 +48,8 @@ interface OrderCardProps {
   now: number;
   isFresh: boolean;
   isPending: boolean;
+  /** Nombre de la sucursal del pedido; null si la marca tiene una sola o aún no cargó. */
+  locationName?: string | null;
   onChangeStatus: (order: StaffOrder, action: StatusAction) => void;
   onSeen: (orderId: string) => void;
 }
@@ -58,11 +60,13 @@ export function OrderCard({
   now,
   isFresh,
   isPending,
+  locationName = null,
   onChangeStatus,
   onSeen,
 }: OrderCardProps) {
-  const { t, rich, money, clock, elapsed, customerName } = useI18n();
+  const { t, rich, money, clock, dateTime, elapsed, customerName } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [confirmingAdvance, setConfirmingAdvance] = useState(false);
   const titleId = useId();
   const action = primaryAction(order.status);
   const urgency = urgencyOf(order.status, minutesSince(order.placedAt, now));
@@ -114,15 +118,36 @@ export function OrderCard({
         )}
       </div>
 
+      <p className="order-card__when">
+        {t('card.placedAt', { time: dateTime(order.placedAt) })}
+        {locationName && ` · ${locationName}`}
+        {order.scheduledFor &&
+          ` · ${t('card.scheduledFor', { time: dateTime(order.scheduledFor) })}`}
+      </p>
+
       <ul className="order-card__lines">
         {order.lines.map((line) => (
           <li key={line.id} className="order-line">
             <span className="order-line__qty">{line.quantity}×</span>
             <div className="order-line__body">
               <span className="order-line__name">{line.nameSnapshot}</span>
+              <span className="order-line__price">
+                {line.quantity > 1
+                  ? t('card.lineEach', {
+                      unit: amount(line.unitPriceCents),
+                      total: amount(line.totalCents),
+                    })
+                  : amount(line.totalCents)}
+              </span>
               {line.selectedOptions.length > 0 && (
                 <span className="order-line__options">
-                  {line.selectedOptions.map((option) => option.nameSnapshot).join(', ')}
+                  {line.selectedOptions
+                    .map((option) =>
+                      option.priceDeltaCents !== 0
+                        ? `${option.nameSnapshot} (${option.priceDeltaCents > 0 ? '+' : '−'}${amount(Math.abs(option.priceDeltaCents))})`
+                        : option.nameSnapshot,
+                    )
+                    .join(', ')}
                 </span>
               )}
               {line.notes && (
@@ -143,6 +168,22 @@ export function OrderCard({
       )}
 
       <dl className="order-card__totals">
+        <div>
+          <dt>{t('card.subtotal')}</dt>
+          <dd>{amount(order.subtotalCents)}</dd>
+        </div>
+        {order.discountCents > 0 && order.pointsRedeemed === 0 && (
+          <div>
+            <dt>{t('card.discount')}</dt>
+            <dd>−{amount(order.discountCents)}</dd>
+          </div>
+        )}
+        {order.taxCents > 0 && (
+          <div>
+            <dt>{t('card.tax')}</dt>
+            <dd>{amount(order.taxCents)}</dd>
+          </div>
+        )}
         {order.pointsRedeemed > 0 && (
           <div className="order-card__points">
             <dt>{t('card.pointsRedeemed')}</dt>
@@ -158,6 +199,16 @@ export function OrderCard({
           <dt>{t('card.total')}</dt>
           <dd>{amount(order.totalCents)}</dd>
         </div>
+        <div>
+          <dt>{t('card.payment')}</dt>
+          <dd>{t(`payment.${order.paymentStatus}`)}</dd>
+        </div>
+        {order.pointsEarned > 0 && (
+          <div>
+            <dt>{t('card.pointsEarned')}</dt>
+            <dd>{order.pointsEarned}</dd>
+          </div>
+        )}
       </dl>
 
       {confirmingCancel ? (
@@ -195,6 +246,43 @@ export function OrderCard({
             </button>
           </div>
         </div>
+      ) : confirmingAdvance && action ? (
+        <div className="order-card__confirm" role="group" aria-label={t('card.advanceGroup')}>
+          <p>
+            {rich('card.confirmAdvance', {
+              code: <strong>{order.code}</strong>,
+              status: <strong>{t(statusLabel(action.to))}</strong>,
+            })}
+          </p>
+          <div className="order-card__actions">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setConfirmingAdvance(false)}
+            >
+              {t('card.confirmNo')}
+            </button>
+            {/* El foco cae en «Sí»: tocar o Enter confirma, un solo gesto más que antes. */}
+            <button
+              type="button"
+              className="btn btn--primary"
+              autoFocus
+              disabled={isPending}
+              onClick={(event) => {
+                // Al avanzar, la tarjeta cambia de columna: el foco pasa al título de la
+                // columna en vez de perderse en <body>.
+                const heading = event.currentTarget
+                  .closest('section')
+                  ?.querySelector<HTMLElement>('h2');
+                setConfirmingAdvance(false);
+                onChangeStatus(order, action);
+                heading?.focus();
+              }}
+            >
+              {t('card.advanceYes')}
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="order-card__actions">
           {canCancel(order.status) && (
@@ -213,7 +301,7 @@ export function OrderCard({
               type="button"
               className={`btn btn--primary order-card__advance btn--to-${action.to}`}
               disabled={isPending}
-              onClick={() => onChangeStatus(order, action)}
+              onClick={() => setConfirmingAdvance(true)}
             >
               {t(action.label)}
               {action.to === 'completed' ? <IconCheck size={20} /> : <IconArrowRight size={20} />}
