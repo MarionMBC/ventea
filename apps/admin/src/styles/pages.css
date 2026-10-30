@@ -6,7 +6,8 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   width: 100%;
-  max-width: 1120px;
+  /* Ancho útil en pantallas grandes: con 1120 px sobraba una franja vacía a la derecha. */
+  max-width: 1480px;
   padding: 16px var(--gutter) 32px;
 }
 
@@ -24,7 +25,8 @@
 @media (min-width: 900px) {
   .page-grid {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    align-items: start;
+    /* Tarjetas de la misma altura: la más corta no deja un hueco debajo. */
+    align-items: stretch;
   }
 }
 
