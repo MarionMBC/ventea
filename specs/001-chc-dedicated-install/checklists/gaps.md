@@ -8,7 +8,7 @@ Marcado: `[x]` cumplido y verificado · `[ ]` hueco abierto (evidencia y severid
 
 ## Datos y continuidad
 
-- [ ] CHK001 Respaldo diario fuera del servidor (FR-005, SC-002). **CRÍTICO**. Dokploy: `carolina-prod` con 0 backups, 0 backups de volumen, 0 destinos S3. Postgres, el volumen `media` y el volumen `minio` viven solo en el disco de la VPS.
+- [x] CHK001 Respaldo diario fuera del servidor (FR-005, SC-002). Cerrado el 2026-11-10: Cloudflare R2, bucket `chc-backups` (destino de Dokploy `fXxu_DTVpjyqL-lTEsb8z`). Postgres a las 09:00 UTC (backup `bJWgebLtNeeUWmK3NZX-s`) y volumen `minio` a las 09:30 UTC (`UED1GaXJXVAAtK7Fcd6ON`), se guardan los últimos 14. Primera corrida manual subida; el dump se restauró con `pg_restore` en una base aparte y los conteos coinciden.
 - [ ] CHK002 Una sola instalación recibe pedidos (FR-001, SC-001). **CRÍTICO**. `carolina-hot-chicken.ventea.tech/api/health` sigue respondiendo 200: los builds ≤ 12 (prueba interna anterior, App Tester anterior) mandan pedidos al servidor viejo y la base diverge.
 - [ ] CHK003 Reversión probada en menos de 15 min (US3/AC2). **ALTO**. Volver a `ventea-api:e94c1bb` (driver disco) no ve las imágenes subidas después del cambio a MinIO; Dokploy tiene limpieza automática de imágenes Docker (`enableDockerCleanup`), así que la imagen anterior puede no estar.
 - [x] CHK004 Imágenes en MinIO propio en Dokploy (FR-012). API `f67472d`, bucket privado `carolina-media`, 4/4 fotos del menú servidas desde MinIO.
@@ -38,5 +38,5 @@ Marcado: `[x]` cumplido y verificado · `[ ]` hueco abierto (evidencia y severid
 
 ## Notes
 
-- 18 ítems: 3 cumplidos y 15 huecos (4 críticos, 7 altos, 4 medios).
+- 18 ítems: 4 cumplidos y 14 huecos (3 críticos, 7 altos, 4 medios).
 - No se tocó nada de las otras apps del servidor; CHK010 y CHK012 son para decidir.
