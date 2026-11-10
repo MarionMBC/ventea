@@ -1,16 +1,16 @@
 {
   "tenantSlug": "carolina-hot-chicken",
-  "apiUrl": "https://carolina-hot-chicken.ventea.tech",
+  "apiUrl": "https://api.carolinahotchicken.com",
   "appName": "Carolina Hot Chicken",
   "bundleId": "com.carolinahotchicken.app",
   "colors": { "primary": "#E23B2E", "secondary": "#1F1D1B", "accent": "#FDB913" },
-  "logoUrl": "https://carolina-hot-chicken.ventea.tech/api/media/78b45686-0751-4429-86b3-973de7c617df/f8439b72451772160eb2297e24ff2cd09e3ef9a3d880fab9a86aab644de6554a.webp",
-  "iconUrl": "https://carolina-hot-chicken.ventea.tech/api/media/78b45686-0751-4429-86b3-973de7c617df/f8439b72451772160eb2297e24ff2cd09e3ef9a3d880fab9a86aab644de6554a.webp",
+  "logoUrl": "https://api.carolinahotchicken.com/api/media/78b45686-0751-4429-86b3-973de7c617df/f8439b72451772160eb2297e24ff2cd09e3ef9a3d880fab9a86aab644de6554a.webp",
+  "iconUrl": "https://api.carolinahotchicken.com/api/media/78b45686-0751-4429-86b3-973de7c617df/f8439b72451772160eb2297e24ff2cd09e3ef9a3d880fab9a86aab644de6554a.webp",
   "defaultLanguage": "en",
   "lockLanguage": true,
   "currency": "USD",
   "push": { "enabled": true },
   "legacyStoragePrefix": "chc.",
   "version": "1.2.0",
-  "buildNumber": 12
+  "buildNumber": 13
 }
