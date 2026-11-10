@@ -90,12 +90,24 @@ export class PublicMediaController {
   constructor(private readonly storage: MediaStorage) {}
 
   @Get(':tenantId/:file')
-  serve(
+  async serve(
     @Param('tenantId') tenantId: string,
     @Param('file') file: string,
     @Res() res: Response,
-  ): void {
-    const target = MEDIA_FILE_PATTERN.test(file) ? this.storage.servable(tenantId, file) : null;
+  ): Promise<void> {
+    if (!MEDIA_FILE_PATTERN.test(file)) throw new NotFoundException('Imagen no encontrada');
+
+    if (this.storage.driver === 's3') {
+      const object = await this.storage.open(tenantId, file);
+      if (!object) throw new NotFoundException('Imagen no encontrada');
+      res.set(MEDIA_HEADERS);
+      if (object.size !== undefined) res.set('Content-Length', String(object.size));
+      object.body.on('error', () => res.destroy());
+      object.body.pipe(res);
+      return;
+    }
+
+    const target = this.storage.servable(tenantId, file);
     if (!target) throw new NotFoundException('Imagen no encontrada');
 
     res.sendFile(
@@ -104,16 +116,7 @@ export class PublicMediaController {
         // Ruta relativa a la carpeta de la marca: `send` rechaza todo lo que salga de `root`.
         root: target.root,
         dotfiles: 'deny',
-        headers: {
-          // Fijo: lo que hay en disco siempre es un WebP generado por la API.
-          'Content-Type': 'image/webp',
-          'Cache-Control': IMMUTABLE,
-          'X-Content-Type-Options': 'nosniff',
-          // helmet pone `same-origin`: la app nativa y el panel cargan estas imágenes desde
-          // otro origen (capacitor://localhost, app.ventea.tech).
-          'Cross-Origin-Resource-Policy': 'cross-origin',
-          'Content-Security-Policy': "default-src 'none'; sandbox",
-        },
+        headers: MEDIA_HEADERS,
       },
       (error?: Error) => {
         if (!error || res.headersSent) return;
@@ -124,3 +127,15 @@ export class PublicMediaController {
     );
   }
 }
+
+/** Cabeceras de todo archivo servido (disco o S3). */
+const MEDIA_HEADERS = {
+  // Fijo: lo guardado siempre es un WebP generado por la API.
+  'Content-Type': 'image/webp',
+  'Cache-Control': IMMUTABLE,
+  'X-Content-Type-Options': 'nosniff',
+  // helmet pone `same-origin`: la app nativa y el panel cargan estas imágenes desde otro
+  // origen (capacitor://localhost, app.ventea.tech).
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+  'Content-Security-Policy': "default-src 'none'; sandbox",
+};

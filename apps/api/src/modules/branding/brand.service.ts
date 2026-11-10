@@ -77,7 +77,12 @@ export class BrandService {
     const { logoUrl, iconUrl, ...fields } = input;
     // En una transacción: `resolveOwnedRef` toma el lock de medios de la marca hasta el commit,
     // así un borrado de la imagen no se cuela entre la verificación y el guardado.
-    await this.prisma.$transaction(async (tx) => {
+    // Logo/ícono anteriores que esta escritura reemplazó: se liberan después del commit.
+    const replaced = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.tenantBranding.findUnique({
+        where: { tenantId },
+        select: { logoUrl: true, iconUrl: true },
+      });
       const data: Prisma.TenantBrandingUncheckedUpdateInput = { ...fields };
       if (logoUrl !== undefined) {
         data.logoUrl = logoUrl
@@ -94,7 +99,12 @@ export class BrandService {
         update: data,
         create: { ...(data as Prisma.TenantBrandingUncheckedCreateInput), tenantId },
       });
+      return [
+        data.logoUrl && current?.logoUrl !== data.logoUrl ? current?.logoUrl : null,
+        data.iconUrl && current?.iconUrl !== data.iconUrl ? current?.iconUrl : null,
+      ];
     });
+    await this.media.releaseUnused(tenantId, replaced);
     return this.get(tenantId, base);
   }
 

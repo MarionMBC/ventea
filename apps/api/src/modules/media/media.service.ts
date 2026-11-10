@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   PayloadTooLargeException,
   ServiceUnavailableException,
@@ -68,6 +69,7 @@ function positiveInt(raw: string | undefined, fallback: number): number {
  */
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
   private readonly quotaBytes: number;
   private readonly gate: ProcessingGate;
 
@@ -180,13 +182,46 @@ export class MediaService {
    * Los archivos se borran después del commit.
    */
   async remove(tenantId: string, hash: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.deleteIfUnused(tenantId, hash);
+    if (outcome === 'missing') throw new NotFoundException('Imagen no encontrada');
+    if (outcome === 'in_use') {
+      throw new ConflictException('La imagen está en uso (menú o marca): quítala primero');
+    }
+  }
+
+  /**
+   * Libera las imágenes que una escritura dejó de usar (la foto vieja de un ítem al cambiarla,
+   * el logo anterior, la foto de un ítem borrado): borra registro, imagen y miniatura de cada
+   * una que ya nadie referencia. Llamar DESPUÉS del commit de la escritura, con las referencias
+   * anteriores. Nunca lanza: si algo falla, la imagen queda en la biblioteca y se puede borrar
+   * a mano.
+   */
+  async releaseUnused(tenantId: string, refs: (string | null | undefined)[]): Promise<void> {
+    const hashes = new Set<string>();
+    for (const ref of refs) {
+      const parsed = ref ? parseMediaRef(ref) : null;
+      if (parsed?.tenantId === tenantId) hashes.add(parsed.hash);
+    }
+    for (const hash of hashes) {
+      try {
+        await this.deleteIfUnused(tenantId, hash);
+      } catch (error) {
+        this.logger.warn(`No se pudo liberar la imagen ${tenantId}/${hash}: ${String(error)}`);
+      }
+    }
+  }
+
+  private async deleteIfUnused(
+    tenantId: string,
+    hash: string,
+  ): Promise<'deleted' | 'missing' | 'in_use'> {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       await lockMedia(tx, tenantId);
       const asset = await tx.mediaAsset.findFirst({
         where: { tenantId, hash },
         select: { id: true },
       });
-      if (!asset) throw new NotFoundException('Imagen no encontrada');
+      if (!asset) return 'missing' as const;
 
       const ref = mediaPath(tenantId, hash);
       const items = await tx.menuItem.count({
@@ -195,13 +230,14 @@ export class MediaService {
       const branding = await tx.tenantBranding.count({
         where: { tenantId, OR: [{ logoUrl: ref }, { iconUrl: ref }] },
       });
-      if (items > 0 || branding > 0) {
-        throw new ConflictException('La imagen está en uso (menú o marca): quítala primero');
-      }
+      if (items > 0 || branding > 0) return 'in_use' as const;
       await tx.mediaAsset.deleteMany({ where: { tenantId, hash } });
+      return 'deleted' as const;
     });
-    await this.storage.remove(tenantId, mediaFileName(hash));
-    await this.storage.remove(tenantId, mediaFileName(hash, true));
+    if (outcome === 'deleted') {
+      await this.storage.removeMany(tenantId, [mediaFileName(hash), mediaFileName(hash, true)]);
+    }
+    return outcome;
   }
 
   /**

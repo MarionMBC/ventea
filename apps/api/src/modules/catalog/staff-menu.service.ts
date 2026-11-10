@@ -271,10 +271,11 @@ export class StaffMenuService {
 
   async updateItem(actor: MenuActor, id: string, input: UpdateMenuItemInput): Promise<void> {
     const { tenantId } = actor;
-    await this.prisma.$transaction(async (tx) => {
+    // Foto anterior, si el PATCH la reemplazó por otra: se libera después del commit.
+    const replaced = await this.prisma.$transaction(async (tx) => {
       const current = await tx.menuItem.findFirst({
         where: { tenantId, id, ...NOT_DELETED },
-        select: { basePriceCents: true, compareAtPriceCents: true },
+        select: { basePriceCents: true, compareAtPriceCents: true, imageUrl: true },
       });
       if (!current) throw new NotFoundException('Producto no encontrado');
       assertCompareAt(
@@ -307,7 +308,10 @@ export class StaffMenuService {
         });
       }
       await this.audit(tx, actor, 'item', id, 'update', { ...input, imageUrl: data.imageUrl });
+      // Reemplazada por otra (no quitada: quitar la deja en la biblioteca para volver a usarla).
+      return data.imageUrl && current.imageUrl !== data.imageUrl ? current.imageUrl : null;
     });
+    await this.media.releaseUnused(tenantId, [replaced]);
   }
 
   async setAvailability(actor: MenuActor, id: string, isAvailable: boolean): Promise<void> {
@@ -324,12 +328,14 @@ export class StaffMenuService {
 
   async deleteItem(actor: MenuActor, id: string): Promise<DeleteMenuItemResult> {
     const { tenantId } = actor;
-    return this.prisma.$transaction(async (tx) => {
+    let image: string | null = null;
+    const result = await this.prisma.$transaction(async (tx) => {
       const item = await tx.menuItem.findFirst({
         where: { tenantId, id, ...NOT_DELETED },
-        select: { name: true },
+        select: { name: true, imageUrl: true },
       });
       if (!item) throw new NotFoundException('Producto no encontrado');
+      image = item.imageUrl;
 
       const orders = await tx.orderLine.count({ where: { tenantId, menuItemId: id } });
       if (orders > 0) {
@@ -341,6 +347,10 @@ export class StaffMenuService {
       await this.audit(tx, actor, 'item', id, 'delete', { name: item.name });
       return { deleted: 'hard' as const };
     });
+    // La foto del ítem borrado (también el borrado lógico: ya no sale en el menú) se libera si
+    // nadie más la usa.
+    await this.media.releaseUnused(tenantId, [image]);
+    return result;
   }
 
   async reorderItems(actor: MenuActor, input: ReorderInput): Promise<void> {

@@ -562,3 +562,116 @@ describe('Medios: GC de archivos huérfanos (TASK-025)', () => {
     await expect(stat(orphan)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
+
+describe('Medios: reemplazar una imagen borra la anterior', () => {
+  let app: INestApplication;
+  let prisma: PrismaClient;
+  let tenant: TestTenant;
+  let owner: string;
+  let categoryId: string;
+
+  const api = (method: 'post' | 'patch' | 'delete', url: string, body?: object) => {
+    const server = request(app.getHttpServer());
+    const req = server[method](url)
+      .set('X-Tenant-Slug', tenant.slug)
+      .set('Authorization', `Bearer ${owner}`);
+    return body ? req.send(body) : req;
+  };
+  const uploadPng = async (size: number): Promise<string> =>
+    (
+      (
+        await request(app.getHttpServer())
+          .post('/api/staff/media')
+          .set('X-Tenant-Slug', tenant.slug)
+          .set('Authorization', `Bearer ${owner}`)
+          .attach('file', await pngWithExif(size, size), {
+            filename: 'r.png',
+            contentType: 'image/png',
+          })
+          .expect(201)
+      ).body as MediaUploadResponse
+    ).url;
+  const hashOf = (url: string) => /([0-9a-f]{64})\.webp$/.exec(url)![1]!;
+  const exists = async (url: string) => {
+    const asset = await prisma.mediaAsset.count({
+      where: { tenantId: tenant.id, hash: hashOf(url) },
+    });
+    const main = await request(app.getHttpServer()).get(pathOf(url));
+    const thumb = await request(app.getHttpServer()).get(
+      pathOf(url).replace('.webp', '.thumb.webp'),
+    );
+    return { asset, main: main.status, thumb: thumb.status };
+  };
+  const createItem = async (name: string, imageUrl: string): Promise<string> =>
+    (
+      (
+        await api('post', '/api/staff/menu/items', {
+          categoryId,
+          name,
+          basePriceCents: 500,
+          imageUrl,
+          modifierGroupIds: [],
+        }).expect(201)
+      ).body as { id: string }
+    ).id;
+
+  beforeAll(async () => {
+    app = await createApp();
+    prisma = createRawPrisma();
+    tenant = await seedTenant(prisma, 'media-reemplazo');
+    owner = (await loginStaff(app, tenant)).accessToken;
+    categoryId = (
+      (await api('post', '/api/staff/menu/categories', { name: 'Reemplazos' }).expect(201))
+        .body as { id: string }
+    ).id;
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  it('foto de un ítem: la anterior se borra (registro, imagen y miniatura); la nueva queda', async () => {
+    const before = await uploadPng(61);
+    const after = await uploadPng(62);
+    const itemId = await createItem('Uno', before);
+
+    await api('patch', `/api/staff/menu/items/${itemId}`, { imageUrl: after }).expect(204);
+
+    expect(await exists(before)).toEqual({ asset: 0, main: 404, thumb: 404 });
+    expect(await exists(after)).toEqual({ asset: 1, main: 200, thumb: 200 });
+  });
+
+  it('si otro ítem todavía usa la anterior, no se borra', async () => {
+    const shared = await uploadPng(63);
+    const next = await uploadPng(64);
+    const a = await createItem('A', shared);
+    await createItem('B', shared);
+
+    await api('patch', `/api/staff/menu/items/${a}`, { imageUrl: next }).expect(204);
+    expect(await exists(shared)).toEqual({ asset: 1, main: 200, thumb: 200 });
+  });
+
+  it('quitar la foto (sin reemplazo) la deja en la biblioteca', async () => {
+    const kept = await uploadPng(65);
+    const itemId = await createItem('Sin foto', kept);
+    await api('patch', `/api/staff/menu/items/${itemId}`, { imageUrl: null }).expect(204);
+    expect(await exists(kept)).toEqual({ asset: 1, main: 200, thumb: 200 });
+  });
+
+  it('borrar el ítem borra su foto si nadie más la usa', async () => {
+    const photo = await uploadPng(66);
+    const itemId = await createItem('Borrable', photo);
+    await api('delete', `/api/staff/menu/items/${itemId}`).expect(200);
+    expect(await exists(photo)).toEqual({ asset: 0, main: 404, thumb: 404 });
+  });
+
+  it('logo de la marca: el anterior se borra al subir otro', async () => {
+    const oldLogo = await uploadPng(67);
+    const newLogo = await uploadPng(68);
+    await api('patch', '/api/staff/brand', { logoUrl: oldLogo }).expect(200);
+    await api('patch', '/api/staff/brand', { logoUrl: newLogo }).expect(200);
+    expect(await exists(oldLogo)).toEqual({ asset: 0, main: 404, thumb: 404 });
+    expect(await exists(newLogo)).toEqual({ asset: 1, main: 200, thumb: 200 });
+  });
+});
