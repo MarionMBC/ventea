@@ -299,6 +299,25 @@ cargarlo fresco justo antes (`gh secret set VENTEA_PLATFORM_TOKEN --env <slug>`)
 terminar (`gh secret delete VENTEA_PLATFORM_TOKEN --env <slug>`). **Nunca como secret
 permanente.**
 
+#### Carolina Hot Chicken (iOS = la Android publicada)
+
+La Android en Firebase App Distribution es **1.2.0 (13)**, servidor
+`https://api.carolinahotchicken.com`, config `apps/mobile/brands/brand.carolina.json`. Para el
+mismo iOS, siempre desde `main` actualizado (abrir `apps/mobile/ios` directo da la plantilla
+genérica `app.ventea.template` 0.2.0; un clon viejo da el build 12 con el servidor anterior):
+
+```bash
+git checkout main && git pull
+npm ci
+npm run brand:app -- --tenant carolina-hot-chicken --platform ios --config-from file --build-number 13
+open dist-apps/.work/carolina-hot-chicken/ios/App/App.xcodeproj
+# Signing & Capabilities: Team de la cuenta que publica · Product → Archive → Distribute
+```
+
+Si ya se subió un 13 a App Store Connect, usar `--build-number 14`. Verificado sin firmar en el
+workflow (corrida 44554027505, 2026-11-19): compila y sale con la misma config que la Android.
+Push en iOS sigue apagado (ver [Push en el build](#push-en-el-build)).
+
 ### Fotos de una app anterior
 
 ```bash
