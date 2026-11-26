@@ -9,6 +9,8 @@ export interface AuthValue {
   signUp: (input: RegisterInput) => Promise<void>;
   /** Resolves once the device is forgotten (≤ ~3 s) and the session cleared. */
   signOut: () => Promise<void>;
+  /** Deletes the account on the API, then clears the session. Rejects with the API error. */
+  deleteAccount: () => Promise<void>;
   /** Replaces the cached customer after `/api/me` answers. */
   updateCustomer: (customer: Customer) => void;
 }

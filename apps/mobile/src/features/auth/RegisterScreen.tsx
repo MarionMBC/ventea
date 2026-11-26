@@ -18,12 +18,15 @@ import {
 import { t } from '../../i18n';
 import { useAuth } from './authContext';
 import '../screens/screens.css';
+import '../legal/legal.css';
 
 export interface RegisterScreenProps {
   embedded?: boolean;
   onBack?: () => void;
   onSignedIn?: () => void;
   onOpenLogin?: () => void;
+  onOpenTerms?: () => void;
+  onOpenPrivacy?: () => void;
 }
 
 interface RegisterForm {
@@ -55,6 +58,8 @@ export const RegisterScreen = ({
   onBack,
   onSignedIn,
   onOpenLogin,
+  onOpenTerms,
+  onOpenPrivacy,
 }: RegisterScreenProps) => {
   const { signUp } = useAuth();
   const [form, setForm] = useState<RegisterForm>({
@@ -166,6 +171,17 @@ export const RegisterScreen = ({
         >
           {t('auth.createAccount')}
         </Button>
+        <p className="vt-caption vt-legal-consent">
+          {t('auth.legalConsent.before')}
+          <button type="button" className="vt-inline-link" onClick={onOpenTerms}>
+            {t('profile.terms')}
+          </button>
+          {t('auth.legalConsent.and')}
+          <button type="button" className="vt-inline-link" onClick={onOpenPrivacy}>
+            {t('profile.privacy')}
+          </button>
+          .
+        </p>
         <Button variant="ghost" block onClick={onOpenLogin}>
           {t('auth.haveAccount')}
         </Button>

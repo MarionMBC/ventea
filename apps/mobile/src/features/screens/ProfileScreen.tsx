@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { ApiError } from '../../api/client';
 import { getMe, getRewardBalance, getRewardLedger, getTenant } from '../../api/endpoints';
 import type { RewardCatalogEntry, RewardLedgerEntry, RewardLedgerReason } from '../../api/types';
 import { useBrand } from '../../brand/useBrand';
+import { InlineAlert } from '../../components/feedback/InlineAlert';
 import { ProfileMenu } from '../../components/navigation/ProfileMenu';
+import { Button } from '../../components/ui/Button';
 import { BrandLogo } from '../../components/ui/BrandLogo';
 import { formatPrice } from '../../components/ui/formatPrice';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -21,9 +24,19 @@ export interface ProfileScreenProps {
   onOpenFavourites?: () => void;
   onOpenOrders?: () => void;
   onSignIn?: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenTerms?: () => void;
   /** Called after the session is cleared. */
   onSignedOut?: () => void;
+  /** Called after the account is deleted and the session cleared. */
+  onAccountDeleted?: () => void;
 }
+
+/** Account deletion (App Store 5.1.1(v)): asked inline, then one call to the API. */
+type DeleteState =
+  | { step: 'idle' }
+  | { step: 'confirm'; error?: string }
+  | { step: 'deleting' };
 
 const LEDGER_PREVIEW = 5;
 
@@ -85,10 +98,14 @@ export const ProfileScreen = ({
   onOpenFavourites,
   onOpenOrders,
   onSignIn,
+  onOpenPrivacy,
+  onOpenTerms,
   onSignedOut,
+  onAccountDeleted,
 }: ProfileScreenProps) => {
   const brand = useBrand();
-  const { customer, isAuthenticated, signOut, updateCustomer } = useAuth();
+  const { customer, isAuthenticated, signOut, deleteAccount, updateCustomer } = useAuth();
+  const [deletion, setDeletion] = useState<DeleteState>({ step: 'idle' });
   /* Sign-out waits for the API to forget this device (up to ~3 s): show it, and one tap only. */
   const [signingOut, setSigningOut] = useState(false);
   const me = useResource((signal) => getMe(signal), [], { enabled: isAuthenticated });
@@ -109,6 +126,22 @@ export const ProfileScreen = ({
   }, [me.data, updateCustomer]);
 
   const header = <BackHeader title={t('profile.title')} onBack={onBack} />;
+
+  const confirmDelete = () => {
+    if (deletion.step === 'deleting') return;
+    setDeletion({ step: 'deleting' });
+    deleteAccount()
+      .then(() => onAccountDeleted?.())
+      .catch((error: unknown) =>
+        setDeletion({
+          step: 'confirm',
+          error:
+            error instanceof ApiError && error.status === 409
+              ? t('profile.delete.activeOrder')
+              : t('profile.delete.error'),
+        }),
+      );
+  };
 
   if (!isAuthenticated || !customer) {
     return (
@@ -227,6 +260,18 @@ export const ProfileScreen = ({
               onSelect: onOpenFavourites,
             },
             {
+              id: 'privacy',
+              label: t('profile.privacy'),
+              icon: 'shieldCheckmarkOutline',
+              onSelect: onOpenPrivacy,
+            },
+            {
+              id: 'terms',
+              label: t('profile.terms'),
+              icon: 'documentTextOutline',
+              onSelect: onOpenTerms,
+            },
+            {
               id: 'logout',
               label: signingOut ? t('profile.signingOut') : t('profile.signOut'),
               icon: 'logOutOutline',
@@ -240,8 +285,45 @@ export const ProfileScreen = ({
                   .finally(() => setSigningOut(false));
               },
             },
+            {
+              id: 'delete',
+              label: t('profile.delete'),
+              icon: 'trashOutline',
+              danger: true,
+              onSelect: () => setDeletion({ step: 'confirm' }),
+            },
           ]}
         />
+
+        {deletion.step !== 'idle' && (
+          <InlineAlert tone="danger" title={t('profile.delete.title')}>
+            {t('profile.delete.description')}
+            {deletion.step === 'confirm' && deletion.error && (
+              <strong style={{ display: 'block', marginTop: 'var(--vt-space-2)' }}>
+                {deletion.error}
+              </strong>
+            )}
+            <span className="vt-row" style={{ marginTop: 'var(--vt-space-2)' }}>
+              <Button
+                variant="danger"
+                size="sm"
+                loading={deletion.step === 'deleting'}
+                loadingLabel={t('profile.delete.deleting')}
+                onClick={confirmDelete}
+              >
+                {t('profile.delete.confirm')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={deletion.step === 'deleting'}
+                onClick={() => setDeletion({ step: 'idle' })}
+              >
+                {t('common.cancel')}
+              </Button>
+            </span>
+          </InlineAlert>
+        )}
 
         <div
           className="vt-row"

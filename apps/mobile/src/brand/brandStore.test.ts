@@ -185,6 +185,20 @@ describe('runtime: which brand', () => {
     ).toBe('');
   });
 
+  test('dedicated install: production web uses the build brand on its own domain', () => {
+    expect(
+      resolveTenantSlug({
+        ...base,
+        hostname: 'fe.carolinahotchicken.com',
+        native: false,
+        dedicated: true,
+        dev: false,
+        search: '?tenant=evil',
+        storage: memoryStorage(),
+      }),
+    ).toBe('demo-burgers');
+  });
+
   test('slugFromHostname is case-insensitive and tolerates a trailing dot', () => {
     expect(slugFromHostname('Demo-Burgers.Ventea.Tech.', 'ventea.tech')).toBe('demo-burgers');
   });
