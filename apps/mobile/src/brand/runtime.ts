@@ -40,6 +40,8 @@ export const slugFromHostname = (hostname: string, baseDomain: string): string |
  * Which brand this run is:
  *
  * - native binary → always the brand it was built for (`brand.config.json`);
+ * - dedicated install (one brand per server, built with `VENTEA_BRAND_FILE`, e.g.
+ *   fe.carolinahotchicken.com) → always the build brand, whatever its own domain;
  * - production web (the public menu at `<slug>.ventea.tech`, served by nginx)
  *   → the brand of the hostname; any other host → none ('');
  * - `vite dev` → `?tenant=<slug>` previews any brand (kept in sessionStorage
@@ -48,6 +50,7 @@ export const slugFromHostname = (hostname: string, baseDomain: string): string |
  */
 export const resolveTenantSlug = ({
   native,
+  dedicated = false,
   dev,
   hostname,
   baseDomain,
@@ -56,6 +59,7 @@ export const resolveTenantSlug = ({
   fallback,
 }: {
   native: boolean;
+  dedicated?: boolean;
   dev: boolean;
   hostname: string;
   baseDomain: string;
@@ -64,6 +68,7 @@ export const resolveTenantSlug = ({
   fallback: string;
 }): string => {
   if (native) return fallback;
+  if (dedicated && !dev) return fallback;
   if (!dev) return slugFromHostname(hostname, baseDomain) ?? '';
   const requested = new URLSearchParams(search).get('tenant')?.trim().toLowerCase();
   if (requested && SLUG.test(requested) && requested.length <= 63) {
@@ -115,6 +120,7 @@ const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'ventea.tech';
 
 export const TENANT_SLUG = resolveTenantSlug({
   native: IS_NATIVE,
+  dedicated: __DEDICATED__,
   dev: import.meta.env.DEV,
   hostname: typeof window !== 'undefined' ? window.location.hostname : '',
   baseDomain: BASE_DOMAIN,

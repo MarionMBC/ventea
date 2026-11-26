@@ -26,6 +26,7 @@ import {
   CheckoutPage,
   FavouritesPage,
   HomePage,
+  LegalPage,
   LoginPage,
   MenuPage,
   OrderTrackingPage,
@@ -92,6 +93,8 @@ const AppShell = () => (
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+      <Route path="/terms" element={<LegalPage doc="terms" />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
     </IonRouterOutlet>
 

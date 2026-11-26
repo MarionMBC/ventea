@@ -33,6 +33,8 @@ export const login = (input: LoginInput) =>
 /* Customer */
 export const getMe = (signal?: AbortSignal) => api.get<Customer>('/api/me', { signal });
 export const updateMe = (input: UpdateMeInput) => api.patch<Customer>('/api/me', input);
+/** Deletes the account (App Store 5.1.1(v)); 409 while an order is in progress. */
+export const deleteMe = () => api.delete<void>('/api/me');
 
 /* Tenant and catalogue — public */
 export const getTenant = (signal?: AbortSignal) =>

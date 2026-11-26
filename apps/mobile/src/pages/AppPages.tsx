@@ -4,6 +4,10 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { RegisterScreen } from '../features/auth/RegisterScreen';
 import { RequireAuth } from '../features/auth/RequireAuth';
 import { safeRedirect } from '../features/auth/authContext';
+import { useToast } from '../components/feedback/toastContext';
+import { LegalScreen } from '../features/legal/LegalScreen';
+import type { LegalDoc } from '../features/legal/legalContent';
+import { t } from '../i18n';
 import {
   CartScreen,
   CategoriesScreen,
@@ -145,6 +149,7 @@ export const FavouritesPage = () => {
 
 export const ProfilePage = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   return (
     <IonPage>
       <RequireAuth path="/profile">
@@ -153,9 +158,33 @@ export const ProfilePage = () => {
           onOpenFavourites={() => navigate('/favourites')}
           onOpenOrders={() => navigate('/orders')}
           onSignIn={() => navigate(loginPath('/profile'))}
+          onOpenPrivacy={() => navigate('/privacy')}
+          onOpenTerms={() => navigate('/terms')}
           onSignedOut={() => navigate('/home', { replace: true })}
+          onAccountDeleted={() => {
+            showToast({ message: t('profile.delete.done'), tone: 'success' });
+            navigate('/home', { replace: true });
+          }}
         />
       </RequireAuth>
+    </IonPage>
+  );
+};
+
+/** Privacy policy and terms: public, and the URLs given to the stores. */
+export const LegalPage = ({ doc }: { doc: LegalDoc }) => {
+  const navigate = useNavigate();
+  return (
+    <IonPage>
+      <LegalScreen
+        doc={doc}
+        /* Opened straight from the store link there is no page to go back to. */
+        onBack={() =>
+          (window.history.state as { idx?: number } | null)?.idx
+            ? navigate(-1)
+            : navigate('/home', { replace: true })
+        }
+      />
     </IonPage>
   );
 };
@@ -191,6 +220,8 @@ export const RegisterPage = () => {
         onBack={() => navigate('/home')}
         onSignedIn={() => navigate(redirect, { replace: true })}
         onOpenLogin={() => navigate(loginPath(redirect), { replace: true })}
+        onOpenTerms={() => navigate('/terms')}
+        onOpenPrivacy={() => navigate('/privacy')}
       />
     </IonPage>
   );

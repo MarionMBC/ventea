@@ -20,4 +20,6 @@ declare global {
   const __BRAND__: BrandConfig;
   /** `version` of apps/mobile/package.json. */
   const __APP_VERSION__: string;
+  /** Built with `VENTEA_BRAND_FILE`: a one-brand install whose web ignores the host. */
+  const __DEDICATED__: boolean;
 }

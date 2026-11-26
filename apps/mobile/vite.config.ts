@@ -77,6 +77,8 @@ export default defineConfig({
   define: {
     __BRAND__: JSON.stringify(brand),
     __APP_VERSION__: JSON.stringify(appVersion),
+    /* Dedicated install of one brand (Dockerfile.web BRAND_FILE): its web serves only that brand. */
+    __DEDICATED__: JSON.stringify(Boolean(process.env.VENTEA_BRAND_FILE)),
   },
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { login, register } from '../../api/endpoints';
+import { deleteMe, login, register } from '../../api/endpoints';
 import { sessionStore } from '../../api/session';
 import type { Customer, LoginInput, RegisterInput } from '../../api/types';
 import { push } from '../../native/push';
@@ -54,6 +54,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await push.beforeSignOut();
     sessionStore.clear('signed-out');
   }, []);
+  const deleteAccount = useCallback(async () => {
+    /* The API deletes the devices with the account: nothing to forget first. */
+    await deleteMe();
+    sessionStore.clear('signed-out');
+  }, []);
   const updateCustomer = useCallback((next: Customer) => sessionStore.setCustomer(next), []);
 
   const value = useMemo<AuthValue>(
@@ -63,9 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signUp,
       signOut,
+      deleteAccount,
       updateCustomer,
     }),
-    [customer, signIn, signUp, signOut, updateCustomer],
+    [customer, signIn, signUp, signOut, deleteAccount, updateCustomer],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
