@@ -160,6 +160,7 @@ export const ProfilePage = () => {
           onSignIn={() => navigate(loginPath('/profile'))}
           onOpenPrivacy={() => navigate('/privacy')}
           onOpenTerms={() => navigate('/terms')}
+          onOpenSupport={() => navigate('/support')}
           onSignedOut={() => navigate('/home', { replace: true })}
           onAccountDeleted={() => {
             showToast({ message: t('profile.delete.done'), tone: 'success' });
@@ -171,7 +172,7 @@ export const ProfilePage = () => {
   );
 };
 
-/** Privacy policy and terms: public, and the URLs given to the stores. */
+/** Privacy policy, terms and support: public, and the URLs given to the stores. */
 export const LegalPage = ({ doc }: { doc: LegalDoc }) => {
   const navigate = useNavigate();
   return (

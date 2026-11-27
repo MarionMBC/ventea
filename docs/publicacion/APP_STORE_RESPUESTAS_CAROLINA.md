@@ -35,7 +35,7 @@ Material ya generado: `dist-apps/carolina-hot-chicken/app-store/` (`app-store-co
 
 | Ítem | Estado | Respuesta |
 |---|---|---|
-| URL de soporte con datos de contacto reales | 🟡 | Hoy se usa `/privacy` (sección de contacto) con `hola@ventea.tech`. Apple pide una página de soporte con contacto real: falta crear `/support` (ver 9.2). Mientras tanto, ese enlace es el provisional. |
+| URL de soporte con datos de contacto reales | 🟡 | Página `/support` creada en el código (EN/ES, con email, ayuda de pedidos, puntos, cuenta y borrado, notificaciones) y enlazada en Perfil; **sin desplegar todavía**. URL definitiva: https://fe.carolinahotchicken.com/support. Falta que el restaurante dé teléfono/WhatsApp y horario para añadirlos. |
 | Cuestionario de clasificación por edad | 🔴 | Respuestas listas: todo «None/No» → **4+** (ver 7). Hay que cargarlas en App Store Connect. |
 | Al menos 8 capturas de iPhone (y 8 de iPad) | 🟡 | Hay **5 por tamaño** (inicio, menú, producto, carrito, perfil con puntos) en 6.9", 6.5" e iPad 13". Ojo: este ítem dice 8, pero la tabla 8.3 del mismo documento dice «de 1 a 10»; Apple exige mínimo 1. Con 5 alcanza para enviar; si se quieren 8, faltan seguimiento del pedido, sucursales y otra de puntos. |
 | Borrado de cuenta dentro de la app | ✅ | Perfil → «Delete account» → «Delete my account». Llama a `DELETE /api/me`; devuelve 409 si hay un pedido activo. Desplegado en producción el 2026-11-27 (401 sin sesión). **Falta correr el e2e** `apps/api/test/e2e/account-deletion.e2e-spec.ts` (Docker Desktop daba error 500). |
@@ -150,7 +150,7 @@ El encabezado del punto dice «solo si usas push o inicio de sesión con Google/
 | Descripción (≤ 4.000) | ✅ | La «Descripción larga» de `dist-apps/carolina-hot-chicken/1.2.0+13/store-listing.md`. |
 | Palabras clave (100 bytes) | 🔴 | Propuesta (sin repetir nombre ni subtítulo, sin espacios, ~88 bytes): `fried,spicy,pickup,order,loyalty,points,tenders,sandwich,restaurant,food,menu,rewards` |
 | Novedades | ✅ No aplica | No existe en la v1. |
-| URL de soporte | 🟡 | Provisional: `/privacy`. Definitiva: `/support` (ver 9.2). |
+| URL de soporte | 🟡 | https://fe.carolinahotchicken.com/support (existe en el código; disponible tras el deploy). |
 | URL de marketing | ✅ Opcional | https://fe.carolinahotchicken.com |
 | Copyright | 🔴 | Hoy `2026 Carolina Hot Chicken`. Apple pide el **nombre legal** de quien publica: confirmar la razón social con el restaurante. |
 | Versión | 🔴 | `1.2.0`, igual al `CFBundleShortVersionString` del build. |
@@ -200,11 +200,11 @@ Implementada (EN/ES, operador Ventea como proveedor técnico y el restaurante co
 
 | Ítem | Estado | Respuesta |
 |---|---|---|
-| Email/teléfono y horarios | 🟡 | Falta la página. Mínimo: email `hola@ventea.tech`; el restaurante debe dar **teléfono o WhatsApp y horario de atención** reales. |
-| Preguntas frecuentes | 🟡 | Falta: pedidos para retirar, cómo pagar (en el restaurante), puntos, cuenta. |
-| Enlace a cómo borrar la cuenta | 🟡 | Falta: Perfil → Delete account. |
+| Email/teléfono y horarios | 🟡 | Página creada con el email `hola@ventea.tech`. Falta que el restaurante dé **teléfono o WhatsApp y horario de atención** reales para añadirlos. |
+| Preguntas frecuentes | ✅ | En la página: pedidos para retirar, pago en el restaurante, puntos, cuenta y notificaciones. |
+| Enlace a cómo borrar la cuenta | ✅ | Explicado en la sección «Tu cuenta y tus datos» (Perfil → Borrar cuenta). |
 
-Propuesta: crear la ruta pública `/support` en la web de la marca (igual que `/privacy` y `/terms`) y usarla como URL de soporte.
+Ruta pública `/support` creada igual que `/privacy` y `/terms` (misma pantalla `LegalScreen`).
 
 ### 9.3 Términos y condiciones — https://fe.carolinahotchicken.com/terms
 
@@ -235,7 +235,7 @@ Opcional. Omitir en la primera versión.
 | Pagos (3.1.3(e)) | ✅ | **No hay pago en la app**: pedido para retirar y pago en el restaurante. Los puntos no se compran. |
 | Push (4.5.4) | ✅ | Solo estado del pedido, sin promociones. Si algún día se mandan promociones, pedir consentimiento y permitir baja dentro de la app. |
 | Permisos no condicionan funciones (5.1.2(i)) | ✅ | Nada se condiciona a aceptar push. |
-| Enlaces a privacidad y soporte dentro de la app (1.5) | 🟡 | Privacidad y términos están (Registro y Perfil). Falta el enlace de **soporte** cuando exista `/support`. |
+| Enlaces a privacidad y soporte dentro de la app (1.5) | ✅ | Privacidad y términos (Registro y Perfil) y Soporte (Perfil). Visible tras el deploy. |
 | Contenido generado por usuarios (1.2) | ✅ No aplica | No hay reseñas ni comentarios. |
 
 ---
@@ -272,7 +272,7 @@ Todo queda pendiente hasta tener el build de iOS en TestFlight. Cuando esté pub
 ## Resumen: qué falta y quién lo hace
 
 **Desde el repo (código/archivos):**
-1. Crear `/support` y enlazarla dentro de la app.
+1. Desplegar `/support` (ya creada) y añadirle teléfono/WhatsApp y horario cuando el restaurante los dé.
 2. Añadir `PrivacyInfo.xcprivacy`.
 3. Añadir la capacidad Push Notifications (`aps-environment`) al proyecto iOS de la marca y confirmar el bundle id al generar.
 4. Direcciones reales de las sucursales en producción.

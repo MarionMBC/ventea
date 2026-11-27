@@ -95,6 +95,7 @@ const AppShell = () => (
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/privacy" element={<LegalPage doc="privacy" />} />
       <Route path="/terms" element={<LegalPage doc="terms" />} />
+      <Route path="/support" element={<LegalPage doc="support" />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
     </IonRouterOutlet>
 

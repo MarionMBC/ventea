@@ -224,6 +224,7 @@ export const en = {
   'profile.signingOut': 'Signing out',
   'profile.privacy': 'Privacy policy',
   'profile.terms': 'Terms of use',
+  'profile.support': 'Support',
   'profile.delete': 'Delete account',
   'profile.delete.title': 'Delete your account?',
   'profile.delete.description':

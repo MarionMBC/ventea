@@ -212,6 +212,7 @@ export const es: Record<MessageKey, string> = {
   'profile.signingOut': 'Cerrando sesión',
   'profile.privacy': 'Política de privacidad',
   'profile.terms': 'Términos de uso',
+  'profile.support': 'Soporte',
   'profile.delete': 'Borrar cuenta',
   'profile.delete.title': '¿Borrar tu cuenta?',
   'profile.delete.description':

@@ -2,15 +2,15 @@ import type { Language } from '../../brand/brandConfig';
 
 /*
  * Privacy policy and terms of use of every brand app (App Store 5.1.1, Play «Data safety»).
- * Served in the app (Profile) and on the web at `/privacy` and `/terms` of the brand's host,
- * which is the URL given to the stores.
+ * Served in the app (Profile) and on the web at `/privacy`, `/terms` and `/support` of the brand's
+ * host, which are the URLs given to the stores (`/support` is the store «Support URL»).
  *
  * Rule: describe only what the product does today (apps/api/prisma/schema.prisma). If the data
  * kept, the providers or the deletion flow change, update this text and `LEGAL_UPDATED`.
  * `{brand}` is the restaurant's name.
  */
 
-export type LegalDoc = 'privacy' | 'terms';
+export type LegalDoc = 'privacy' | 'terms' | 'support';
 
 export interface LegalSection {
   title: string;
@@ -174,6 +174,47 @@ const en: Record<LegalDoc, LegalText> = {
       },
     ],
   },
+  support: {
+    title: 'Support',
+    intro:
+      'Need help with the {brand} app? Write to us and we will answer by email. Here are the most common questions.',
+    sections: [
+      {
+        title: 'Contact',
+        paragraphs: [
+          'Email: {email}. Please include the email of your account and, if it is about an order, the name of the location and the time you placed it.',
+        ],
+      },
+      {
+        title: 'Orders',
+        bullets: [
+          'Orders are for pickup: choose the location, add your items and place the order. You pay at the restaurant; the app does not charge your card.',
+          'Open Orders in the app to follow the status of your order live. If you allowed notifications, we also tell you when it changes, for example when it is ready.',
+          'To change or cancel an order, contact the restaurant or write to us as soon as possible.',
+        ],
+      },
+      {
+        title: 'Points',
+        paragraphs: [
+          'You earn points on your orders and can see them in Profile. How they are earned and redeemed is explained in the Terms of use. If your points do not look right, write to us with your account email and the order.',
+        ],
+      },
+      {
+        title: 'Your account and your data',
+        bullets: [
+          'To delete your account: open Profile → Delete account and confirm. The deletion is immediate and cannot be undone. If you have an order in progress, you can delete it once it is completed or cancelled.',
+          'To see, correct or ask for a copy of your data, write to {email} from the email of your account.',
+          'How we treat your data is explained in the Privacy policy.',
+        ],
+      },
+      {
+        title: 'Notifications',
+        paragraphs: [
+          'We only use notifications to tell you about the status of your orders. You can turn them off at any time in your phone settings; the app keeps working without them.',
+        ],
+      },
+    ],
+  },
 };
 
 const es: Record<LegalDoc, LegalText> = {
@@ -316,6 +357,47 @@ const es: Record<LegalDoc, LegalText> = {
         title: 'Cambios y contacto',
         paragraphs: [
           'Podemos actualizar estos términos; la versión nueva se publica aquí con su fecha. Si sigues usando la app después de un cambio, aceptas la versión nueva. Consultas: {email}.',
+        ],
+      },
+    ],
+  },
+  support: {
+    title: 'Soporte',
+    intro:
+      '¿Necesitas ayuda con la app de {brand}? Escríbenos y te respondemos por correo. Aquí van las dudas más comunes.',
+    sections: [
+      {
+        title: 'Contacto',
+        paragraphs: [
+          'Correo: {email}. Indica el correo de tu cuenta y, si es sobre un pedido, la sucursal y la hora en que lo hiciste.',
+        ],
+      },
+      {
+        title: 'Pedidos',
+        bullets: [
+          'Los pedidos son para recoger: elige la sucursal, agrega tus productos y haz el pedido. El pago se hace en el restaurante; la app no cobra tu tarjeta.',
+          'Entra a Pedidos en la app para seguir el estado de tu pedido en vivo. Si permitiste las notificaciones, también te avisamos cuando cambia, por ejemplo cuando está listo.',
+          'Para cambiar o cancelar un pedido, comunícate con el restaurante o escríbenos lo antes posible.',
+        ],
+      },
+      {
+        title: 'Puntos',
+        paragraphs: [
+          'Acumulas puntos con tus pedidos y los ves en Perfil. Cómo se ganan y se canjean está en los Términos de uso. Si tus puntos no cuadran, escríbenos con el correo de tu cuenta y el pedido.',
+        ],
+      },
+      {
+        title: 'Tu cuenta y tus datos',
+        bullets: [
+          'Para borrar tu cuenta: entra a Perfil → Borrar cuenta y confirma. El borrado es inmediato y no se puede deshacer. Si tienes un pedido en curso, podrás borrarla cuando se complete o se cancele.',
+          'Para ver, corregir o pedir una copia de tus datos, escribe a {email} desde el correo de tu cuenta.',
+          'Cómo tratamos tus datos se explica en la Política de privacidad.',
+        ],
+      },
+      {
+        title: 'Notificaciones',
+        paragraphs: [
+          'Usamos las notificaciones solo para avisarte del estado de tus pedidos. Puedes desactivarlas cuando quieras en los ajustes de tu teléfono; la app sigue funcionando sin ellas.',
         ],
       },
     ],

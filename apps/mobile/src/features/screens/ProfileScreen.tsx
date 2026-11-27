@@ -26,6 +26,7 @@ export interface ProfileScreenProps {
   onSignIn?: () => void;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
+  onOpenSupport?: () => void;
   /** Called after the session is cleared. */
   onSignedOut?: () => void;
   /** Called after the account is deleted and the session cleared. */
@@ -100,6 +101,7 @@ export const ProfileScreen = ({
   onSignIn,
   onOpenPrivacy,
   onOpenTerms,
+  onOpenSupport,
   onSignedOut,
   onAccountDeleted,
 }: ProfileScreenProps) => {
@@ -270,6 +272,12 @@ export const ProfileScreen = ({
               label: t('profile.terms'),
               icon: 'documentTextOutline',
               onSelect: onOpenTerms,
+            },
+            {
+              id: 'support',
+              label: t('profile.support'),
+              icon: 'helpCircleOutline',
+              onSelect: onOpenSupport,
             },
             {
               id: 'logout',
