@@ -32,7 +32,7 @@ Marcado: `[x]` cumplido y verificado · `[ ]` hueco abierto (evidencia y severid
 
 ## Play Store
 
-- [ ] CHK016 Política de privacidad pública (FR-010). **ALTO** (bloquea producción). `fe.carolinahotchicken.com/privacy` devuelve la SPA (200 genérico), no una política.
+- [x] CHK016 Política de privacidad pública (FR-010). Cerrado 2026-11-27: desplegado f65c427 en Dokploy; el bundle de fe.carolinahotchicken.com trae el texto legal (hola@ventea.tech) y DELETE /api/me responde 401 (antes 404). Rollback: compose.before-f65c427.yml (api f67472d, web e94c1bb-carolina).
 - [ ] CHK017 Testers asignados en prueba interna (US4). **ALTO**. El segmento interno está «Inactivo»: no hay lista de testers.
 - [ ] CHK018 Requisitos de producción (SC-006). **MEDIO**. Cuenta personal: hace falta una prueba cerrada con 12 testers durante 14 días, además de la ficha, la sección de seguridad de datos y las capturas.
 
